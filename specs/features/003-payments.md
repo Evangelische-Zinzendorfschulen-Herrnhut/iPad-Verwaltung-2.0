@@ -44,7 +44,7 @@ Zahlungen, Kautionen, Reparaturkosten und offene Betraege muessen fuer Buchhaltu
 - Fehlende oder beschaedigte Teile aus der Ruecknahme koennen einen Zahlungsvorgang oder Abrechnungshinweis erzeugen.
 - `admin` und `ipad_verwaltung` duerfen Zahlungsforderungen aus Ruecknahme-Markierungen erstellen.
 - `buchhaltung` wird bei neuer Zahlungsforderung per Mail informiert.
-- Die initiale Empfaengeradresse ist anja.desmaretz@ezsh.de.
+- Die initiale Empfaengeradresse ist buchhaltung.invalid.
 - Ersatzbetraege sind im System editierbar.
 - Ersatzbetraege werden versioniert, nicht ueberschrieben.
 - Aeltere Abrechnungen bleiben mit dem damals verwendeten Betrag nachvollziehbar.

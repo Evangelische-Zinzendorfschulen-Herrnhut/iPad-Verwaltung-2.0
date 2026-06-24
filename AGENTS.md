@@ -72,7 +72,8 @@ Eine Funktion ist fertig, wenn:
 - Bei Ruecknahme muss Vollstaendigkeit der Komponenten und ihres Zubehoers protokollierbar und bei Bedarf abrechenbar sein.
 - Ersatzbetraege muessen versioniert werden; der Betrag wird erst beim Erstellen einer Abrechnung/Zahlungsforderung festgeschrieben.
 - `admin` und `ipad_verwaltung` duerfen Zahlungsforderungen erstellen; `buchhaltung` wird dabei per Mail informiert.
-- Initiale Buchhaltungsadresse: anja.desmaretz@ezsh.de.
+- Initiale Adminadresse wird ueber `INITIAL_ADMIN_EMAIL` konfiguriert.
+- Initiale Buchhaltungsadresse: buchhaltung.invalid.
 - Legacy-Datenquelle ist `db/iPad-Verwaltung.db`. Sie enthaelt bekannte Inkonsistenzen und darf nur mit Validierungs-/Bereinigungslogik migriert werden.
 - Ausleihrelevante Personentypen sind Schueler, Lehrer, Mitarbeiter, Referendar und Praktikant.
 - Personentyp und Personenstatus werden getrennt gespeichert; Legacy-`BenutzerTyp` wird normalisiert.

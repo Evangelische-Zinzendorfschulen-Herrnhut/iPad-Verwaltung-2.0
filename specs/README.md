@@ -25,6 +25,7 @@ Eine WebApp zur Verwaltung schulischer iPad-Sets, ihrer Geraete, Nutzer, Ausleih
 - `data/legacy-sqlite-source.md`: Analyse und Importregeln fuer die bestehende SQLite-Datenbank
 - `data/status-normalization.md`: Zielmodell fuer normalisierte Statusdimensionen
 - `data/schema-persons-classes.md`: konkretes Zielschema fuer Personen, Schuljahre und Klassen
+- `data/schema-app-users-roles.md`: Zielschema fuer lokale App-Benutzer, Auth-Identitaeten und Rollen
 - `features/`: Feature-Spezifikationen
 - `decisions/`: Architecture Decision Records
 - `questions/open-questions.md`: offene Fragen fuer die naechsten Entscheidungen

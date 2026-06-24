@@ -6,6 +6,10 @@
 
 Verwaltet Systemkonfiguration, Benutzer, Rollen, Stammdaten, technische Geraetedaten und Integrationen. Im MVP ist die IT-Funktion in `admin` enthalten.
 
+Initialer User:
+
+- Wird ueber `INITIAL_ADMIN_EMAIL` konfiguriert.
+
 ### ipad_verwaltung
 
 Koordiniert Sets, Ausgabe, Ruecknahme, Geraetezuordnung, Zustandsdokumentation und Vorgangsuebersicht.
@@ -16,7 +20,7 @@ Sieht Zahlungsvorgaenge, Kosten, Rechnungs-/Kautionsstatus und buchhalterische E
 
 Initialer User:
 
-- anja.desmaretz@ezsh.de
+- buchhaltung.invalid
 
 ## Spaetere Rollen
 
@@ -66,7 +70,7 @@ Nur lesender Zugriff auf freigegebene Bereiche.
 - Admin-Aenderungen an Benutzern und Rollen muessen auditierbar sein.
 - `admin` deckt im MVP auch IT-Aufgaben ab.
 - `buchhaltung` wird im MVP bei neuen Zahlungsforderungen per Mail informiert.
-- Erste Benachrichtigungsadresse fuer `buchhaltung`: anja.desmaretz@ezsh.de.
+- Erste Benachrichtigungsadresse fuer `buchhaltung`: buchhaltung.invalid.
 
 ## Grundregeln
 

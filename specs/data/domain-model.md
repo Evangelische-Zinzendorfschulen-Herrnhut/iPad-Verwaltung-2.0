@@ -579,7 +579,7 @@ Wichtige Felder:
 
 Initiale Konfiguration:
 
-- Buchhaltung-Empfaenger: anja.desmaretz@ezsh.de
+- Buchhaltung-Empfaenger: buchhaltung.invalid
 
 ### Schadensfall
 

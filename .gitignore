@@ -4,7 +4,6 @@ node_modules/
 # Next.js
 .next/
 out/
-next-env.d.ts
 
 # Production
 build/
@@ -39,3 +38,6 @@ test-results/
 db/*.db
 db/*.sqlite
 db/*.sqlite3
+
+# Local input files with personal data
+input/

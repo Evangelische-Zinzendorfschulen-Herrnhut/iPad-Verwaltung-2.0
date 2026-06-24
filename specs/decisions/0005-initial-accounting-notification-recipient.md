@@ -12,7 +12,7 @@ Wenn aus einer Ruecknahme-Markierung eine Abrechnung/Zahlungsforderung erstellt 
 
 Fuer das MVP wird die direkte E-Mail-Adresse der ersten Buchhaltungsnutzerin verwendet:
 
-- anja.desmaretz@ezsh.de
+- buchhaltung.invalid
 
 Diese Nutzerin erhaelt die Rolle `buchhaltung`.
 

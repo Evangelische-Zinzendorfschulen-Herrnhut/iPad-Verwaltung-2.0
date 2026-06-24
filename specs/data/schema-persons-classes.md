@@ -42,6 +42,10 @@ Quelle fuer Erstimport:
 
 ## Tabellen
 
+Lokale Migration:
+
+- `supabase/migrations/20260623132419_create_people_and_classes.sql`
+
 ### person
 
 Speichert Personen, denen Sets zugeordnet oder fuer die Ausleihen dokumentiert werden.

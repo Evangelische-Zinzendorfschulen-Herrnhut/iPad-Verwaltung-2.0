@@ -140,13 +140,18 @@ async function generateRecoveryLink(supabase, email, appUrl) {
   };
 }
 
-async function upsertAppUser(supabase, { email, displayName, roleKey, authUser }) {
+async function upsertAppUser(
+  supabase,
+  { email, displayName, firstName, lastName, roleKey, authUser },
+) {
   const { data: appUser, error: appUserError } = await supabase
     .from("app_user")
     .upsert(
       {
         email,
         display_name: displayName,
+        first_name: firstName,
+        last_name: lastName,
         status: "active",
       },
       { onConflict: "email" },
@@ -208,6 +213,10 @@ const supabaseUrl = requireEnv("NEXT_PUBLIC_SUPABASE_URL");
 const serviceKey = requireEnv("SUPABASE_SECRET_KEY");
 const adminEmail = requireEnv("INITIAL_ADMIN_EMAIL");
 const accountingEmail = requireEnv("INITIAL_ACCOUNTING_EMAIL");
+const adminFirstName = process.env.INITIAL_ADMIN_FIRST_NAME || "Markus";
+const adminLastName = process.env.INITIAL_ADMIN_LAST_NAME || "Hacker";
+const accountingFirstName = process.env.INITIAL_ACCOUNTING_FIRST_NAME || "Anja";
+const accountingLastName = process.env.INITIAL_ACCOUNTING_LAST_NAME || "Desmaretz";
 const inviteAdmin = getFlag("invite-admin");
 const inviteAccounting = getFlag("invite-accounting");
 const printAdminLink = getFlag("print-admin-link");
@@ -225,7 +234,9 @@ const supabase = createClient(supabaseUrl, serviceKey, {
 const users = [
   {
     email: adminEmail,
-    displayName: "Initialer Admin",
+    firstName: adminFirstName,
+    lastName: adminLastName,
+    displayName: `${adminFirstName} ${adminLastName}`.trim(),
     roleKey: "admin",
     invite: inviteAdmin,
     printLink: printAdminLink,
@@ -233,7 +244,9 @@ const users = [
   },
   {
     email: accountingEmail,
-    displayName: "Buchhaltung",
+    firstName: accountingFirstName,
+    lastName: accountingLastName,
+    displayName: `${accountingFirstName} ${accountingLastName}`.trim(),
     roleKey: "buchhaltung",
     invite: inviteAccounting,
     printLink: printAccountingLink,

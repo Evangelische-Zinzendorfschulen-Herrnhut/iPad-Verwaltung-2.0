@@ -4,8 +4,10 @@ import { getCurrentAppUser } from "@/lib/auth/current-user";
 
 const foundations = [
   { label: "Personen und Klassen", href: "/personen" },
-  { label: "Komponenten und Sets", href: null },
-  { label: "Ausgabe und Rueckgabe", href: null },
+  { label: "Komponenten und Sets", href: "/sets" },
+  { label: "Geräteliste", href: "/geraete" },
+  { label: "Schadensfälle", href: "/schadensfaelle" },
+  { label: "Aus- und Rückgabeliste", href: "/ausgaben" },
   { label: "Legacy-Import", href: null },
 ];
 

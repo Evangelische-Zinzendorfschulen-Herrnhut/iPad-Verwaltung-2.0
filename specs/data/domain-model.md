@@ -140,6 +140,40 @@ Wichtige Felder:
 - Status
 - letzter Login
 
+### Rechnung
+
+Einkaufsrechnung fuer beschaffte Komponenten.
+
+Wichtige Felder:
+
+- Legacy-Rechnungsnummer
+- Rechnungsdatum
+- Lieferant
+
+Regeln:
+
+- Das Rechnungsdatum ist die Quelle fuer das Anschaffungsdatum von Komponenten, wenn die Komponente ueber eine Rechnungsposition verknuepft ist.
+- `buchhaltung`, `ipad_verwaltung` und `admin` duerfen Rechnungsdaten lesen.
+- Im MVP importiert `admin` Rechnungsdaten aus der Legacy-Datenbank.
+
+### Rechnungsposition
+
+Position innerhalb einer Einkaufsrechnung.
+
+Wichtige Felder:
+
+- Legacy-Rechnungspositionsnummer
+- Rechnung
+- Titel
+- Einzelpreis
+- Anzahl
+
+Regeln:
+
+- Komponenten verweisen auf eine Rechnungsposition.
+- Die Legacy-Positionsnummer bleibt zusaetzlich an der Komponente erhalten, damit Import und Datenbereinigung nachvollziehbar bleiben.
+- Fuer den Schadensbericht wird das Anschaffungsdatum ueber `Komponente -> Rechnungsposition -> Rechnung.Rechnungsdatum` ermittelt.
+
 ### AuthIdentity
 
 Verknuepft ein lokales Benutzerkonto mit einer externen Login-Identitaet.

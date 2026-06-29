@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { getCurrentAppUser, hasAnyRole } from "@/lib/auth/current-user";
 import { createClient } from "@/lib/supabase/server";
+import { SectionTabs } from "../section-tabs";
 
 type PersonRow = {
   id: string;
@@ -310,6 +311,8 @@ export default async function PersonenPage({
             </button>
           </form>
         </header>
+
+        <SectionTabs active="personen" />
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <div className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">

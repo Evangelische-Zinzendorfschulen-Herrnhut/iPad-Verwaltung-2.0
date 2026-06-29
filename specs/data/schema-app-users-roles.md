@@ -11,6 +11,18 @@ Lokale App-Benutzer und fachliche Rollen werden getrennt von Supabase Auth model
 - `role`
 - `user_role`
 
+### app_user
+
+| Feld | Bedeutung |
+| --- | --- |
+| `email` | Primaere Kontakt- und Login-Adresse |
+| `first_name` | Vorname des App-Benutzers |
+| `last_name` | Nachname des App-Benutzers |
+| `display_name` | Anzeigename/Fallback, falls Vor- und Nachname fehlen |
+| `status` | `active` oder `disabled` |
+
+Vor- und Nachname werden getrennt gespeichert, damit der aktive App-Benutzer in Workflows wie Schadensmeldungen als Bearbeiter eindeutig vorausgefuellt werden kann. Beim spaeteren Univention-SSO sollen diese Felder aus Profilclaims befuellt werden.
+
 ## Rollen zum Start
 
 - `admin`
@@ -40,6 +52,7 @@ Spaeter kann ein weiterer Provider, z. B. `univention`, ergaenzt werden.
 ## Migration
 
 - `supabase/migrations/20260623135656_create_app_users_roles_and_policies.sql`
+- `supabase/migrations/20260625131542_add_app_user_names.sql`
 
 ## Offene Fragen
 

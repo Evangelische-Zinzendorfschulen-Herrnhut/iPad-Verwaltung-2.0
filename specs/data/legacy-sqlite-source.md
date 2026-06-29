@@ -126,6 +126,20 @@ Fachliche Hinweise:
 - `SchadenBeschreibung`
 - `BetroffeneKomponenten`
 
+### Rechnung
+
+- `RechnungsNr`
+- `RechnungsDatum`
+- `Lieferant`
+
+### Rechnungsposition
+
+- `RechnungsPositionsNr`
+- `Titel`
+- `Einzelpreis`
+- `Anzahl`
+- `RechnungsNr`
+
 ## Erste Analyse
 
 Device-Kategorien:
@@ -211,7 +225,9 @@ Device-Statuswerte enthalten u. a.:
 | SetUserZuordnung.Status | Ausleihstatus + Importhinweis |
 | Rueckgabe*-Vorhanden | AusleiheKomponentenCheck oder KomponentenZubehoerCheck |
 | Schaden | Schadensfall |
-| Rechnung/Rechnungsposition | Einkaufs-/Beschaffungsreferenz, spaeter |
+| Rechnung | Einkaufsrechnung |
+| Rechnungsposition | Einkaufs-/Beschaffungsposition |
+| Device.RechnungsPositionsNr | Komponenten-Verknuepfung zur Rechnungsposition |
 
 ## Offene Importfragen
 

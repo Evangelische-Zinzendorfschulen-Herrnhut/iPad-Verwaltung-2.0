@@ -28,6 +28,7 @@ Vor- und Nachname werden getrennt gespeichert, damit der aktive App-Benutzer in 
 - `admin`
 - `ipad_verwaltung`
 - `buchhaltung`
+- `readonly`
 
 ## Auth-Provider
 
@@ -46,13 +47,14 @@ Spaeter kann ein weiterer Provider, z. B. `univention`, ergaenzt werden.
 
 - Benutzer- und Rollenverwaltung ist admin-only.
 - Nutzer duerfen ihr eigenes App-Profil und eigene Rollen lesen.
-- `admin` und `ipad_verwaltung` duerfen Personen/Klassen lesen.
+- `admin`, `ipad_verwaltung` und `readonly` duerfen freigegebene Personen-/Klassen-, Set-, Geraete-, Ausgabe-/Rueckgabe- und Schadensfalldaten lesen.
 - Nur `admin` darf Personen/Klassen im ersten Schritt verwalten.
 
 ## Migration
 
 - `supabase/migrations/20260623135656_create_app_users_roles_and_policies.sql`
 - `supabase/migrations/20260625131542_add_app_user_names.sql`
+- `supabase/migrations/20260629135826_add_readonly_role.sql`
 
 ## Offene Fragen
 

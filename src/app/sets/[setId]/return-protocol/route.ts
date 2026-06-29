@@ -411,7 +411,7 @@ export async function GET(
     return new NextResponse("Nicht angemeldet", { status: 401 });
   }
 
-  if (!hasAnyRole(appUser, ["admin", "ipad_verwaltung"])) {
+  if (!hasAnyRole(appUser, ["admin", "ipad_verwaltung", "readonly"])) {
     return new NextResponse("Keine Berechtigung", { status: 403 });
   }
 

@@ -416,7 +416,7 @@ export default async function GeraetePage({
     redirect("/login");
   }
 
-  if (!hasAnyRole(appUser, ["admin", "ipad_verwaltung"])) {
+  if (!hasAnyRole(appUser, ["admin", "ipad_verwaltung", "readonly"])) {
     redirect("/");
   }
 

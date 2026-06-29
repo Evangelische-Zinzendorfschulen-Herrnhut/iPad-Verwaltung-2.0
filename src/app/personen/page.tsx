@@ -127,7 +127,7 @@ export default async function PersonenPage({
     redirect("/login");
   }
 
-  if (!hasAnyRole(appUser, ["admin", "ipad_verwaltung"])) {
+  if (!hasAnyRole(appUser, ["admin", "ipad_verwaltung", "readonly"])) {
     redirect("/");
   }
 

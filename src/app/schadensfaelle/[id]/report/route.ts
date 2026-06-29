@@ -557,7 +557,7 @@ export async function GET(_request: Request, { params }: ReportRouteProps) {
     redirect("/login");
   }
 
-  if (!hasAnyRole(appUser, ["admin", "ipad_verwaltung", "buchhaltung"])) {
+  if (!hasAnyRole(appUser, ["admin", "ipad_verwaltung", "buchhaltung", "readonly"])) {
     redirect("/");
   }
 

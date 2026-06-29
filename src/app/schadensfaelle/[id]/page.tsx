@@ -177,7 +177,7 @@ export default async function SchadensfallDetailPage({ params }: DetailPageProps
     redirect("/login");
   }
 
-  if (!hasAnyRole(appUser, ["admin", "ipad_verwaltung", "buchhaltung"])) {
+  if (!hasAnyRole(appUser, ["admin", "ipad_verwaltung", "buchhaltung", "readonly"])) {
     redirect("/");
   }
 

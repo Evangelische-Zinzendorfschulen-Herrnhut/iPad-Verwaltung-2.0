@@ -460,7 +460,7 @@ export default async function AusgabenPage({
     redirect("/login");
   }
 
-  if (!hasAnyRole(appUser, ["admin", "ipad_verwaltung"])) {
+  if (!hasAnyRole(appUser, ["admin", "ipad_verwaltung", "readonly"])) {
     redirect("/");
   }
 

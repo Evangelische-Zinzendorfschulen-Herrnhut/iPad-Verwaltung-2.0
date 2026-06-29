@@ -210,7 +210,7 @@ export async function GET(request: NextRequest) {
     return new Response("Nicht angemeldet", { status: 401 });
   }
 
-  if (!hasAnyRole(appUser, ["admin", "ipad_verwaltung"])) {
+  if (!hasAnyRole(appUser, ["admin", "ipad_verwaltung", "readonly"])) {
     return new Response("Nicht berechtigt", { status: 403 });
   }
 

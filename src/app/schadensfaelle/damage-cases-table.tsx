@@ -16,6 +16,7 @@ export type DamageCaseListRow = {
   import_hint: string | null;
   inventory_set: {
     legacy_set_id: number;
+    storage_label: string | null;
   } | null;
   legacy_damage_id: number | null;
   damage_number: number;
@@ -55,13 +56,8 @@ function formatSet(set: DamageCaseListRow["inventory_set"]) {
   return set ? String(set.legacy_set_id) : "-";
 }
 
-function formatComponent(component: DamageCaseListRow["component"]) {
-  if (!component) {
-    return "-";
-  }
-
-  const model = component.model ? ` · ${component.model}` : "";
-  return `${component.legacy_inventory_number}${model}`;
+function formatStorage(set: DamageCaseListRow["inventory_set"]) {
+  return set?.storage_label || "-";
 }
 
 function affectedItemLabel(value: string) {
@@ -132,21 +128,19 @@ export function DamageCasesTable({ canManage, cases }: DamageCasesTableProps) {
   return (
     <>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[1180px] border-collapse text-left text-sm">
+        <table className="w-full min-w-[960px] table-fixed border-collapse text-left text-sm">
           <thead className="bg-zinc-100 text-zinc-600">
             <tr>
-              <th className="w-32 whitespace-nowrap px-4 py-3 font-medium">
+              <th className="w-28 whitespace-nowrap px-4 py-3 font-medium">
                 Datum
               </th>
-              <th className="px-4 py-3 font-medium">Person</th>
-              <th className="px-4 py-3 font-medium">Set</th>
-              <th className="w-44 px-4 py-3 font-medium">Komponente</th>
-              <th className="px-4 py-3 font-medium">Art</th>
-              <th className="px-4 py-3 font-medium">Status</th>
-              <th className="px-4 py-3 font-medium">Abrechnung</th>
+              <th className="w-52 px-4 py-3 font-medium">Person</th>
+              <th className="w-20 px-4 py-3 font-medium">Set</th>
+              <th className="w-32 px-4 py-3 font-medium">Lagerort</th>
+              <th className="w-32 px-4 py-3 font-medium">Art</th>
+              <th className="w-36 px-4 py-3 font-medium">Status</th>
               <th className="px-4 py-3 font-medium">Beschreibung</th>
-              <th className="px-4 py-3 font-medium">Nr.</th>
-              <th className="px-4 py-3 font-medium">Legacy</th>
+              <th className="w-20 px-4 py-3 font-medium">Nr.</th>
             </tr>
           </thead>
           <tbody>
@@ -156,30 +150,23 @@ export function DamageCasesTable({ canManage, cases }: DamageCasesTableProps) {
                 key={caseRow.id}
                 onContextMenu={(event) => openContextMenu(event, caseRow.id)}
               >
-                <td className="w-32 whitespace-nowrap px-4 py-3">
+                <td className="w-28 whitespace-nowrap px-4 py-3">
                   {caseRow.reported_at}
                 </td>
-                <td className="px-4 py-3">{formatPerson(caseRow.person)}</td>
-                <td className="px-4 py-3">{formatSet(caseRow.inventory_set)}</td>
-                <td className="w-44 px-4 py-3">
-                  <span className="font-medium">
-                    {affectedItemLabel(caseRow.affected_item)}
-                  </span>
-                  <br />
-                  <span className="whitespace-nowrap text-zinc-600">
-                    {formatComponent(caseRow.component)}
-                  </span>
+                <td className="w-52 truncate px-4 py-3">
+                  {formatPerson(caseRow.person)}
                 </td>
-                <td className="px-4 py-3">{caseRow.case_type}</td>
-                <td className="px-4 py-3">{caseRow.status}</td>
-                <td className="px-4 py-3">{caseRow.billing_assessment}</td>
-                <td className="px-4 py-3">{caseRow.short_description}</td>
-                <td className="px-4 py-3 font-semibold">
+                <td className="w-20 px-4 py-3">{formatSet(caseRow.inventory_set)}</td>
+                <td className="w-32 truncate px-4 py-3">
+                  {formatStorage(caseRow.inventory_set)}
+                </td>
+                <td className="px-4 py-3">
+                  {affectedItemLabel(caseRow.affected_item)}
+                </td>
+                <td className="w-36 px-4 py-3">{caseRow.status}</td>
+                <td className="truncate px-4 py-3">{caseRow.short_description}</td>
+                <td className="w-20 px-4 py-3 font-semibold">
                   {caseRow.damage_number}
-                </td>
-                <td className="px-4 py-3 text-zinc-600">
-                  {caseRow.legacy_damage_id ?? "-"}
-                  {caseRow.import_hint ? ` · ${caseRow.import_hint}` : ""}
                 </td>
               </tr>
             ))}

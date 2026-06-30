@@ -14,8 +14,12 @@ export type SetsTableRow = {
   legacyStatus: string | null;
   pencil: string;
   person: string;
+  previousPerson: string | null;
+  problemHref: string | null;
   returnProtocolHref: string | null;
   returnSetHref: string | null;
+  storageHref: string | null;
+  storageLabel: string;
 };
 
 type SetsTableProps = {
@@ -24,9 +28,11 @@ type SetsTableProps = {
 
 type ContextMenuState = {
   damageHref: string | null;
+  problemHref: string | null;
   returnProtocolHref: string | null;
   returnSetHref: string | null;
   setLabel: string;
+  storageHref: string | null;
   x: number;
   y: number;
 } | null;
@@ -58,9 +64,11 @@ export function SetsTable({ rows }: SetsTableProps) {
     event.preventDefault();
     setContextMenu({
       damageHref: row.damageHref,
+      problemHref: row.problemHref,
       returnProtocolHref: row.returnProtocolHref,
       returnSetHref: row.returnSetHref,
       setLabel: `Set ${row.legacySetId}`,
+      storageHref: row.storageHref,
       x: event.clientX,
       y: event.clientY,
     });
@@ -77,6 +85,7 @@ export function SetsTable({ rows }: SetsTableProps) {
               <th className="px-4 py-3 font-medium">iPad</th>
               <th className="px-4 py-3 font-medium">Pencil</th>
               <th className="px-4 py-3 font-medium">Tastatur</th>
+              <th className="px-4 py-3 font-medium">Lagerort</th>
               <th className="px-4 py-3 font-medium">Verfuegbarkeit</th>
               <th className="px-4 py-3 font-medium">Zustand</th>
               <th className="px-4 py-3 font-medium">Legacy</th>
@@ -91,10 +100,21 @@ export function SetsTable({ rows }: SetsTableProps) {
                 onContextMenu={(event) => openContextMenu(event, row)}
               >
                 <td className="px-4 py-3 font-semibold">{row.legacySetId}</td>
-                <td className="px-4 py-3">{row.person}</td>
+                <td className="px-4 py-3">
+                  {row.person !== "-" ? (
+                    row.person
+                  ) : row.previousPerson ? (
+                    <span className="text-zinc-400">
+                      ehemals {row.previousPerson}
+                    </span>
+                  ) : (
+                    "-"
+                  )}
+                </td>
                 <td className="px-4 py-3">{row.ipad}</td>
                 <td className="px-4 py-3">{row.pencil}</td>
                 <td className="px-4 py-3">{row.keyboard}</td>
+                <td className="px-4 py-3">{row.storageLabel}</td>
                 <td className="px-4 py-3">{row.availability}</td>
                 <td className="px-4 py-3">{row.condition}</td>
                 <td className="px-4 py-3 text-zinc-600">
@@ -147,6 +167,22 @@ export function SetsTable({ rows }: SetsTableProps) {
               href={contextMenu.damageHref}
             >
               Schaden/Verlust melden
+            </Link>
+          ) : null}
+          {contextMenu.problemHref ? (
+            <Link
+              className="block w-full rounded px-3 py-2 text-left font-medium hover:bg-zinc-100"
+              href={contextMenu.problemHref}
+            >
+              Problem melden
+            </Link>
+          ) : null}
+          {contextMenu.storageHref ? (
+            <Link
+              className="block w-full rounded px-3 py-2 text-left font-medium hover:bg-zinc-100"
+              href={contextMenu.storageHref}
+            >
+              Lagerort ändern
             </Link>
           ) : null}
           <p className="border-t border-zinc-100 px-3 py-2 text-xs text-zinc-500">

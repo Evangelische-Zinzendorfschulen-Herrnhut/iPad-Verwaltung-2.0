@@ -86,7 +86,7 @@ function buildPageHref(
 
 function buildGeraeteHref(
   params: Record<string, string | string[] | undefined>,
-  options?: { edit?: string | null; page?: number },
+  options?: { edit?: string | null; page?: number; storage?: string | null },
 ) {
   const nextParams = new URLSearchParams();
 
@@ -107,6 +107,10 @@ function buildGeraeteHref(
 
   if (options?.edit) {
     nextParams.set("edit", options.edit);
+  }
+
+  if (options?.storage) {
+    nextParams.set("storage", options.storage);
   }
 
   const queryString = nextParams.toString();
@@ -396,6 +400,39 @@ async function completeComponentRepair(formData: FormData) {
   redirect(returnTo);
 }
 
+async function updateComponentStorage(formData: FormData) {
+  "use server";
+
+  const appUser = await getCurrentAppUser();
+
+  if (!appUser) {
+    redirect("/login");
+  }
+
+  if (!hasAnyRole(appUser, ["admin"])) {
+    redirect("/");
+  }
+
+  const componentId = normalizeRequiredText(formData.get("component_id"));
+  const returnTo = normalizeRequiredText(formData.get("return_to")) || "/geraete";
+
+  if (!componentId) {
+    redirect(returnTo);
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("inventory_component")
+    .update({ storage_label: normalizeOptionalText(formData.get("storage_label")) })
+    .eq("id", componentId);
+
+  if (error) {
+    throw error;
+  }
+
+  redirect(returnTo);
+}
+
 export default async function GeraetePage({
   searchParams,
 }: {
@@ -410,6 +447,7 @@ export default async function GeraetePage({
   const sort = getSortParam(params);
   const page = getPageParam(params);
   const editComponentId = getSingleParam(params, "edit");
+  const storageComponentId = getSingleParam(params, "storage");
   const appUser = await getCurrentAppUser();
 
   if (!appUser) {
@@ -533,8 +571,14 @@ export default async function GeraetePage({
         .join(" · "),
       serialNumber: component.serial_number,
       setLabel: formatSet(assignment),
+      storageHref: canEditComponents
+        ? buildGeraeteHref(params, {
+            page: currentPage,
+            storage: component.id,
+          })
+        : null,
       storageLabel:
-        assignment?.set?.storage_label || component.storage_label || "-",
+        component.storage_label || assignment?.set?.storage_label || "-",
     };
   });
   const displayedFrom = filteredCount === 0 ? 0 : rangeStart + 1;
@@ -545,12 +589,22 @@ export default async function GeraetePage({
   const editComponent = canEditComponents
     ? (components.find((component) => component.id === editComponentId) ?? null)
     : null;
+  const storageComponent = canEditComponents
+    ? (components.find((component) => component.id === storageComponentId) ?? null)
+    : null;
+  const storageAssignment = storageComponent
+    ? assignmentByComponentId.get(storageComponent.id)
+    : undefined;
   const editAssignment = editComponent
     ? assignmentByComponentId.get(editComponent.id)
     : undefined;
   const closeEditHref = buildGeraeteHref(params, {
     edit: null,
     page: currentPage,
+  });
+  const closeStorageHref = buildGeraeteHref(params, {
+    page: currentPage,
+    storage: null,
   });
 
   return (
@@ -859,6 +913,84 @@ export default async function GeraetePage({
                 </Link>
                 <button className="rounded-md bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800">
                   Speichern
+                </button>
+              </div>
+            </form>
+          </aside>
+        </div>
+      ) : null}
+      {storageComponent ? (
+        <div className="fixed inset-0 z-40 bg-zinc-950/25">
+          <aside className="ml-auto flex h-full w-full max-w-xl flex-col overflow-y-auto border-l border-zinc-200 bg-white shadow-2xl">
+            <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-zinc-200 bg-white px-6 py-5">
+              <div>
+                <p className="text-sm font-medium text-zinc-500">
+                  Geräte-Lagerort
+                </p>
+                <h2 className="mt-1 text-2xl font-semibold tracking-tight">
+                  {storageComponent.legacy_inventory_number}
+                </h2>
+              </div>
+              <Link
+                className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-semibold transition hover:bg-zinc-50"
+                href={closeStorageHref}
+              >
+                Schließen
+              </Link>
+            </div>
+
+            <form action={updateComponentStorage} className="grid gap-6 px-6 py-6">
+              <input
+                name="component_id"
+                type="hidden"
+                value={storageComponent.id}
+              />
+              <input name="return_to" type="hidden" value={closeStorageHref} />
+
+              <section className="grid gap-4 rounded-lg border border-zinc-200 p-4">
+                <div>
+                  <h3 className="font-semibold">Lagerort der Komponente</h3>
+                  <p className="mt-1 text-sm text-zinc-500">
+                    Dieser Lagerort gehoert zum einzelnen Geraet und ist
+                    unabhaengig vom Lagerort des Sets.
+                  </p>
+                </div>
+
+                <label className="flex flex-col gap-1 text-sm font-medium">
+                  Lagerort
+                  <input
+                    className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
+                    defaultValue={storageComponent.storage_label ?? ""}
+                    name="storage_label"
+                    placeholder="z. B. W2 - 24, Schrank1 oder Regal1"
+                  />
+                </label>
+
+                <dl className="grid gap-3 text-sm sm:grid-cols-2">
+                  <div>
+                    <dt className="text-zinc-500">Aktuelles Set</dt>
+                    <dd className="mt-1 font-semibold">
+                      {formatSet(storageAssignment)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-zinc-500">Set-Lagerort</dt>
+                    <dd className="mt-1 font-semibold">
+                      {storageAssignment?.set?.storage_label ?? "-"}
+                    </dd>
+                  </div>
+                </dl>
+              </section>
+
+              <div className="sticky bottom-0 -mx-6 flex justify-end gap-3 border-t border-zinc-200 bg-white px-6 py-4">
+                <Link
+                  className="rounded-md border border-zinc-300 px-4 py-2 text-sm font-semibold transition hover:bg-zinc-50"
+                  href={closeStorageHref}
+                >
+                  Abbrechen
+                </Link>
+                <button className="rounded-md bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800">
+                  Lagerort speichern
                 </button>
               </div>
             </form>

@@ -5,6 +5,7 @@ import { getCurrentAppUser, hasAnyRole } from "@/lib/auth/current-user";
 import { createClient } from "@/lib/supabase/server";
 import { SectionTabs } from "../section-tabs";
 import { DamageCasesTable } from "./damage-cases-table";
+import { DamageCasesFilterForm } from "./damage-cases-filter-form";
 import { FieldIcon } from "./field-icon";
 
 type DamageCaseRow = {
@@ -31,6 +32,7 @@ type DamageCaseRow = {
   } | null;
   inventory_set: {
     legacy_set_id: number;
+    storage_label: string | null;
   } | null;
   component: {
     legacy_inventory_number: string;
@@ -306,7 +308,7 @@ function formatPerson(person: DamageCaseRow["person"], schoolClassLabel?: string
     : label;
 }
 
-function formatSet(set: DamageCaseRow["inventory_set"]) {
+function formatSet(set: { legacy_set_id: number } | null) {
   return set ? String(set.legacy_set_id) : "-";
 }
 
@@ -433,7 +435,7 @@ export default async function SchadensfaellePage({
   let damageQuery = supabase
     .from("damage_case")
     .select(
-      "id,damage_number,legacy_damage_id,case_type,affected_item,status,legacy_status,legacy_exchange_status,legacy_insurance_warranty,reported_at,occurred_at,short_description,billing_assessment,import_hint,person:person_id(first_name,last_name,email),inventory_set:set_id(legacy_set_id),component:component_id(legacy_inventory_number,model),replacement_component:replacement_component_id(legacy_inventory_number)",
+      "id,damage_number,legacy_damage_id,case_type,affected_item,status,legacy_status,legacy_exchange_status,legacy_insurance_warranty,reported_at,occurred_at,short_description,billing_assessment,import_hint,person:person_id(first_name,last_name,email),inventory_set:set_id(legacy_set_id,storage_label),component:component_id(legacy_inventory_number,model),replacement_component:replacement_component_id(legacy_inventory_number)",
     )
     .order("reported_at", { ascending: false })
     .order("damage_number", { ascending: false })
@@ -472,7 +474,7 @@ export default async function SchadensfaellePage({
       ? supabase
           .from("damage_case")
           .select(
-            "id,damage_number,legacy_damage_id,legacy_source,legacy_source_id,case_type,affected_item,status,legacy_status,legacy_exchange_status,legacy_insurance_warranty,reported_at,occurred_at,replacement_issued_at,short_description,detail_description,incident_description,location,witnesses,handler,internal_note,affected_components_raw,import_status,import_hint,billing_assessment,created_at,updated_at,person:person_id(id,first_name,last_name,email,person_type),inventory_set:set_id(legacy_set_id),replacement_set:replacement_set_id(legacy_set_id),component:component_id(legacy_inventory_number,model),replacement_component:replacement_component_id(legacy_inventory_number),created_by_user:created_by(email)",
+            "id,damage_number,legacy_damage_id,legacy_source,legacy_source_id,case_type,affected_item,status,legacy_status,legacy_exchange_status,legacy_insurance_warranty,reported_at,occurred_at,replacement_issued_at,short_description,detail_description,incident_description,location,witnesses,handler,internal_note,affected_components_raw,import_status,import_hint,billing_assessment,created_at,updated_at,person:person_id(id,first_name,last_name,email,person_type),inventory_set:set_id(legacy_set_id,storage_label),replacement_set:replacement_set_id(legacy_set_id),component:component_id(legacy_inventory_number,model),replacement_component:replacement_component_id(legacy_inventory_number),created_by_user:created_by(email)",
           )
           .eq("id", detailId || editId)
           .maybeSingle()
@@ -611,77 +613,14 @@ export default async function SchadensfaellePage({
             </p>
           </div>
 
-          <form className="grid gap-3 border-b border-zinc-200 px-4 py-4 md:grid-cols-[minmax(220px,1fr)_170px_170px_170px_auto]">
-            <label className="flex flex-col gap-1 text-sm font-medium">
-              Suche
-              <input
-                className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
-                defaultValue={query}
-                name="q"
-                placeholder="Beschreibung, Person, Set oder Inventar"
-                type="search"
-              />
-            </label>
-
-            <label className="flex flex-col gap-1 text-sm font-medium">
-              Status
-              <select
-                className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
-                defaultValue={statusFilter}
-                name="status"
-              >
-                <option value="">Alle</option>
-                <option value="offen">Offen</option>
-                <option value="in_bearbeitung">In Bearbeitung</option>
-                <option value="bericht_erzeugt">Bericht erzeugt</option>
-                <option value="bericht_unterschrieben">Bericht unterschrieben</option>
-                <option value="abgeschlossen">Abgeschlossen</option>
-                <option value="storniert">Storniert</option>
-              </select>
-            </label>
-
-            <label className="flex flex-col gap-1 text-sm font-medium">
-              Art
-              <select
-                className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
-                defaultValue={typeFilter}
-                name="type"
-              >
-                <option value="">Alle</option>
-                <option value="schaden">Schaden</option>
-                <option value="verlust">Verlust</option>
-                <option value="technisches_problem">Technisches Problem</option>
-              </select>
-            </label>
-
-            <label className="flex flex-col gap-1 text-sm font-medium">
-              Abrechnung
-              <select
-                className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
-                defaultValue={billingFilter}
-                name="billing"
-              >
-                <option value="">Alle</option>
-                <option value="unklar">Unklar</option>
-                <option value="abrechenbar">Abrechenbar</option>
-                <option value="nicht_abrechenbar">Nicht abrechenbar</option>
-              </select>
-            </label>
-
-            <div className="flex items-end gap-2">
-              <button className="rounded-md bg-zinc-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-zinc-800">
-                Filtern
-              </button>
-              {hasActiveFilters ? (
-                <Link
-                  className="rounded-md border border-zinc-300 px-4 py-2 text-sm font-semibold transition hover:bg-zinc-50"
-                  href="/schadensfaelle"
-                >
-                  Zurücksetzen
-                </Link>
-              ) : null}
-            </div>
-          </form>
+          <DamageCasesFilterForm
+            billing={billingFilter}
+            hasActiveFilters={hasActiveFilters}
+            key={`${query}:${statusFilter}:${typeFilter}:${billingFilter}`}
+            query={query}
+            status={statusFilter}
+            type={typeFilter}
+          />
 
           {visibleCases.length > 0 ? (
             <DamageCasesTable
@@ -1102,19 +1041,23 @@ export default async function SchadensfaellePage({
                     label="Person"
                     value={formatPerson(editCase.person, detailSchoolClass?.label)}
                   />
-                  <Field label="Set" value={formatSet(editCase.inventory_set)} />
-                  <Field
-                    label="Komponente"
-                    value={formatComponent(editCase.component)}
-                  />
-                  <Field
-                    label="Ersatzset"
-                    value={formatSet(editCase.replacement_set)}
-                  />
-                  <Field
-                    label="Ersatzkomponente"
-                    value={formatComponent(editCase.replacement_component)}
-                  />
+                  <div className="grid gap-4">
+                    <Field label="Set" value={formatSet(editCase.inventory_set)} />
+                    <Field
+                      label="Ersatzset"
+                      value={formatSet(editCase.replacement_set)}
+                    />
+                  </div>
+                  <div className="grid gap-4">
+                    <Field
+                      label="Komponente"
+                      value={formatComponent(editCase.component)}
+                    />
+                    <Field
+                      label="Ersatzkomponente"
+                      value={formatComponent(editCase.replacement_component)}
+                    />
+                  </div>
                 </dl>
               </section>
 

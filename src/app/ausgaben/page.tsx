@@ -28,6 +28,7 @@ type AssignmentRow = {
     id: string;
     legacy_set_id: number;
     availability: string;
+    storage_label: string | null;
   } | null;
   person: {
     id: string;
@@ -177,6 +178,41 @@ function buildEditHref(
 }
 
 function buildCloseEditHref(
+  params: Record<string, string | string[] | undefined>,
+) {
+  const nextParams = new URLSearchParams();
+
+  for (const key of ["q", "status", "class", "to", "returned_from", "sort", "page"]) {
+    const value = getSingleParam(params, key).trim();
+
+    if (value) {
+      nextParams.set(key, value);
+    }
+  }
+
+  const queryString = nextParams.toString();
+  return queryString ? `/ausgaben?${queryString}` : "/ausgaben";
+}
+
+function buildStorageHref(
+  params: Record<string, string | string[] | undefined>,
+  setId: string,
+) {
+  const nextParams = new URLSearchParams();
+
+  for (const key of ["q", "status", "class", "to", "returned_from", "sort", "page"]) {
+    const value = getSingleParam(params, key).trim();
+
+    if (value) {
+      nextParams.set(key, value);
+    }
+  }
+
+  nextParams.set("storage", setId);
+  return `/ausgaben?${nextParams.toString()}`;
+}
+
+function buildCloseStorageHref(
   params: Record<string, string | string[] | undefined>,
 ) {
   const nextParams = new URLSearchParams();
@@ -438,6 +474,40 @@ async function updateAssignment(formData: FormData) {
   redirect(returnTo);
 }
 
+async function updateSetStorage(formData: FormData) {
+  "use server";
+
+  const appUser = await getCurrentAppUser();
+
+  if (!appUser) {
+    redirect("/login");
+  }
+
+  if (!hasAnyRole(appUser, ["admin", "ipad_verwaltung"])) {
+    redirect("/");
+  }
+
+  const setId = normalizeRequiredText(formData.get("set_id"));
+  const returnTo = normalizeRequiredText(formData.get("return_to")) || "/ausgaben";
+  const storageLabel = normalizeOptionalText(formData.get("storage_label"));
+
+  if (!setId) {
+    redirect(returnTo);
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("inventory_set")
+    .update({ storage_label: storageLabel })
+    .eq("id", setId);
+
+  if (error) {
+    throw error;
+  }
+
+  redirect(returnTo);
+}
+
 export default async function AusgabenPage({
   searchParams,
 }: {
@@ -451,6 +521,7 @@ export default async function AusgabenPage({
   const issuedTo = getSingleParam(params, "to").trim();
   const returnedFrom = getSingleParam(params, "returned_from").trim();
   const editAssignmentId = getSingleParam(params, "edit").trim();
+  const storageSetId = getSingleParam(params, "storage").trim();
   const page = getPageParam(params);
   const rangeStart = (page - 1) * PAGE_SIZE;
   const rangeEnd = rangeStart + PAGE_SIZE - 1;
@@ -465,6 +536,7 @@ export default async function AusgabenPage({
   }
 
   const supabase = await createClient();
+  const canEditSetStorage = hasAnyRole(appUser, ["admin", "ipad_verwaltung"]);
   const { data: classOptionData } = await supabase
     .from("school_class")
     .select("id,label,grade_level")
@@ -475,7 +547,7 @@ export default async function AusgabenPage({
   let assignmentsQuery = supabase
     .from("set_person_assignment")
     .select(
-      "id,issued_at,issue_note,return_charging_cable_present,return_defects,return_ipad_present,return_keyboard_present,returned_at,return_note,return_pencil_cap_present,return_pencil_present,return_power_adapter_present,return_resolutions,set:set_id(id,legacy_set_id,availability),person:person_id(id,first_name,last_name,email,person_type)",
+      "id,issued_at,issue_note,return_charging_cable_present,return_defects,return_ipad_present,return_keyboard_present,returned_at,return_note,return_pencil_cap_present,return_pencil_present,return_power_adapter_present,return_resolutions,set:set_id(id,legacy_set_id,availability,storage_label),person:person_id(id,first_name,last_name,email,person_type)",
       { count: "exact" },
     );
   const requiredAssignmentIdsByFilter: string[][] = [];
@@ -741,9 +813,42 @@ export default async function AusgabenPage({
       setHref: setId ? `/sets?q=${legacySetId ?? ""}&sort=set` : "/sets",
       setLabel: legacySetId ? `Set ${legacySetId}` : "Set -",
       status: isActive ? "Aktiv" : "Zurückgegeben",
+      storageHref:
+        canEditSetStorage && setId ? buildStorageHref(params, setId) : null,
+      storageLabel: assignment.set?.storage_label || "-",
     };
   });
   const closeEditHref = buildCloseEditHref(params);
+  const closeStorageHref = buildCloseStorageHref(params);
+  const selectedStorageSet =
+    storageSetId && assignments.some((assignment) => assignment.set?.id === storageSetId)
+      ? assignments.find((assignment) => assignment.set?.id === storageSetId)?.set
+      : null;
+  const storageSetResult =
+    storageSetId && !selectedStorageSet
+      ? await supabase
+          .from("inventory_set")
+          .select("id,legacy_set_id,storage_label")
+          .eq("id", storageSetId)
+          .maybeSingle()
+      : null;
+  const setToEditStorage =
+    selectedStorageSet ??
+    (storageSetResult?.data
+      ? {
+          availability: "",
+          ...(storageSetResult.data as {
+            id: string;
+            legacy_set_id: number;
+            storage_label: string | null;
+          }),
+        }
+      : null);
+
+  if (storageSetResult?.error) {
+    throw storageSetResult.error;
+  }
+
   const selectedAssignment =
     editAssignmentId && assignments.some((assignment) => assignment.id === editAssignmentId)
       ? assignments.find((assignment) => assignment.id === editAssignmentId)
@@ -753,7 +858,7 @@ export default async function AusgabenPage({
       ? await supabase
           .from("set_person_assignment")
           .select(
-            "id,issued_at,issue_note,return_charging_cable_present,return_defects,return_ipad_present,return_keyboard_present,returned_at,return_note,return_pencil_cap_present,return_pencil_present,return_power_adapter_present,return_resolutions,set:set_id(id,legacy_set_id,availability),person:person_id(id,first_name,last_name,email,person_type)",
+            "id,issued_at,issue_note,return_charging_cable_present,return_defects,return_ipad_present,return_keyboard_present,returned_at,return_note,return_pencil_cap_present,return_pencil_present,return_power_adapter_present,return_resolutions,set:set_id(id,legacy_set_id,availability,storage_label),person:person_id(id,first_name,last_name,email,person_type)",
           )
           .eq("id", editAssignmentId)
           .maybeSingle()
@@ -952,6 +1057,59 @@ export default async function AusgabenPage({
             </div>
           ) : null}
         </section>
+
+        {setToEditStorage ? (
+          <div className="fixed inset-0 z-40 bg-zinc-950/25">
+            <aside className="ml-auto flex h-full w-full max-w-lg flex-col border-l border-zinc-200 bg-white shadow-2xl">
+              <div className="flex flex-wrap items-start justify-between gap-4 border-b border-zinc-200 px-6 py-5">
+                <div>
+                  <p className="text-sm font-medium text-zinc-500">
+                    Aus- und Rückgabeliste
+                  </p>
+                  <h2 className="mt-1 text-2xl font-semibold tracking-tight">
+                    Lagerort ändern
+                  </h2>
+                  <p className="mt-2 text-sm text-zinc-600">
+                    Set {setToEditStorage.legacy_set_id}
+                  </p>
+                </div>
+                <Link
+                  className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-semibold transition hover:bg-zinc-50"
+                  href={closeStorageHref}
+                >
+                  Schließen
+                </Link>
+              </div>
+
+              <form action={updateSetStorage} className="grid gap-5 px-6 py-6">
+                <input name="set_id" type="hidden" value={setToEditStorage.id} />
+                <input name="return_to" type="hidden" value={closeStorageHref} />
+
+                <label className="flex flex-col gap-1 text-sm font-medium">
+                  Lagerort
+                  <input
+                    className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
+                    defaultValue={setToEditStorage.storage_label ?? ""}
+                    name="storage_label"
+                    placeholder="z. B. W1 - 04, Schrank1 oder Regal1"
+                  />
+                </label>
+
+                <div className="flex flex-wrap justify-end gap-2 border-t border-zinc-200 pt-4">
+                  <Link
+                    className="rounded-md border border-zinc-300 px-4 py-2 text-sm font-semibold transition hover:bg-zinc-50"
+                    href={closeStorageHref}
+                  >
+                    Abbrechen
+                  </Link>
+                  <button className="rounded-md bg-zinc-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-zinc-800">
+                    Speichern
+                  </button>
+                </div>
+              </form>
+            </aside>
+          </div>
+        ) : null}
 
         {assignmentToEdit ? (
           <div className="fixed inset-0 z-40 bg-zinc-950/25">

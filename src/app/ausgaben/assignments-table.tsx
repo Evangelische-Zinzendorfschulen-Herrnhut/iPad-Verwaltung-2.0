@@ -21,6 +21,8 @@ export type AssignmentTableRow = {
   setHref: string;
   setLabel: string;
   status: string;
+  storageHref: string | null;
+  storageLabel: string;
 };
 
 type AssignmentsTableProps = {
@@ -32,6 +34,7 @@ type ContextMenuState = {
   label: string;
   returnHref: string | null;
   returnProtocolHref: string | null;
+  storageHref: string | null;
   x: number;
   y: number;
 } | null;
@@ -69,6 +72,7 @@ export function AssignmentsTable({ rows }: AssignmentsTableProps) {
       label: `${row.setLabel} · ${row.person}`,
       returnHref: row.returnHref,
       returnProtocolHref: row.returnProtocolHref,
+      storageHref: row.storageHref,
       x: event.clientX,
       y: event.clientY,
     });
@@ -83,6 +87,7 @@ export function AssignmentsTable({ rows }: AssignmentsTableProps) {
               <th className="px-4 py-3 font-medium">Set</th>
               <th className="px-4 py-3 font-medium">Person</th>
               <th className="px-4 py-3 font-medium">Klasse</th>
+              <th className="px-4 py-3 font-medium">Lagerort</th>
               <th className="px-4 py-3 font-medium">Ausgabe</th>
               <th className="px-4 py-3 font-medium">Rückgabe</th>
               <th className="px-4 py-3 font-medium">Vollst.</th>
@@ -104,6 +109,7 @@ export function AssignmentsTable({ rows }: AssignmentsTableProps) {
                 </td>
                 <td className="px-4 py-3">{row.person}</td>
                 <td className="px-4 py-3">{row.classLabel}</td>
+                <td className="px-4 py-3">{row.storageLabel}</td>
                 <td className="px-4 py-3">{row.issuedAt}</td>
                 <td className="px-4 py-3">{row.returnedAt}</td>
                 <td className="px-4 py-3">
@@ -198,6 +204,14 @@ export function AssignmentsTable({ rows }: AssignmentsTableProps) {
             >
               Rückgabeprotokoll als PDF
             </a>
+          ) : null}
+          {contextMenu.storageHref ? (
+            <Link
+              className="block w-full rounded px-3 py-2 text-left font-medium hover:bg-zinc-100"
+              href={contextMenu.storageHref}
+            >
+              Lagerort ändern
+            </Link>
           ) : null}
           <p className="border-t border-zinc-100 px-3 py-2 text-xs text-zinc-500">
             {contextMenu.label}

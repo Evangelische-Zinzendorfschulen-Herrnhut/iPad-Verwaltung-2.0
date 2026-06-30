@@ -40,6 +40,7 @@ type PersonAssignmentRow = {
   id: string;
   set_id: string;
   issued_at: string | null;
+  returned_at?: string | null;
   person: {
     id: string;
     first_name: string | null;
@@ -169,6 +170,41 @@ function buildCloseDamageHref(
   return queryString ? `/sets?${queryString}` : "/sets";
 }
 
+function buildProblemHref(
+  params: Record<string, string | string[] | undefined>,
+  setId: string,
+) {
+  const nextParams = new URLSearchParams();
+
+  for (const key of ["q", "availability", "condition", "class", "sort", "page"]) {
+    const value = getSingleParam(params, key).trim();
+
+    if (value) {
+      nextParams.set(key, value);
+    }
+  }
+
+  nextParams.set("problem", setId);
+  return `/sets?${nextParams.toString()}`;
+}
+
+function buildCloseProblemHref(
+  params: Record<string, string | string[] | undefined>,
+) {
+  const nextParams = new URLSearchParams();
+
+  for (const key of ["q", "availability", "condition", "class", "sort", "page"]) {
+    const value = getSingleParam(params, key).trim();
+
+    if (value) {
+      nextParams.set(key, value);
+    }
+  }
+
+  const queryString = nextParams.toString();
+  return queryString ? `/sets?${queryString}` : "/sets";
+}
+
 function buildReturnHref(
   params: Record<string, string | string[] | undefined>,
   setId: string,
@@ -188,6 +224,41 @@ function buildReturnHref(
 }
 
 function buildCloseReturnHref(
+  params: Record<string, string | string[] | undefined>,
+) {
+  const nextParams = new URLSearchParams();
+
+  for (const key of ["q", "availability", "condition", "class", "sort", "page"]) {
+    const value = getSingleParam(params, key).trim();
+
+    if (value) {
+      nextParams.set(key, value);
+    }
+  }
+
+  const queryString = nextParams.toString();
+  return queryString ? `/sets?${queryString}` : "/sets";
+}
+
+function buildStorageHref(
+  params: Record<string, string | string[] | undefined>,
+  setId: string,
+) {
+  const nextParams = new URLSearchParams();
+
+  for (const key of ["q", "availability", "condition", "class", "sort", "page"]) {
+    const value = getSingleParam(params, key).trim();
+
+    if (value) {
+      nextParams.set(key, value);
+    }
+  }
+
+  nextParams.set("storage", setId);
+  return `/sets?${nextParams.toString()}`;
+}
+
+function buildCloseStorageHref(
   params: Record<string, string | string[] | undefined>,
 ) {
   const nextParams = new URLSearchParams();
@@ -479,6 +550,40 @@ async function returnSet(formData: FormData) {
   redirect(returnTo);
 }
 
+async function updateSetStorage(formData: FormData) {
+  "use server";
+
+  const appUser = await getCurrentAppUser();
+
+  if (!appUser) {
+    redirect("/login");
+  }
+
+  if (!hasAnyRole(appUser, ["admin", "ipad_verwaltung"])) {
+    redirect("/");
+  }
+
+  const setId = normalizeRequiredText(formData.get("set_id"));
+  const returnTo = normalizeRequiredText(formData.get("return_to")) || "/sets";
+  const storageLabel = normalizeOptionalText(formData.get("storage_label"));
+
+  if (!setId) {
+    redirect(returnTo);
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("inventory_set")
+    .update({ storage_label: storageLabel })
+    .eq("id", setId);
+
+  if (error) {
+    throw error;
+  }
+
+  redirect(returnTo);
+}
+
 export default async function SetsPage({
   searchParams,
 }: {
@@ -490,7 +595,9 @@ export default async function SetsPage({
   const conditionFilter = getSingleParam(params, "condition");
   const classFilter = getSingleParam(params, "class");
   const damageSetId = getSingleParam(params, "damage");
+  const problemSetId = getSingleParam(params, "problem");
   const returnSetId = getSingleParam(params, "return");
+  const storageSetId = getSingleParam(params, "storage");
   const sort = getSortParam(params);
   const page = getPageParam(params);
   const appUser = await getCurrentAppUser();
@@ -504,6 +611,7 @@ export default async function SetsPage({
   }
 
   const supabase = await createClient();
+  const canEditSetStorage = hasAnyRole(appUser, ["admin", "ipad_verwaltung"]);
   const { data: classOptionData } = await supabase
     .from("school_class")
     .select("id,label,grade_level")
@@ -879,6 +987,42 @@ export default async function SetsPage({
           .is("returned_at", null)
           .in("set_id", setIds)
       : { data: [] };
+  const rawPreviousPersonAssignments: RawPersonAssignmentRow[] = [];
+
+  for (const setIdBatch of chunkValues(setIds)) {
+    const { data, error } = await supabase
+      .from("set_person_assignment")
+      .select(
+        "id,set_id,issued_at,returned_at,person:person_id(id,first_name,last_name,email,person_type)",
+      )
+      .not("returned_at", "is", null)
+      .in("set_id", setIdBatch)
+      .order("returned_at", { ascending: false });
+
+    if (error) {
+      throw error;
+    }
+
+    rawPreviousPersonAssignments.push(
+      ...((data ?? []) as RawPersonAssignmentRow[]),
+    );
+  }
+
+  const previousPersonBySetId = new Map<string, PersonAssignmentRow["person"]>();
+
+  for (const assignment of rawPreviousPersonAssignments) {
+    if (previousPersonBySetId.has(assignment.set_id)) {
+      continue;
+    }
+
+    previousPersonBySetId.set(
+      assignment.set_id,
+      Array.isArray(assignment.person)
+        ? (assignment.person[0] ?? null)
+        : assignment.person,
+    );
+  }
+
   const componentAssignments = (
     (componentAssignmentsResult.data ?? []) as RawComponentAssignmentRow[]
   ).map((assignment) => ({
@@ -921,6 +1065,7 @@ export default async function SetsPage({
     const currentAssignment = currentAssignmentBySetId.get(set.id);
     const schoolClass = person ? classDetailByPersonId.get(person.id) : undefined;
     const availability = deriveAvailability(set, person, schoolClass);
+    const previousPerson = previousPersonBySetId.get(set.id) ?? null;
 
     return {
       availability,
@@ -937,14 +1082,26 @@ export default async function SetsPage({
         person,
         person ? classByPersonId.get(person.id) : undefined,
       ),
+      previousPerson:
+        availability === "frei" && previousPerson
+          ? formatPerson(previousPerson)
+          : null,
+      problemHref:
+        availability === "ausgegeben" ? buildProblemHref(params, set.id) : null,
       returnProtocolHref: currentAssignment
         ? null
         : `/sets/${set.id}/return-protocol`,
       returnSetHref:
         person && currentAssignment ? buildReturnHref(params, set.id) : null,
+      storageHref:
+        canEditSetStorage && availability !== "ausgegeben"
+          ? buildStorageHref(params, set.id)
+          : null,
+      storageLabel: set.storage_label || "-",
     };
   });
   const setToReturn = sets.find((set) => set.id === returnSetId) ?? null;
+  const setToEditStorage = sets.find((set) => set.id === storageSetId) ?? null;
   const assignmentToReturn = setToReturn
     ? currentAssignmentBySetId.get(setToReturn.id)
     : undefined;
@@ -964,6 +1121,7 @@ export default async function SetsPage({
   const pencilToReturn = componentsToReturn?.get("pencil")?.component ?? null;
   const pencilAccessoryToReturn = pencilAccessory(pencilToReturn);
   const returnCloseHref = buildCloseReturnHref(params);
+  const storageCloseHref = buildCloseStorageHref(params);
   const returnDateDefault = new Date().toISOString().slice(0, 10);
   const returnSupplementalComponents = [
     componentsToReturn?.get("adapter")?.component
@@ -1096,6 +1254,92 @@ export default async function SetsPage({
             </div>
           ) : null}
         </section>
+
+        {setToEditStorage ? (
+          <div className="fixed inset-0 z-40 bg-zinc-950/25">
+            <aside className="ml-auto flex h-full w-full max-w-lg flex-col border-l border-zinc-200 bg-white shadow-2xl">
+              <div className="flex flex-wrap items-start justify-between gap-4 border-b border-zinc-200 px-6 py-5">
+                <div>
+                  <p className="text-sm font-medium text-zinc-500">
+                    Set-Liste
+                  </p>
+                  <h2 className="mt-1 text-2xl font-semibold tracking-tight">
+                    Lagerort ändern
+                  </h2>
+                  <p className="mt-2 text-sm text-zinc-600">
+                    Set {setToEditStorage.legacy_set_id}
+                  </p>
+                </div>
+                <Link
+                  className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-semibold transition hover:bg-zinc-50"
+                  href={storageCloseHref}
+                >
+                  Schließen
+                </Link>
+              </div>
+
+              <form action={updateSetStorage} className="grid gap-5 px-6 py-6">
+                <input name="set_id" type="hidden" value={setToEditStorage.id} />
+                <input name="return_to" type="hidden" value={storageCloseHref} />
+
+                <label className="flex flex-col gap-1 text-sm font-medium">
+                  Lagerort
+                  <input
+                    className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
+                    defaultValue={setToEditStorage.storage_label ?? ""}
+                    name="storage_label"
+                    placeholder="z. B. W1 - 04, Schrank1 oder Regal1"
+                  />
+                </label>
+
+                <div className="flex flex-wrap justify-end gap-2 border-t border-zinc-200 pt-4">
+                  <Link
+                    className="rounded-md border border-zinc-300 px-4 py-2 text-sm font-semibold transition hover:bg-zinc-50"
+                    href={storageCloseHref}
+                  >
+                    Abbrechen
+                  </Link>
+                  <button className="rounded-md bg-zinc-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-zinc-800">
+                    Speichern
+                  </button>
+                </div>
+              </form>
+            </aside>
+          </div>
+        ) : null}
+
+        {problemSetId ? (
+          <div className="fixed inset-0 z-40 bg-zinc-950/25">
+            <aside className="ml-auto flex h-full w-full max-w-5xl flex-col border-l border-zinc-200 bg-white shadow-2xl">
+              <div className="flex flex-wrap items-start justify-between gap-4 border-b border-zinc-200 px-6 py-4">
+                <div>
+                  <p className="text-sm font-medium text-zinc-500">
+                    Sets und Inventar
+                  </p>
+                  <h2 className="mt-1 text-xl font-semibold tracking-tight">
+                    Problem melden
+                  </h2>
+                </div>
+                <Link
+                  className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-semibold transition hover:bg-zinc-50"
+                  href={buildCloseProblemHref(params)}
+                >
+                  Schließen
+                </Link>
+              </div>
+              <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+                <DamageNewPage
+                  params={Promise.resolve({ setId: problemSetId })}
+                  searchParams={Promise.resolve({
+                    embedded: "1",
+                    mode: "problem",
+                    return_to: buildCloseProblemHref(params),
+                  })}
+                />
+              </div>
+            </aside>
+          </div>
+        ) : null}
 
         {damageSetId ? (
           <div className="fixed inset-0 z-40 bg-zinc-950/25">

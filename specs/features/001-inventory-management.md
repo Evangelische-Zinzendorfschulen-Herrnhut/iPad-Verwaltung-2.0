@@ -21,6 +21,14 @@ Die Schule braucht eine verlaessliche Uebersicht ueber alle Komponenten eines iP
 3. Berechtigte Nutzer koennen technische oder organisatorische Daten aktualisieren.
 4. Kritische Aenderungen werden auditierbar gespeichert.
 
+## Workflow: Komponenten-Lagerort pflegen
+
+1. Nutzer filtert oder sucht eine Komponente in der Geraeteliste.
+2. Nutzer oeffnet `Lagerort` fuer die einzelne Komponente.
+3. System zeigt den Komponenten-Lagerort und, falls vorhanden, den Lagerort des aktuell zugeordneten Sets.
+4. Nutzer setzt oder leert den Komponenten-Lagerort.
+5. System speichert den Lagerort an der Komponente, unabhaengig vom Lagerort des Sets.
+
 ## Workflow: Set auftrennen und vervollstaendigen
 
 1. Nutzer oeffnet ein freies oder blockiertes Set.
@@ -50,6 +58,7 @@ Die Schule braucht eine verlaessliche Uebersicht ueber alle Komponenten eines iP
 - Ausgegebene Sets koennen nicht ohne Ruecknahme aufgetrennt werden.
 - Komponenten-Neuzuordnungen bleiben historisch nachvollziehbar.
 - Fuer freie und blockierte Sets ist ein Lagerort dokumentierbar.
+- Fuer einzelne Komponenten ist ein eigener Lagerort dokumentierbar, unabhaengig vom Lagerort des Sets.
 - Start-Lagerorte sind W1 bis W6 mit je 30 Plätzen sowie Schrank1, Schrank2 und Regal1.
 - Bei W1 bis W6 soll der konkrete Platz 1-30 dokumentiert werden.
 - Sets koennen einer Person zugeordnet sein und trotzdem physisch im Lager oder Wagen liegen, insbesondere bei Schuelern der 5. und 6. Klassen.

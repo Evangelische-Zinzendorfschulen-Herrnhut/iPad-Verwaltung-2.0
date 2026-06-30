@@ -52,7 +52,19 @@ Der erste Schnitt bildet noch nicht den vollstaendigen Eltern-PDF- und Abrechnun
 8. Vorgang wird mit Status `entwurf` oder `offen` gespeichert.
 9. Das Set bleibt zunaechst ausgegeben; Folgeschritte wie Ruecknahme, Geraetetausch, Reparatur oder Zahlungsforderung werden spaeter aus dem Vorgang gestartet.
 
+Alternativ kann der Nutzer aus der Set-Liste `Problem melden` starten. Dann ist `technisches Problem` als Vorgangsart vorausgewaehlt. Das Formular nutzt die gleichen Grunddaten, blendet aber Hergang und Zeugen aus, bezeichnet die Detailbeschreibung als `Problembeschreibung` und erlaubt, den Lagerort des Sets direkt mit dem Vorgang zu aktualisieren.
+
 Neue Schadensfaelle erhalten zusaetzlich zur technischen UUID eine fortlaufende `damage_number` als menschlich lesbare Schadensnummer. Die UUID bleibt Primaerschluessel; die Schadensnummer wird fuer Suche, Anzeige und Kommunikation genutzt.
+
+Wenn beim Anlegen eines Schadensfalls der Austauschstatus `ausgegeben` und ein Ersatzset gesetzt werden, fuehrt die App den Setwechsel direkt aus:
+
+- Die bisher aktive Set-Person-Zuordnung des alten Sets wird zum Ersatz-Ausgabedatum beendet.
+- Fuer das Ersatzset wird eine neue aktive Set-Person-Zuordnung fuer dieselbe Person angelegt.
+- Das alte Set wird als `blockiert` und `defekt` markiert.
+- Das Ersatzset wird als `ausgegeben` und `ok` markiert.
+- Bei Setschaden wird die aktuelle iPad-Komponente des alten Sets als `defekt` markiert.
+
+Assumption: Im ersten Schnitt wird dieser automatische Setwechsel nur fuer Ersatzsets ausgefuehrt. Reine Ersatzkomponenten-Zuordnungen bleiben bis zum ausgebauten Geraetetausch-Workflow manuell zu pruefen.
 
 ## Bearbeiten bestehender Schadensfaelle
 
@@ -174,6 +186,9 @@ Assumption: Das Legacy-Feld `VersicherungGarantie` wird in der UI fachlich als `
 ## Akzeptanzkriterien, Entwurf
 
 - Aus einem fachlich `ausgegeben`en Set kann ein Schadens-/Verlustvorgang angelegt werden.
+- Aus einem fachlich `ausgegeben`en Set kann ein technisches Problem mit vorausgewaehlter Vorgangsart angelegt werden.
+- Bei technischen Problemen werden Hergang und Zeugen im Formular nicht angezeigt; statt Schadenbeschreibung wird Problembeschreibung angezeigt.
+- Beim Anlegen eines technischen Problems kann der Lagerort des Sets gesetzt oder geleert werden.
 - Der Vorgang ist mit Set, aktueller Person und aktueller Set-Zuordnung verknuepft.
 - Vorgangsart und betroffener Gegenstand werden strukturiert gespeichert.
 - Ein Vorgang kann zunaechst ohne Zahlungsforderung existieren.
@@ -182,6 +197,7 @@ Assumption: Das Legacy-Feld `VersicherungGarantie` wird in der UI fachlich als `
 - `buchhaltung` kann Schadensfaelle lesen, aber nicht bearbeiten.
 - Pflichtfelder und Enum-Werte werden serverseitig geprueft.
 - Ein Schadensbericht-PDF kann aus der Liste heraus fuer einen Datensatz geoeffnet werden.
+- Beim Speichern eines Schadensfalls mit Austauschstatus `ausgegeben` und Ersatzset werden Setliste, Ausgabeliste und Geraeteliste konsistent aktualisiert.
 - Schadensbericht kann erst erzeugt werden, wenn alle Pflichtfelder vollständig sind.
 - Erzeugter PDF-Bericht wird versioniert oder nachvollziehbar gespeichert.
 - Unterschriebener PDF-Bericht kann hochgeladen und dem Schadensfall zugeordnet werden.

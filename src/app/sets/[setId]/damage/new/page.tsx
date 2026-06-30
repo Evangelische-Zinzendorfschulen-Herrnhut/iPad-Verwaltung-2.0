@@ -133,6 +133,191 @@ function appendFlagToHref(href: string, key: string, value: string) {
   return `${href}${separator}${key}=${value}`;
 }
 
+async function applyReplacementSetIssue({
+  assignmentId,
+  damageNumber,
+  damagedComponentId,
+  issuedAt,
+  personId,
+  replacementSetId,
+  setId,
+}: {
+  assignmentId: string;
+  damageNumber: number;
+  damagedComponentId: string | null;
+  issuedAt: string;
+  personId: string;
+  replacementSetId: string;
+  setId: string;
+}) {
+  const supabase = await createClient();
+  const [
+    { data: currentAssignment, error: currentAssignmentError },
+    { data: replacementAssignment, error: replacementAssignmentError },
+    { data: currentSet, error: currentSetError },
+    { data: replacementSet, error: replacementSetError },
+    ipadAssignmentResult,
+    { data: person, error: personError },
+  ] = await Promise.all([
+    supabase
+      .from("set_person_assignment")
+      .select("id,set_id,person_id,returned_at")
+      .eq("id", assignmentId)
+      .eq("set_id", setId)
+      .is("returned_at", null)
+      .maybeSingle(),
+    supabase
+      .from("set_person_assignment")
+      .select("id")
+      .eq("set_id", replacementSetId)
+      .is("returned_at", null)
+      .maybeSingle(),
+    supabase
+      .from("inventory_set")
+      .select("legacy_set_id")
+      .eq("id", setId)
+      .maybeSingle(),
+    supabase
+      .from("inventory_set")
+      .select("legacy_set_id")
+      .eq("id", replacementSetId)
+      .maybeSingle(),
+    damagedComponentId
+      ? Promise.resolve({ data: null, error: null })
+      : supabase
+          .from("set_component_assignment")
+          .select("component_id")
+          .eq("set_id", setId)
+          .eq("role", "ipad")
+          .is("valid_until", null)
+          .maybeSingle(),
+    supabase
+      .from("person")
+      .select("legacy_user_id")
+      .eq("id", personId)
+      .maybeSingle(),
+  ]);
+
+  if (currentAssignmentError) {
+    throw currentAssignmentError;
+  }
+
+  if (replacementAssignmentError) {
+    throw replacementAssignmentError;
+  }
+
+  if (currentSetError) {
+    throw currentSetError;
+  }
+
+  if (replacementSetError) {
+    throw replacementSetError;
+  }
+
+  if (ipadAssignmentResult.error) {
+    throw ipadAssignmentResult.error;
+  }
+
+  if (personError) {
+    throw personError;
+  }
+
+  if (!currentAssignment || currentAssignment.person_id !== personId) {
+    throw new Error("Aktive Ausgabe des alten Sets wurde nicht gefunden.");
+  }
+
+  if (replacementAssignment) {
+    throw new Error("Ersatzset ist bereits aktiv ausgegeben.");
+  }
+
+  if (!currentSet || !replacementSet) {
+    throw new Error("Setwechsel konnte nicht vorbereitet werden.");
+  }
+
+  const note = `Automatischer Setwechsel aus Schaden ${damageNumber}: Set ${currentSet.legacy_set_id} -> Set ${replacementSet.legacy_set_id}.`;
+  const legacyUserId =
+    person && "legacy_user_id" in person ? person.legacy_user_id : null;
+  const componentIdToMarkDefective =
+    damagedComponentId || ipadAssignmentResult.data?.component_id || null;
+
+  const { error: closeAssignmentError } = await supabase
+    .from("set_person_assignment")
+    .update({
+      returned_at: issuedAt,
+      return_note: note,
+    })
+    .eq("id", assignmentId)
+    .is("returned_at", null);
+
+  if (closeAssignmentError) {
+    throw closeAssignmentError;
+  }
+
+  const { error: newAssignmentError } = await supabase
+    .from("set_person_assignment")
+    .insert({
+      issued_at: issuedAt,
+      issue_note: note,
+      legacy_assignment_id: -damageNumber,
+      legacy_status: `damage_${damageNumber}_replacement_set`,
+      legacy_user_id: legacyUserId ?? 0,
+      person_id: personId,
+      set_id: replacementSetId,
+    });
+
+  if (newAssignmentError) {
+    throw newAssignmentError;
+  }
+
+  const [
+    oldSetUpdate,
+    replacementSetUpdate,
+    damagedIpadUpdate,
+  ] = await Promise.all([
+    supabase
+      .from("inventory_set")
+      .update({
+        assigned_person_id: null,
+        availability: "blockiert",
+        condition: "defekt",
+        legacy_user_id: null,
+        notes: note,
+      })
+      .eq("id", setId),
+    supabase
+      .from("inventory_set")
+      .update({
+        assigned_person_id: personId,
+        availability: "ausgegeben",
+        condition: "ok",
+        legacy_user_id: legacyUserId,
+        notes: note,
+      })
+      .eq("id", replacementSetId),
+    componentIdToMarkDefective
+      ? supabase
+          .from("inventory_component")
+          .update({
+            condition: "defekt",
+            legacy_status: "defekt",
+          })
+          .eq("id", componentIdToMarkDefective)
+      : Promise.resolve({ error: null }),
+  ]);
+
+  if (oldSetUpdate.error) {
+    throw oldSetUpdate.error;
+  }
+
+  if (replacementSetUpdate.error) {
+    throw replacementSetUpdate.error;
+  }
+
+  if (damagedIpadUpdate.error) {
+    throw damagedIpadUpdate.error;
+  }
+}
+
 async function createDamageCase(formData: FormData) {
   "use server";
 
@@ -161,6 +346,8 @@ async function createDamageCase(formData: FormData) {
   const billingAssessment = String(formData.get("billing_assessment") ?? "unklar");
   const liability = String(formData.get("liability") ?? "").trim();
   const exchangeStatus = String(formData.get("exchange_status") ?? "").trim();
+  const hasStorageLabelField = formData.has("storage_label");
+  const storageLabel = String(formData.get("storage_label") ?? "").trim();
   const returnTo = String(formData.get("return_to") ?? "/sets");
 
   if (!setId || !assignmentId || !caseType || !affectedItem || !reportedAt) {
@@ -263,6 +450,34 @@ async function createDamageCase(formData: FormData) {
     if (updateError) {
       throw updateError;
     }
+
+    if (
+      exchangeStatus === "ausgegeben" &&
+      replacementSetId &&
+      personId &&
+      replacementSetId !== setId
+    ) {
+      await applyReplacementSetIssue({
+        assignmentId,
+        damageNumber: damageCase.damage_number,
+        damagedComponentId: componentId || null,
+        issuedAt: replacementIssuedAt || reportedAt,
+        personId,
+        replacementSetId,
+        setId,
+      });
+    }
+  }
+
+  if (hasStorageLabelField) {
+    const { error: storageError } = await supabase
+      .from("inventory_set")
+      .update({ storage_label: storageLabel || null })
+      .eq("id", setId);
+
+    if (storageError) {
+      throw storageError;
+    }
   }
 
   redirect(appendFlagToHref(returnTo, "damage_created", "1"));
@@ -275,6 +490,7 @@ export default async function DamageNewPage({
   const { setId } = await params;
   const search = await searchParams;
   const embedded = getSingleParam(search, "embedded") === "1";
+  const isProblemMode = getSingleParam(search, "mode") === "problem";
   const returnTo = getSingleParam(search, "return_to") || "/sets";
   const appUser = await getCurrentAppUser();
 
@@ -298,7 +514,7 @@ export default async function DamageNewPage({
   ] = await Promise.all([
       supabase
         .from("inventory_set")
-        .select("id,legacy_set_id,condition,availability")
+        .select("id,legacy_set_id,condition,availability,storage_label")
         .eq("id", setId)
         .maybeSingle(),
       supabase
@@ -423,7 +639,7 @@ export default async function DamageNewPage({
               Sets und Inventar
             </Link>
             <h1 className="mt-3 text-3xl font-semibold tracking-tight">
-              Schaden oder Verlust melden
+              {isProblemMode ? "Problem melden" : "Schaden oder Verlust melden"}
             </h1>
             <p className="mt-2 text-sm text-zinc-600">
               Set {set.legacy_set_id} · {formatPerson(assignment.person)}
@@ -452,6 +668,9 @@ export default async function DamageNewPage({
             <FormFieldLabel label="Vorgangsart">
               <select
                 className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
+                defaultValue={
+                  isProblemMode ? "technisches_problem" : "schaden"
+                }
                 name="case_type"
                 required
               >
@@ -512,6 +731,17 @@ export default async function DamageNewPage({
               />
             </FormFieldLabel>
 
+            {isProblemMode ? (
+              <FormFieldLabel label="Lagerort">
+                <input
+                  className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
+                  defaultValue={set.storage_label ?? ""}
+                  name="storage_label"
+                  placeholder="z. B. W2 - 24, Schrank1 oder Regal1"
+                />
+              </FormFieldLabel>
+            ) : null}
+
             <FormFieldLabel label="Haftung">
               <select
                 className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
@@ -544,26 +774,32 @@ export default async function DamageNewPage({
             />
           </FormFieldLabel>
 
-          <FormFieldLabel label="Hergang | Wie">
-            <textarea
-              className="min-h-24 rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
-              name="incident_description"
-            />
-          </FormFieldLabel>
+          {isProblemMode ? null : (
+            <FormFieldLabel label="Hergang | Wie">
+              <textarea
+                className="min-h-24 rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
+                name="incident_description"
+              />
+            </FormFieldLabel>
+          )}
 
-          <FormFieldLabel label="Schadenbeschreibung | was">
+          <FormFieldLabel
+            label={isProblemMode ? "Problembeschreibung" : "Schadenbeschreibung | was"}
+          >
             <textarea
               className="min-h-28 rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
               name="detail_description"
             />
           </FormFieldLabel>
 
-          <FormFieldLabel label="Zeugen">
-            <textarea
-              className="min-h-20 rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
-              name="witnesses"
-            />
-          </FormFieldLabel>
+          {isProblemMode ? null : (
+            <FormFieldLabel label="Zeugen">
+              <textarea
+                className="min-h-20 rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
+                name="witnesses"
+              />
+            </FormFieldLabel>
+          )}
 
           <FormFieldLabel label="Bearbeiter">
             <input

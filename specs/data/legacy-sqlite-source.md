@@ -186,6 +186,8 @@ Device-Statuswerte enthalten u. a.:
 - `Sets.iPad`, `Sets.Pencil` und `Sets.Tastatur` verweisen zwar auf existierende `Device.InvNr`, aber es gibt fehlende Komponenten in Sets.
 - Einige Komponenten sind in mehreren Sets eingetragen.
 - Der zweite Zahlenblock der Inventarnummer ist historisch und darf nicht als aktuelle Set-Zuordnung interpretiert werden.
+- Bei iPad-Schäden wurde fachlich in der Regel das ganze Set getauscht. Eine abweichende iPad-Inventarnummer in `Sets.iPad`, deren letzte Slash-Ziffern nicht zu `Sets.SetID` passen, darf deshalb nicht als aktiver iPad-Komponententausch in dieses Set importiert werden.
+- Bei Pencil- und Tastatur-Schäden wurde in der Regel nur die betroffene Komponente getauscht. Abweichende Slash-Ziffern bei `Sets.Pencil` oder `Sets.Tastatur` koennen daher als aktive Komponenten-Zuordnung importiert werden, muessen aber als Bereinigungs-/Tauschhinweis nachvollziehbar bleiben.
 - Statuswerte sind nicht normalisiert.
 - Leerwerte in Statusfeldern muessen beim Import fachlich bewertet werden.
 - Vollstaendigkeitsfelder existieren bereits teilweise, sind aber wahrscheinlich nicht vollstaendig oder konsistent.
@@ -198,6 +200,8 @@ Device-Statuswerte enthalten u. a.:
 - Jede importierte Zeile braucht eine Rueckverknuepfung zur Legacy-Quelle.
 - Inkonsistente Sets nicht still korrigieren, sondern als Importwarnung markieren.
 - Aktive Set-Zuordnung in der neuen App aus `Sets` uebernehmen, aber Dubletten und fehlende Komponenten markieren.
+- Fuer `Sets.iPad` nur dann eine aktive Set-Komponenten-Zuordnung importieren, wenn die letzten Slash-Ziffern der iPad-Inventarnummer zur `SetID` passen. Abweichungen werden als Settausch-Hinweis behandelt.
+- Fuer `Sets.Pencil` und `Sets.Tastatur` duerfen abweichende Slash-Ziffern als Komponentenwechsel importiert werden, sofern die Komponente eindeutig ist und keine aktive Doppelzuordnung entsteht.
 - Historische Ausgabe/Rueckgabe aus `SetUserZuordnung` uebernehmen, wenn Person und Set aufloesbar sind.
 - Schaeden aus `Schaden` uebernehmen und mit Komponenten, Sets und Zuordnungen verknuepfen, soweit eindeutig.
 - Originalstatuswerte behalten und normalisierte Statuswerte zunaechst app-seitig oder im Import berechnen.

@@ -219,6 +219,22 @@ function roleForComponent(category) {
   return category;
 }
 
+function inventoryNumberSetSuffix(value) {
+  const text = normalizeText(value);
+
+  if (!text) {
+    return null;
+  }
+
+  const match = text.match(/\/\s*(\d+)\s*$/);
+
+  if (!match) {
+    return null;
+  }
+
+  return Number.parseInt(match[1], 10);
+}
+
 async function loadPeopleByLegacyUserId(supabase) {
   const people = new Map();
   let from = 0;
@@ -417,6 +433,7 @@ async function closeCurrentComponentAssignments(supabase) {
 async function importSetComponents(supabase, sets, setByLegacyId, components) {
   let inserted = 0;
   let missing = 0;
+  let ipadSetSwapHintsSkipped = 0;
   let duplicateComponentsSkipped = 0;
   let duplicateRolesSkipped = 0;
   const assignedComponentIds = new Set();
@@ -439,6 +456,17 @@ async function importSetComponents(supabase, sets, setByLegacyId, components) {
       }
 
       const role = roleForComponent(component.category);
+      const setSuffix = inventoryNumberSetSuffix(inventoryNumber);
+
+      if (
+        role === "ipad" &&
+        setSuffix !== null &&
+        setSuffix !== normalizeInteger(legacySet.SetID)
+      ) {
+        ipadSetSwapHintsSkipped += 1;
+        continue;
+      }
+
       const setRoleKey = `${setId}:${role}`;
 
       if (assignedComponentIds.has(component.id)) {
@@ -472,6 +500,7 @@ async function importSetComponents(supabase, sets, setByLegacyId, components) {
   return {
     inserted,
     missing,
+    ipad_set_swap_hints_skipped: ipadSetSwapHintsSkipped,
     duplicate_components_skipped: duplicateComponentsSkipped,
     duplicate_roles_skipped: duplicateRolesSkipped,
   };
@@ -603,6 +632,8 @@ console.log(
       sets_skipped_missing_legacy_id: setImportStats.skipped,
       component_assignments_inserted: componentAssignmentStats.inserted,
       component_assignments_missing_components: componentAssignmentStats.missing,
+      component_assignments_ipad_set_swap_hints_skipped:
+        componentAssignmentStats.ipad_set_swap_hints_skipped,
       component_assignments_duplicate_components_skipped:
         componentAssignmentStats.duplicate_components_skipped,
       component_assignments_duplicate_roles_skipped:

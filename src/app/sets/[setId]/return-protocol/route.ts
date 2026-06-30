@@ -75,6 +75,11 @@ type ReturnChecks = {
   powerAdapter: boolean;
 };
 
+type ReturnRequirements = {
+  adapter: boolean;
+  hdmiCable: boolean;
+};
+
 function normalizeJoined<T>(value: T | T[] | null) {
   return Array.isArray(value) ? (value[0] ?? null) : value;
 }
@@ -231,6 +236,7 @@ function buildPdfContent(data: {
   person: PersonAssignmentRow["person"];
   returnDefects: string | null;
   returnChecks: ReturnChecks;
+  returnRequirements: ReturnRequirements;
   returnResolutions: string | null;
   set: SetRow;
 }) {
@@ -255,8 +261,8 @@ function buildPdfContent(data: {
     data.returnChecks.keyboard &&
     data.returnChecks.powerAdapter &&
     data.returnChecks.chargingCable &&
-    data.returnChecks.adapter &&
-    data.returnChecks.hdmiCable;
+    (!data.returnRequirements.adapter || data.returnChecks.adapter) &&
+    (!data.returnRequirements.hdmiCable || data.returnChecks.hdmiCable);
   const hasReturnDefects = Boolean(data.returnDefects?.trim());
   const hasReturnResolutions = Boolean(data.returnResolutions?.trim());
 
@@ -317,7 +323,7 @@ function buildPdfContent(data: {
       "Oben genanntes Gerät wurde mitsamt Zubehör ordnungsgemäß an den Schulträger zurückgegeben.",
       10,
     ),
-    checkbox(48, 324, returnedCompletely),
+    checkbox(48, 324, !hasReturnDefects),
     textLine(64, 325, "Bei Rückgabe des Gerätes waren keine Mängel erkennbar.", 10),
     textLine(48, 292, "Das Gerät wies folgende Mängel auf:", 10, "F2"),
     hasReturnDefects ? textBlock(48, 274, data.returnDefects ?? "", 92, 3) : "",
@@ -430,6 +436,7 @@ export async function GET(
   const [
     componentAssignmentsResult,
     personAssignmentResult,
+    supplementalAssignmentsResult,
   ] = await Promise.all([
     supabase
       .from("set_component_assignment")
@@ -447,6 +454,10 @@ export async function GET(
       .not("returned_at", "is", null)
       .order("returned_at", { ascending: false })
       .limit(1),
+    supabase
+      .from("set_supplemental_assignment")
+      .select("item_type")
+      .eq("set_id", setId),
   ]);
 
   if (componentAssignmentsResult.error) {
@@ -455,6 +466,10 @@ export async function GET(
 
   if (personAssignmentResult.error) {
     throw personAssignmentResult.error;
+  }
+
+  if (supplementalAssignmentsResult.error) {
+    throw supplementalAssignmentsResult.error;
   }
 
   const componentAssignments = (
@@ -468,6 +483,13 @@ export async function GET(
   for (const assignment of componentAssignments) {
     componentsByRole.set(assignment.role, assignment.component);
   }
+
+  const returnRequirements: ReturnRequirements = {
+    adapter: componentsByRole.has("adapter"),
+    hdmiCable: (supplementalAssignmentsResult.data ?? []).some(
+      (assignment) => assignment.item_type === "hdmi_cable",
+    ),
+  };
 
   const rawPersonAssignment = Array.isArray(personAssignmentResult.data)
     ? ((personAssignmentResult.data[0] ?? null) as RawPersonAssignmentRow | null)
@@ -506,6 +528,7 @@ export async function GET(
     person,
     returnDefects: rawPersonAssignment?.return_defects ?? null,
     returnChecks,
+    returnRequirements,
     returnResolutions: rawPersonAssignment?.return_resolutions ?? null,
     set: setData as SetRow,
   });

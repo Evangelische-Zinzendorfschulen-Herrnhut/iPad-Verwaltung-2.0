@@ -18,6 +18,7 @@ export type GeraeteTableRow = {
   manufacturerModel: string;
   serialNumber: string | null;
   setLabel: string;
+  storageHref: string | null;
   storageLabel: string;
 };
 
@@ -32,6 +33,7 @@ type ContextMenuState = {
   condition: string;
   editHref: string | null;
   inventoryNumber: string;
+  storageHref: string | null;
   x: number;
   y: number;
 } | null;
@@ -79,6 +81,7 @@ export function GeraeteTable({
       condition: row.condition,
       editHref: row.editHref,
       inventoryNumber: row.legacyInventoryNumber,
+      storageHref: row.storageHref,
       x: event.clientX,
       y: event.clientY,
     });
@@ -144,7 +147,15 @@ export function GeraeteTable({
                   ) : null}
                 </td>
                 {canEditComponents ? (
-                  <td className="px-4 py-3">
+                  <td className="flex flex-wrap gap-2 px-4 py-3">
+                    {row.storageHref ? (
+                      <Link
+                        className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-semibold transition hover:bg-zinc-50"
+                        href={row.storageHref}
+                      >
+                        Lagerort
+                      </Link>
+                    ) : null}
                     {row.editHref ? (
                       <Link
                         className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-semibold transition hover:bg-zinc-50"
@@ -172,6 +183,14 @@ export function GeraeteTable({
               href={contextMenu.editHref}
             >
               Datensatz bearbeiten
+            </Link>
+          ) : null}
+          {contextMenu.storageHref ? (
+            <Link
+              className="block w-full rounded px-3 py-2 text-left font-medium hover:bg-zinc-100"
+              href={contextMenu.storageHref}
+            >
+              Lagerort ändern
             </Link>
           ) : null}
           {contextMenu.condition === "defekt" ? (

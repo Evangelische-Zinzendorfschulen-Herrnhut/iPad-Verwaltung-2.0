@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
@@ -6,6 +7,10 @@ import { getCurrentAppUser, hasAnyRole } from "@/lib/auth/current-user";
 import { createClient } from "@/lib/supabase/server";
 import { FieldIcon } from "@/app/schadensfaelle/field-icon";
 import { DamageReplacementFields } from "../damage-replacement-fields";
+
+export const metadata: Metadata = {
+  title: "Neuer Schaden | iPad-Verwaltung",
+};
 
 type DamageNewPageProps = {
   params: Promise<{
@@ -58,6 +63,24 @@ type InventoryComponentOptionRow = {
 type ComponentAssignmentCandidateRow = {
   component_id: string;
   set_id: string;
+};
+
+type ActiveComponentAssignmentRow = {
+  id: string;
+  component_id: string;
+  role: string;
+  set_id: string;
+  set: {
+    availability: string;
+    legacy_set_id: number;
+  } | null;
+};
+
+type RawActiveComponentAssignmentRow = Omit<
+  ActiveComponentAssignmentRow,
+  "set"
+> & {
+  set: ActiveComponentAssignmentRow["set"] | ActiveComponentAssignmentRow["set"][];
 };
 
 function FormFieldLabel({
@@ -318,6 +341,191 @@ async function applyReplacementSetIssue({
   }
 }
 
+async function applyReplacementComponentIssue({
+  damagedComponentId,
+  damageNumber,
+  effectiveAt,
+  replacementComponentId,
+  setId,
+}: {
+  damagedComponentId: string;
+  damageNumber: number;
+  effectiveAt: string;
+  replacementComponentId: string;
+  setId: string;
+}) {
+  const supabase = await createClient();
+  const [
+    { data: currentSet, error: currentSetError },
+    { data: damagedAssignmentData, error: damagedAssignmentError },
+    { data: replacementAssignmentData, error: replacementAssignmentError },
+    { data: damagedComponent, error: damagedComponentError },
+    { data: replacementComponent, error: replacementComponentError },
+  ] = await Promise.all([
+    supabase
+      .from("inventory_set")
+      .select("legacy_set_id")
+      .eq("id", setId)
+      .maybeSingle(),
+    supabase
+      .from("set_component_assignment")
+      .select("id,set_id,component_id,role,set:set_id(legacy_set_id,availability)")
+      .eq("set_id", setId)
+      .eq("component_id", damagedComponentId)
+      .is("valid_until", null)
+      .maybeSingle(),
+    supabase
+      .from("set_component_assignment")
+      .select("id,set_id,component_id,role,set:set_id(legacy_set_id,availability)")
+      .eq("component_id", replacementComponentId)
+      .is("valid_until", null)
+      .maybeSingle(),
+    supabase
+      .from("inventory_component")
+      .select("id,category,legacy_inventory_number")
+      .eq("id", damagedComponentId)
+      .maybeSingle(),
+    supabase
+      .from("inventory_component")
+      .select("id,category,legacy_inventory_number")
+      .eq("id", replacementComponentId)
+      .maybeSingle(),
+  ]);
+
+  if (currentSetError) {
+    throw currentSetError;
+  }
+
+  if (damagedAssignmentError) {
+    throw damagedAssignmentError;
+  }
+
+  if (replacementAssignmentError) {
+    throw replacementAssignmentError;
+  }
+
+  if (damagedComponentError) {
+    throw damagedComponentError;
+  }
+
+  if (replacementComponentError) {
+    throw replacementComponentError;
+  }
+
+  const damagedAssignment = damagedAssignmentData
+    ? ({
+        ...damagedAssignmentData,
+        set: normalizeJoin(
+          (damagedAssignmentData as RawActiveComponentAssignmentRow).set,
+        ),
+      } as ActiveComponentAssignmentRow)
+    : null;
+  const replacementAssignment = replacementAssignmentData
+    ? ({
+        ...replacementAssignmentData,
+        set: normalizeJoin(
+          (replacementAssignmentData as RawActiveComponentAssignmentRow).set,
+        ),
+      } as ActiveComponentAssignmentRow)
+    : null;
+
+  if (!currentSet || !damagedAssignment || !damagedComponent || !replacementComponent) {
+    throw new Error("Komponententausch konnte nicht vorbereitet werden.");
+  }
+
+  if (damagedComponent.category !== replacementComponent.category) {
+    throw new Error("Ersatzkomponente passt nicht zur betroffenen Komponente.");
+  }
+
+  if (damagedAssignment.role !== replacementComponent.category) {
+    throw new Error("Ersatzkomponente passt nicht zur Set-Rolle.");
+  }
+
+  if (replacementAssignment?.set_id === setId) {
+    throw new Error("Ersatzkomponente ist bereits diesem Set zugeordnet.");
+  }
+
+  if (replacementAssignment?.set?.availability === "ausgegeben") {
+    throw new Error("Ersatzkomponente ist einem ausgegebenen Set zugeordnet.");
+  }
+
+  const validAt = new Date(`${effectiveAt}T00:00:00.000Z`).toISOString();
+  const note = `Automatischer Komponententausch aus Schaden ${damageNumber}: ${damagedComponent.legacy_inventory_number} -> ${replacementComponent.legacy_inventory_number}.`;
+
+  if (replacementAssignment) {
+    const { error: closeReplacementSourceError } = await supabase
+      .from("set_component_assignment")
+      .update({ valid_until: validAt, source: "damage_component_replacement" })
+      .eq("id", replacementAssignment.id)
+      .is("valid_until", null);
+
+    if (closeReplacementSourceError) {
+      throw closeReplacementSourceError;
+    }
+  }
+
+  const { error: closeDamagedAssignmentError } = await supabase
+    .from("set_component_assignment")
+    .update({ valid_until: validAt, source: "damage_component_replacement" })
+    .eq("id", damagedAssignment.id)
+    .is("valid_until", null);
+
+  if (closeDamagedAssignmentError) {
+    throw closeDamagedAssignmentError;
+  }
+
+  const { error: newAssignmentError } = await supabase
+    .from("set_component_assignment")
+    .insert({
+      component_id: replacementComponentId,
+      legacy_set_id: currentSet.legacy_set_id,
+      role: damagedAssignment.role,
+      set_id: setId,
+      source: "damage_component_replacement",
+      valid_from: validAt,
+    });
+
+  if (newAssignmentError) {
+    throw newAssignmentError;
+  }
+
+  const [damagedComponentUpdate, targetSetUpdate, sourceSetUpdate] =
+    await Promise.all([
+      supabase
+        .from("inventory_component")
+        .update({
+          condition: "defekt",
+          legacy_status: "defekt",
+        })
+        .eq("id", damagedComponentId),
+      supabase
+        .from("inventory_set")
+        .update({ notes: note })
+        .eq("id", setId),
+      replacementAssignment?.set_id
+        ? supabase
+            .from("inventory_set")
+            .update({
+              condition: "unvollständig",
+              notes: note,
+            })
+            .eq("id", replacementAssignment.set_id)
+        : Promise.resolve({ error: null }),
+    ]);
+
+  if (damagedComponentUpdate.error) {
+    throw damagedComponentUpdate.error;
+  }
+
+  if (targetSetUpdate.error) {
+    throw targetSetUpdate.error;
+  }
+
+  if (sourceSetUpdate.error) {
+    throw sourceSetUpdate.error;
+  }
+}
+
 async function createDamageCase(formData: FormData) {
   "use server";
 
@@ -350,7 +558,7 @@ async function createDamageCase(formData: FormData) {
   const storageLabel = String(formData.get("storage_label") ?? "").trim();
   const returnTo = String(formData.get("return_to") ?? "/sets");
 
-  if (!setId || !assignmentId || !caseType || !affectedItem || !reportedAt) {
+  if (!setId || !caseType || !affectedItem || !reportedAt) {
     redirect(appendFlagToHref(returnTo, "error", "missing_required"));
   }
 
@@ -410,7 +618,7 @@ async function createDamageCase(formData: FormData) {
     .from("damage_case")
     .insert({
       set_id: setId,
-      set_person_assignment_id: assignmentId,
+      set_person_assignment_id: assignmentId || null,
       person_id: personId || null,
       component_id: componentId || null,
       replacement_component_id: replacementComponentId || null,
@@ -464,6 +672,20 @@ async function createDamageCase(formData: FormData) {
         issuedAt: replacementIssuedAt || reportedAt,
         personId,
         replacementSetId,
+        setId,
+      });
+    }
+
+    if (
+      componentId &&
+      replacementComponentId &&
+      componentId !== replacementComponentId
+    ) {
+      await applyReplacementComponentIssue({
+        damagedComponentId: componentId,
+        damageNumber: damageCase.damage_number,
+        effectiveAt: replacementIssuedAt || reportedAt,
+        replacementComponentId,
         setId,
       });
     }
@@ -564,10 +786,6 @@ export default async function DamageNewPage({
       }
     : null;
 
-  if (!assignment) {
-    redirect("/sets?error=no_current_assignment");
-  }
-
   const componentAssignments = (
     (componentData ?? []) as RawComponentAssignmentRow[]
   ).map((componentAssignment) => ({
@@ -642,12 +860,12 @@ export default async function DamageNewPage({
               {isProblemMode ? "Problem melden" : "Schaden oder Verlust melden"}
             </h1>
             <p className="mt-2 text-sm text-zinc-600">
-              Set {set.legacy_set_id} · {formatPerson(assignment.person)}
+              Set {set.legacy_set_id} · {formatPerson(assignment?.person ?? null)}
             </p>
           </div>
         ) : (
           <p className="text-sm text-zinc-600">
-            Set {set.legacy_set_id} · {formatPerson(assignment.person)}
+            Set {set.legacy_set_id} · {formatPerson(assignment?.person ?? null)}
           </p>
         )}
 
@@ -660,8 +878,8 @@ export default async function DamageNewPage({
           }
         >
           <input name="set_id" type="hidden" value={set.id} />
-          <input name="assignment_id" type="hidden" value={assignment.id} />
-          <input name="person_id" type="hidden" value={assignment.person_id ?? ""} />
+          <input name="assignment_id" type="hidden" value={assignment?.id ?? ""} />
+          <input name="person_id" type="hidden" value={assignment?.person_id ?? ""} />
           <input name="return_to" type="hidden" value={returnTo} />
 
           <div className="grid gap-4 sm:grid-cols-3">

@@ -1,7 +1,13 @@
 import Link from "next/link";
 
 type SectionTabsProps = {
-  active: "personen" | "sets" | "ausgaben" | "geraete" | "schadensfaelle";
+  active:
+    | "personen"
+    | "sets"
+    | "wagen-w1"
+    | "ausgaben"
+    | "geraete"
+    | "schadensfaelle";
 };
 
 const tabs = [
@@ -10,6 +16,7 @@ const tabs = [
   { key: "ausgaben", label: "Aus-/Rückgaben", href: "/ausgaben" },
   { key: "geraete", label: "Geräte", href: "/geraete" },
   { key: "schadensfaelle", label: "Schadensfälle", href: "/schadensfaelle" },
+  { key: "wagen-w1", label: "Wagen W1", href: "/sets/w1" },
 ] as const;
 
 export function SectionTabs({ active }: SectionTabsProps) {

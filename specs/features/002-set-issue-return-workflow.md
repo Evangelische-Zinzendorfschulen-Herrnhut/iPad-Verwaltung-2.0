@@ -59,9 +59,17 @@ Die aktuelle Set-Zuordnung wird separat gespeichert. Der zweite Zahlenblock der 
 3. Nutzer markiert je Komponente und Zubehoer: vorhanden, fehlt, beschaedigt, Zustand/Notiz.
 4. Nutzer bestaetigt Rueckgabe.
 5. System setzt Ausleihe auf `abgeschlossen`, wenn alle noetigen Angaben erfasst sind.
-6. System setzt verfuegbare Komponenten wieder auf `verfuegbar`.
+6. System setzt das Set zunaechst auf Set-Verfuegbarkeit `blockiert`, damit technische Ruecksetzung, Vollstaendigkeitspruefung und Einlagerung bewusst abgeschlossen werden.
 7. Fehlende oder beschaedigte Komponenten und Zubehoerteile werden fuer Folgeprozesse markiert.
 8. System schreibt Audit-Logs.
+
+## Folgeworkflow: Zuruecksetzen und freigeben
+
+1. Nutzer oeffnet ein zurueckgegebenes Set in der Setliste oder in der Aus- und Rueckgabeliste.
+2. System bietet die Aktion "Zuruecksetzen und freigeben" nur fuer berechtigte Nutzer an, wenn keine aktive Ausleihe existiert, das Set aktuell `blockiert` ist und der Set-Zustand `ok` ist.
+3. Nutzer bestaetigt nach technischer Ruecksetzung und Sichtpruefung die Freigabe.
+4. System setzt die Set-Verfuegbarkeit auf `frei`.
+5. System schreibt Audit-Logs.
 
 ## Aus- und Rueckgabeliste
 
@@ -126,6 +134,8 @@ Die iPad-Verwaltung braucht eine chronologische Arbeitsliste der Set-Ausgaben un
 - Die Aus- und Rueckgabeliste zeigt aktive und abgeschlossene Ausleihen mit Setnummer, Person, Klasse, Ausgabe- und Rueckgabedatum.
 - Die Aus- und Rueckgabeliste kann nach Person oder Setnummer durchsucht und nach Status gefiltert werden.
 - Von abgeschlossenen Eintraegen kann das Rueckgabeprotokoll geoeffnet werden.
+- Von vollstaendig zurueckgegebenen, blockierten und `ok` geprueften Sets kann die Aktion "Zuruecksetzen und freigeben" aus der Setliste und aus der Aus- und Rueckgabeliste ausgefuehrt werden.
+- Die Freigabe setzt serverseitig voraus, dass keine aktive Ausleihe fuer das Set existiert, das Set `blockiert` ist und der Set-Zustand `ok` ist.
 - Von aktiven Eintraegen kann die Rueckgabe ueber die Set-Liste fortgesetzt werden.
 - Aus- und Rueckgabe-Eintraege koennen ueber das Kontextmenue korrigiert werden, ohne die eigentliche Ruecknahme-Logik zu ersetzen.
 

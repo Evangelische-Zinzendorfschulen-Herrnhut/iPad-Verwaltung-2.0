@@ -7,6 +7,7 @@ export type SetsTableRow = {
   availability: string;
   condition: string;
   damageHref: string | null;
+  detailHref: string;
   id: string;
   ipad: string;
   keyboard: string;
@@ -16,6 +17,8 @@ export type SetsTableRow = {
   person: string;
   previousPerson: string | null;
   problemHref: string | null;
+  releaseReturnTo: string;
+  releasable: boolean;
   returnProtocolHref: string | null;
   returnSetHref: string | null;
   storageHref: string | null;
@@ -23,21 +26,26 @@ export type SetsTableRow = {
 };
 
 type SetsTableProps = {
+  releaseAction: (formData: FormData) => void | Promise<void>;
   rows: SetsTableRow[];
 };
 
 type ContextMenuState = {
   damageHref: string | null;
+  detailHref: string;
   problemHref: string | null;
+  releaseReturnTo: string;
+  releasable: boolean;
   returnProtocolHref: string | null;
   returnSetHref: string | null;
+  setId: string;
   setLabel: string;
   storageHref: string | null;
   x: number;
   y: number;
 } | null;
 
-export function SetsTable({ rows }: SetsTableProps) {
+export function SetsTable({ releaseAction, rows }: SetsTableProps) {
   const [contextMenu, setContextMenu] = useState<ContextMenuState>(null);
 
   useEffect(() => {
@@ -64,9 +72,13 @@ export function SetsTable({ rows }: SetsTableProps) {
     event.preventDefault();
     setContextMenu({
       damageHref: row.damageHref,
+      detailHref: row.detailHref,
       problemHref: row.problemHref,
+      releaseReturnTo: row.releaseReturnTo,
+      releasable: row.releasable,
       returnProtocolHref: row.returnProtocolHref,
       returnSetHref: row.returnSetHref,
+      setId: row.id,
       setLabel: `Set ${row.legacySetId}`,
       storageHref: row.storageHref,
       x: event.clientX,
@@ -121,13 +133,38 @@ export function SetsTable({ rows }: SetsTableProps) {
                   {row.legacyStatus ?? "-"}
                 </td>
                 <td className="px-4 py-3">
-                  {row.damageHref ? (
-                    <Link
-                      className="rounded-md border border-zinc-300 px-3 py-2 text-xs font-semibold transition hover:bg-zinc-50"
-                      href={row.damageHref}
-                    >
-                      Schaden/Verlust
-                    </Link>
+                  {row.damageHref || row.problemHref || row.releasable ? (
+                    <div className="flex flex-wrap gap-2">
+                      {row.releasable ? (
+                        <form action={releaseAction}>
+                          <input name="set_id" type="hidden" value={row.id} />
+                          <input
+                            name="return_to"
+                            type="hidden"
+                            value={row.releaseReturnTo}
+                          />
+                          <button className="rounded-md border border-emerald-300 px-3 py-2 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-50">
+                            Zurücksetzen und freigeben
+                          </button>
+                        </form>
+                      ) : null}
+                      {row.damageHref ? (
+                        <Link
+                          className="rounded-md border border-zinc-300 px-3 py-2 text-xs font-semibold transition hover:bg-zinc-50"
+                          href={row.damageHref}
+                        >
+                          Schaden/Verlust
+                        </Link>
+                      ) : null}
+                      {row.problemHref ? (
+                        <Link
+                          className="rounded-md border border-zinc-300 px-3 py-2 text-xs font-semibold transition hover:bg-zinc-50"
+                          href={row.problemHref}
+                        >
+                          Problem
+                        </Link>
+                      ) : null}
+                    </div>
                   ) : (
                     <span className="text-zinc-400">-</span>
                   )}
@@ -143,6 +180,12 @@ export function SetsTable({ rows }: SetsTableProps) {
           className="fixed z-50 min-w-64 rounded-md border border-zinc-200 bg-white p-1 text-sm shadow-lg"
           style={{ left: contextMenu.x, top: contextMenu.y }}
         >
+          <Link
+            className="block w-full rounded px-3 py-2 text-left font-medium hover:bg-zinc-100"
+            href={contextMenu.detailHref}
+          >
+            Datensatz anzeigen
+          </Link>
           {contextMenu.returnProtocolHref ? (
             <a
               className="block w-full rounded px-3 py-2 text-left font-medium hover:bg-zinc-100"
@@ -184,6 +227,19 @@ export function SetsTable({ rows }: SetsTableProps) {
             >
               Lagerort ändern
             </Link>
+          ) : null}
+          {contextMenu.releasable ? (
+            <form action={releaseAction}>
+              <input name="set_id" type="hidden" value={contextMenu.setId} />
+              <input
+                name="return_to"
+                type="hidden"
+                value={contextMenu.releaseReturnTo}
+              />
+              <button className="block w-full rounded px-3 py-2 text-left font-medium text-emerald-700 hover:bg-emerald-50">
+                Zurücksetzen und freigeben
+              </button>
+            </form>
           ) : null}
           <p className="border-t border-zinc-100 px-3 py-2 text-xs text-zinc-500">
             {contextMenu.setLabel}

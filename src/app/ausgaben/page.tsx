@@ -1,11 +1,17 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { getCurrentAppUser, hasAnyRole } from "@/lib/auth/current-user";
 import { createClient } from "@/lib/supabase/server";
+import { releaseReturnedSet } from "../actions/release-set";
 import { SectionTabs } from "../section-tabs";
 import { AssignmentFilterForm } from "./assignment-filter-form";
 import { AssignmentsTable, type AssignmentTableRow } from "./assignments-table";
+
+export const metadata: Metadata = {
+  title: "Ausgaben | iPad-Verwaltung",
+};
 
 type AssignmentStatus = "active" | "all" | "returned";
 type AssignmentSort = "issued_asc" | "name_asc" | "returned_desc";
@@ -28,6 +34,7 @@ type AssignmentRow = {
     id: string;
     legacy_set_id: number;
     availability: string;
+    condition: string;
     storage_label: string | null;
   } | null;
   person: {
@@ -547,7 +554,7 @@ export default async function AusgabenPage({
   let assignmentsQuery = supabase
     .from("set_person_assignment")
     .select(
-      "id,issued_at,issue_note,return_charging_cable_present,return_defects,return_ipad_present,return_keyboard_present,returned_at,return_note,return_pencil_cap_present,return_pencil_present,return_power_adapter_present,return_resolutions,set:set_id(id,legacy_set_id,availability,storage_label),person:person_id(id,first_name,last_name,email,person_type)",
+      "id,issued_at,issue_note,return_charging_cable_present,return_defects,return_ipad_present,return_keyboard_present,returned_at,return_note,return_pencil_cap_present,return_pencil_present,return_power_adapter_present,return_resolutions,set:set_id(id,legacy_set_id,availability,condition,storage_label),person:person_id(id,first_name,last_name,email,person_type)",
       { count: "exact" },
     );
   const requiredAssignmentIdsByFilter: string[][] = [];
@@ -795,6 +802,7 @@ export default async function AusgabenPage({
     const setId = assignment.set?.id ?? "";
     const legacySetId = assignment.set?.legacy_set_id;
     const isActive = !assignment.returned_at;
+    const returnComplete = deriveReturnComplete(assignment);
 
     return {
       classLabel: assignment.person
@@ -804,13 +812,21 @@ export default async function AusgabenPage({
       id: assignment.id,
       issuedAt: formatDate(assignment.issued_at),
       person: formatPerson(assignment.person),
-      returnComplete: deriveReturnComplete(assignment),
+      releaseReturnTo: buildCloseStorageHref(params),
+      releasable:
+        canEditSetStorage &&
+        !isActive &&
+        returnComplete === true &&
+        assignment.set?.availability === "blockiert" &&
+        assignment.set?.condition === "ok",
+      returnComplete,
       returnHref:
         isActive && setId ? `/sets?return=${setId}` : null,
       returnProtocolHref:
         !isActive && setId ? `/sets/${setId}/return-protocol` : null,
       returnedAt: formatDate(assignment.returned_at),
       setHref: setId ? `/sets?q=${legacySetId ?? ""}&sort=set` : "/sets",
+      setId,
       setLabel: legacySetId ? `Set ${legacySetId}` : "Set -",
       status: isActive ? "Aktiv" : "Zurückgegeben",
       storageHref:
@@ -858,7 +874,7 @@ export default async function AusgabenPage({
       ? await supabase
           .from("set_person_assignment")
           .select(
-            "id,issued_at,issue_note,return_charging_cable_present,return_defects,return_ipad_present,return_keyboard_present,returned_at,return_note,return_pencil_cap_present,return_pencil_present,return_power_adapter_present,return_resolutions,set:set_id(id,legacy_set_id,availability,storage_label),person:person_id(id,first_name,last_name,email,person_type)",
+            "id,issued_at,issue_note,return_charging_cable_present,return_defects,return_ipad_present,return_keyboard_present,returned_at,return_note,return_pencil_cap_present,return_pencil_present,return_power_adapter_present,return_resolutions,set:set_id(id,legacy_set_id,availability,condition,storage_label),person:person_id(id,first_name,last_name,email,person_type)",
           )
           .eq("id", editAssignmentId)
           .maybeSingle()
@@ -1016,7 +1032,7 @@ export default async function AusgabenPage({
           />
 
           {rows.length > 0 ? (
-            <AssignmentsTable rows={rows} />
+            <AssignmentsTable releaseAction={releaseReturnedSet} rows={rows} />
           ) : (
             <div className="px-4 py-8 text-sm text-zinc-600">
               Keine Aus- oder Rückgaben für die aktuelle Auswahl gefunden.

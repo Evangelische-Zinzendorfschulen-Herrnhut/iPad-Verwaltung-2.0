@@ -40,6 +40,14 @@ Die Schule braucht eine verlaessliche Uebersicht ueber alle Komponenten eines iP
 7. System aktualisiert Set-Zustand und Set-Verfuegbarkeit.
 8. System schreibt Audit-Logs.
 
+## Workflow: Wagenuebersicht W1 anzeigen
+
+1. Nutzer oeffnet die zusaetzliche Liste `Wagen W1` aus der Set-Liste.
+2. System zeigt alle Sets, deren Set-Lagerort mit `W1` beginnt.
+3. System sortiert erkannte Wagenplaetze 1 bis 30 aufsteigend und zeigt Sets ohne erkannten Platz danach.
+4. System zeigt pro Set Platz, Setnummer, aktuelle Person, Klasse, iPad, Pencil, Tastatur, Verfuegbarkeit, Zustand und Lagerort.
+5. Nutzer kann die W1-Uebersicht als XLSX herunterladen.
+
 ## Datenobjekte
 
 - Komponente
@@ -59,10 +67,13 @@ Die Schule braucht eine verlaessliche Uebersicht ueber alle Komponenten eines iP
 - Komponenten-Neuzuordnungen bleiben historisch nachvollziehbar.
 - Fuer freie und blockierte Sets ist ein Lagerort dokumentierbar.
 - Fuer einzelne Komponenten ist ein eigener Lagerort dokumentierbar, unabhaengig vom Lagerort des Sets.
+- Aus der Set-Liste kann ein Set-Datensatz read-only angezeigt werden.
+- Die Set-Liste zeigt fuer freie und blockierte Sets bei Bedarf den letzten bekannten Nutzer ausgegraut als historischen Hinweis.
 - Start-Lagerorte sind W1 bis W6 mit je 30 Plätzen sowie Schrank1, Schrank2 und Regal1.
 - Bei W1 bis W6 soll der konkrete Platz 1-30 dokumentiert werden.
 - Sets koennen einer Person zugeordnet sein und trotzdem physisch im Lager oder Wagen liegen, insbesondere bei Schuelern der 5. und 6. Klassen.
 - Wagenplaetze sollen vorrangig komplette Sets enthalten.
+- Fuer Wagen W1 gibt es eine zusaetzliche Uebersichtsliste mit XLSX-Export.
 
 ## Offene Fragen
 

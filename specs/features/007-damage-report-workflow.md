@@ -54,6 +54,8 @@ Der erste Schnitt bildet noch nicht den vollstaendigen Eltern-PDF- und Abrechnun
 
 Alternativ kann der Nutzer aus der Set-Liste `Problem melden` starten. Dann ist `technisches Problem` als Vorgangsart vorausgewaehlt. Das Formular nutzt die gleichen Grunddaten, blendet aber Hergang und Zeugen aus, bezeichnet die Detailbeschreibung als `Problembeschreibung` und erlaubt, den Lagerort des Sets direkt mit dem Vorgang zu aktualisieren.
 
+Fuer freie Sets koennen Schaeden, Verluste oder technische Probleme ebenfalls aus der Set-Liste angelegt werden. In diesem Fall wird der Vorgang mit Set und betroffenen Komponenten gespeichert, aber ohne aktuelle Person und ohne aktuelle Set-Person-Zuordnung. Das dient Bestandsklaerung, Lagerpruefung und Reparaturvorbereitung. Personenbezogene Folgeprozesse wie Setwechsel oder Eltern-/Schuelerkommunikation greifen erst, wenn eine Personenzuordnung vorhanden ist oder spaeter fachlich ergaenzt wird.
+
 Neue Schadensfaelle erhalten zusaetzlich zur technischen UUID eine fortlaufende `damage_number` als menschlich lesbare Schadensnummer. Die UUID bleibt Primaerschluessel; die Schadensnummer wird fuer Suche, Anzeige und Kommunikation genutzt.
 
 Wenn beim Anlegen eines Schadensfalls der Austauschstatus `ausgegeben` und ein Ersatzset gesetzt werden, fuehrt die App den Setwechsel direkt aus:
@@ -64,7 +66,15 @@ Wenn beim Anlegen eines Schadensfalls der Austauschstatus `ausgegeben` und ein E
 - Das Ersatzset wird als `ausgegeben` und `ok` markiert.
 - Bei Setschaden wird die aktuelle iPad-Komponente des alten Sets als `defekt` markiert.
 
-Assumption: Im ersten Schnitt wird dieser automatische Setwechsel nur fuer Ersatzsets ausgefuehrt. Reine Ersatzkomponenten-Zuordnungen bleiben bis zum ausgebauten Geraetetausch-Workflow manuell zu pruefen.
+Wenn beim Anlegen eines Schadensfalls eine betroffene Komponente und eine Ersatzkomponente gesetzt werden, fuehrt die App den Komponententausch direkt aus:
+
+- Die bisher aktive Set-Komponenten-Zuordnung der defekten Komponente wird historisiert beendet.
+- Die Ersatzkomponente wird mit derselben Rolle dem Set zugeordnet.
+- Die defekte Komponente wird als `defekt` markiert.
+- Ist die Ersatzkomponente bisher Teil eines freien oder blockierten Sets, wird diese bisherige Zuordnung beendet und das Quellset als `unvollständig` markiert.
+- Ersatzkomponenten aus ausgegebenen Sets duerfen nicht automatisch entnommen werden.
+
+Assumption: Automatischer Komponenten- und Setwechsel sind erste technische Folgeaktionen des Schadensworkflows. Weitergehende Geraetetauschfristen und Erinnerungen bleiben Teil des ausgebauten Geraetetausch-Workflows.
 
 ## Bearbeiten bestehender Schadensfaelle
 
@@ -187,9 +197,10 @@ Assumption: Das Legacy-Feld `VersicherungGarantie` wird in der UI fachlich als `
 
 - Aus einem fachlich `ausgegeben`en Set kann ein Schadens-/Verlustvorgang angelegt werden.
 - Aus einem fachlich `ausgegeben`en Set kann ein technisches Problem mit vorausgewaehlter Vorgangsart angelegt werden.
+- Aus einem fachlich `frei`en Set kann ein Schadens-, Verlust- oder Problemvorgang ohne Person und ohne aktive Set-Person-Zuordnung angelegt werden.
 - Bei technischen Problemen werden Hergang und Zeugen im Formular nicht angezeigt; statt Schadenbeschreibung wird Problembeschreibung angezeigt.
 - Beim Anlegen eines technischen Problems kann der Lagerort des Sets gesetzt oder geleert werden.
-- Der Vorgang ist mit Set, aktueller Person und aktueller Set-Zuordnung verknuepft.
+- Der Vorgang ist immer mit dem Set verknuepft; aktuelle Person und aktuelle Set-Zuordnung werden nur gespeichert, wenn das Set aktiv ausgegeben ist.
 - Vorgangsart und betroffener Gegenstand werden strukturiert gespeichert.
 - Ein Vorgang kann zunaechst ohne Zahlungsforderung existieren.
 - Ein Vorgang veraendert im ersten Schritt nicht automatisch die Set-Verfuegbarkeit.

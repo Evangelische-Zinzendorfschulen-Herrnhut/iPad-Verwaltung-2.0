@@ -1,7 +1,12 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 
 import { getCurrentAppUser } from "@/lib/auth/current-user";
 import { createClient } from "@/lib/supabase/server";
+
+export const metadata: Metadata = {
+  title: "Start | iPad-Verwaltung",
+};
 
 const foundations = [
   { label: "Personen und Klassen", href: "/personen" },
@@ -23,6 +28,31 @@ type DashboardChart = {
   slices: DashboardSlice[];
   title: string;
   totalLabel: string;
+};
+
+type DashboardSetRow = {
+  availability: string;
+  assigned_person: DashboardPerson | DashboardPerson[] | null;
+  id: string;
+};
+
+type DashboardPerson = {
+  id: string;
+  person_type: string;
+};
+
+type DashboardAssignmentRow = {
+  person: DashboardPerson | DashboardPerson[] | null;
+  set_id: string;
+};
+
+type DashboardClassAssignmentRow = {
+  person_id: string;
+  school_class: {
+    grade_level: number | null;
+  } | {
+    grade_level: number | null;
+  }[] | null;
 };
 
 const CHART_COLORS = [
@@ -54,21 +84,53 @@ function countBy<T extends Record<string, unknown>>(rows: T[], key: keyof T) {
     }));
 }
 
-function formatCategory(value: string) {
-  const labels: Record<string, string> = {
-    adapter: "Adapter",
-    charging_cable: "Kabel",
-    hdmi_cable: "HDMI-Kabel",
-    ipad: "iPad",
-    keyboard: "Tastatur",
-    magic_mouse: "Magic-Maus",
-    mouse: "Magic-Maus",
-    other: "Sonstiges",
-    pencil: "Pencil",
-    power_adapter: "Netzteil",
-  };
+function countValues(values: string[]) {
+  const counts = new Map<string, number>();
 
-  return labels[value] ?? value;
+  for (const rawValue of values) {
+    const value = rawValue.trim() || "unbekannt";
+    counts.set(value, (counts.get(value) ?? 0) + 1);
+  }
+
+  return [...counts.entries()]
+    .sort((first, second) => second[1] - first[1])
+    .map(([label, value], index) => ({
+      color: CHART_COLORS[index % CHART_COLORS.length],
+      label,
+      value,
+    }));
+}
+
+function normalizeJoined<T>(value: T | T[] | null | undefined) {
+  return Array.isArray(value) ? (value[0] ?? null) : (value ?? null);
+}
+
+function chunkValues<T>(values: T[], size = 100) {
+  const chunks: T[][] = [];
+
+  for (let index = 0; index < values.length; index += size) {
+    chunks.push(values.slice(index, index + size));
+  }
+
+  return chunks;
+}
+
+function deriveSetAvailability(
+  set: DashboardSetRow,
+  person: DashboardPerson | null,
+  schoolClass?: { grade_level: number | null } | null,
+) {
+  if (!person) {
+    return set.availability;
+  }
+
+  if (person.person_type === "schueler") {
+    return schoolClass?.grade_level && schoolClass.grade_level <= 6
+      ? "zugeordnet"
+      : "ausgegeben";
+  }
+
+  return "ausgegeben";
 }
 
 function formatStatus(value: string) {
@@ -91,6 +153,7 @@ function formatStatus(value: string) {
     schueler: "Schueler",
     storniert: "Storniert",
     unbekannt: "Unbekannt",
+    zugeordnet: "Zugeordnet",
   };
 
   return labels[value] ?? value;
@@ -176,38 +239,104 @@ async function getDashboardCharts(appUser: Awaited<ReturnType<typeof getCurrentA
   }
 
   const supabase = await createClient();
-  const [setsResult, componentsResult, peopleResult, damageCasesResult] =
+  const [setsResult, peopleResult, damageCasesResult] =
     await Promise.all([
-      supabase.from("inventory_set").select("availability").limit(10000),
-      supabase.from("inventory_component").select("category").limit(10000),
-      supabase.from("person").select("person_type").limit(10000),
+      supabase
+        .from("inventory_set")
+        .select("id,availability,assigned_person:assigned_person_id(id,person_type)")
+        .limit(10000),
+      supabase
+        .from("person")
+        .select("person_type")
+        .eq("status", "aktiv")
+        .limit(10000),
       supabase.from("damage_case").select("status").limit(10000),
     ]);
 
   if (
     setsResult.error ||
-    componentsResult.error ||
     peopleResult.error ||
     damageCasesResult.error
   ) {
     throw (
       setsResult.error ??
-      componentsResult.error ??
       peopleResult.error ??
       damageCasesResult.error
     );
   }
 
-  const setSlices = countBy(setsResult.data ?? [], "availability").map((slice) => ({
+  const sets = (setsResult.data ?? []) as DashboardSetRow[];
+  const setIds = sets.map((set) => set.id);
+  const currentAssignments: DashboardAssignmentRow[] = [];
+
+  for (const setIdBatch of chunkValues(setIds)) {
+    const { data, error } = await supabase
+      .from("set_person_assignment")
+      .select("set_id,person:person_id(id,person_type)")
+      .is("returned_at", null)
+      .in("set_id", setIdBatch);
+
+    if (error) {
+      throw error;
+    }
+
+    currentAssignments.push(...((data ?? []) as DashboardAssignmentRow[]));
+  }
+
+  const personBySetId = new Map<string, DashboardPerson | null>();
+
+  for (const assignment of currentAssignments) {
+    personBySetId.set(assignment.set_id, normalizeJoined(assignment.person));
+  }
+
+  for (const set of sets) {
+    if (!personBySetId.has(set.id)) {
+      personBySetId.set(set.id, normalizeJoined(set.assigned_person));
+    }
+  }
+
+  const visiblePersonIds = [
+    ...new Set(
+      [...personBySetId.values()]
+        .map((person) => person?.id)
+      .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+  const classAssignments: DashboardClassAssignmentRow[] = [];
+
+  const classByPersonId = new Map<string, { grade_level: number | null } | null>();
+
+  for (const personIdBatch of chunkValues(visiblePersonIds)) {
+    const { data, error } = await supabase
+      .from("person_class_assignment")
+      .select("person_id,school_class:school_class_id(grade_level)")
+      .is("valid_until", null)
+      .in("person_id", personIdBatch);
+
+    if (error) {
+      throw error;
+    }
+
+    classAssignments.push(...((data ?? []) as DashboardClassAssignmentRow[]));
+  }
+
+  for (const assignment of classAssignments) {
+    classByPersonId.set(
+      assignment.person_id,
+      normalizeJoined(assignment.school_class),
+    );
+  }
+
+  const setAvailabilityValues = sets.map((set) => {
+    const person = personBySetId.get(set.id) ?? null;
+    const schoolClass = person ? classByPersonId.get(person.id) : undefined;
+
+    return deriveSetAvailability(set, person, schoolClass);
+  });
+  const setSlices = countValues(setAvailabilityValues).map((slice) => ({
     ...slice,
     label: formatStatus(slice.label),
   }));
-  const componentSlices = countBy(componentsResult.data ?? [], "category").map(
-    (slice) => ({
-      ...slice,
-      label: formatCategory(slice.label),
-    }),
-  );
   const personSlices = countBy(peopleResult.data ?? [], "person_type").map((slice) => ({
     ...slice,
     label: formatStatus(slice.label),
@@ -227,22 +356,16 @@ async function getDashboardCharts(appUser: Awaited<ReturnType<typeof getCurrentA
       totalLabel: `${setsResult.data?.length ?? 0} Sets`,
     },
     {
-      href: "/geraete",
-      slices: componentSlices,
-      title: "Komponenten nach Kategorie",
-      totalLabel: `${componentsResult.data?.length ?? 0} Komponenten`,
-    },
-    {
-      href: "/personen",
-      slices: personSlices,
-      title: "Personen nach Typ",
-      totalLabel: `${peopleResult.data?.length ?? 0} Personen`,
-    },
-    {
       href: "/schadensfaelle",
       slices: damageCaseSlices,
       title: "Schadensfälle nach Status",
       totalLabel: `${damageCasesResult.data?.length ?? 0} Fälle`,
+    },
+    {
+      href: "/personen?status=aktiv",
+      slices: personSlices,
+      title: "Aktive Personen nach Typ",
+      totalLabel: `${peopleResult.data?.length ?? 0} aktive Personen`,
     },
   ];
 }
@@ -277,11 +400,12 @@ export default async function Home() {
         <div className="flex flex-1 flex-col justify-center">
         <div className="mt-4 max-w-3xl">
           <h1 className="text-4xl font-semibold tracking-tight sm:text-5xl">
-            Arbeitsoberflaeche fuer iPad-Sets
+            iPad-Verwaltung EZSH
           </h1>
           <p className="mt-5 text-lg leading-8 text-zinc-600">
-            Das Projektgrundgeruest steht. Supabase Auth, App-Rollen und die
-            erste Admin-Anmeldung sind angebunden.
+            Die zentrale Arbeitsoberfläche für iPad-Sets: Bestände im Blick,
+            Ausgaben und Rückgaben sauber dokumentiert, Schadensfälle
+            nachvollziehbar gesteuert.
           </p>
         </div>
 

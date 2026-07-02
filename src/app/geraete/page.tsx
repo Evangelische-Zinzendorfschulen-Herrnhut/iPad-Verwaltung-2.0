@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { getCurrentAppUser, hasAnyRole } from "@/lib/auth/current-user";
@@ -6,6 +7,10 @@ import { createClient } from "@/lib/supabase/server";
 import { SectionTabs } from "../section-tabs";
 import { GeraeteFilterForm } from "./geraete-filter-form";
 import { GeraeteTable, type GeraeteTableRow } from "./geraete-table";
+
+export const metadata: Metadata = {
+  title: "Geräte | iPad-Verwaltung",
+};
 
 type ComponentRow = {
   category: string;

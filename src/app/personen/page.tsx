@@ -1,9 +1,14 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { getCurrentAppUser, hasAnyRole } from "@/lib/auth/current-user";
 import { createClient } from "@/lib/supabase/server";
 import { SectionTabs } from "../section-tabs";
+
+export const metadata: Metadata = {
+  title: "Personen | iPad-Verwaltung",
+};
 
 type PersonRow = {
   id: string;

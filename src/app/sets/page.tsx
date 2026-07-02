@@ -1,12 +1,18 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { getCurrentAppUser, hasAnyRole } from "@/lib/auth/current-user";
 import { createClient } from "@/lib/supabase/server";
+import { releaseReturnedSet } from "../actions/release-set";
 import { SectionTabs } from "../section-tabs";
 import DamageNewPage from "./[setId]/damage/new/page";
 import { SetsFilterForm } from "./sets-filter-form";
 import { SetsTable, type SetsTableRow } from "./sets-table";
+
+export const metadata: Metadata = {
+  title: "Sets | iPad-Verwaltung",
+};
 
 type InventorySetRow = {
   id: string;
@@ -154,6 +160,41 @@ function buildDamageHref(
 }
 
 function buildCloseDamageHref(
+  params: Record<string, string | string[] | undefined>,
+) {
+  const nextParams = new URLSearchParams();
+
+  for (const key of ["q", "availability", "condition", "class", "sort", "page"]) {
+    const value = getSingleParam(params, key).trim();
+
+    if (value) {
+      nextParams.set(key, value);
+    }
+  }
+
+  const queryString = nextParams.toString();
+  return queryString ? `/sets?${queryString}` : "/sets";
+}
+
+function buildDetailHref(
+  params: Record<string, string | string[] | undefined>,
+  setId: string,
+) {
+  const nextParams = new URLSearchParams();
+
+  for (const key of ["q", "availability", "condition", "class", "sort", "page"]) {
+    const value = getSingleParam(params, key).trim();
+
+    if (value) {
+      nextParams.set(key, value);
+    }
+  }
+
+  nextParams.set("detail", setId);
+  return `/sets?${nextParams.toString()}`;
+}
+
+function buildCloseDetailHref(
   params: Record<string, string | string[] | undefined>,
 ) {
   const nextParams = new URLSearchParams();
@@ -355,6 +396,25 @@ function supplementalLabel(assignment: SupplementalAssignmentRow) {
   const label = assignment.label || labels[assignment.item_type] || assignment.item_type;
 
   return assignment.quantity > 1 ? `${label} (${assignment.quantity}x)` : label;
+}
+
+function DetailField({
+  label,
+  value,
+}: {
+  label: string;
+  value: number | string | null | undefined;
+}) {
+  return (
+    <div className="rounded-md border border-zinc-200 px-3 py-2">
+      <dt className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+        {label}
+      </dt>
+      <dd className="mt-1 break-words text-sm font-medium text-zinc-900">
+        {value === null || value === undefined || value === "" ? "-" : value}
+      </dd>
+    </div>
+  );
 }
 
 function deriveAvailability(
@@ -595,6 +655,7 @@ export default async function SetsPage({
   const conditionFilter = getSingleParam(params, "condition");
   const classFilter = getSingleParam(params, "class");
   const damageSetId = getSingleParam(params, "damage");
+  const detailSetId = getSingleParam(params, "detail");
   const problemSetId = getSingleParam(params, "problem");
   const returnSetId = getSingleParam(params, "return");
   const storageSetId = getSingleParam(params, "storage");
@@ -1071,7 +1132,10 @@ export default async function SetsPage({
       availability,
       condition: set.condition,
       damageHref:
-        availability === "ausgegeben" ? buildDamageHref(params, set.id) : null,
+        availability === "ausgegeben" || availability === "frei"
+          ? buildDamageHref(params, set.id)
+          : null,
+      detailHref: buildDetailHref(params, set.id),
       id: set.id,
       ipad: componentLabel(ipad),
       keyboard: componentLabel(keyboard),
@@ -1083,11 +1147,15 @@ export default async function SetsPage({
         person ? classByPersonId.get(person.id) : undefined,
       ),
       previousPerson:
-        availability === "frei" && previousPerson
+        (availability === "frei" || availability === "blockiert") && previousPerson
           ? formatPerson(previousPerson)
           : null,
       problemHref:
-        availability === "ausgegeben" ? buildProblemHref(params, set.id) : null,
+        availability === "ausgegeben" || availability === "frei"
+          ? buildProblemHref(params, set.id)
+          : null,
+      releaseReturnTo: buildCloseStorageHref(params),
+      releasable: canEditSetStorage && availability === "blockiert" && set.condition === "ok",
       returnProtocolHref: currentAssignment
         ? null
         : `/sets/${set.id}/return-protocol`,
@@ -1100,6 +1168,7 @@ export default async function SetsPage({
       storageLabel: set.storage_label || "-",
     };
   });
+  const setToShowDetail = sets.find((set) => set.id === detailSetId) ?? null;
   const setToReturn = sets.find((set) => set.id === returnSetId) ?? null;
   const setToEditStorage = sets.find((set) => set.id === storageSetId) ?? null;
   const assignmentToReturn = setToReturn
@@ -1122,6 +1191,32 @@ export default async function SetsPage({
   const pencilAccessoryToReturn = pencilAccessory(pencilToReturn);
   const returnCloseHref = buildCloseReturnHref(params);
   const storageCloseHref = buildCloseStorageHref(params);
+  const detailCloseHref = buildCloseDetailHref(params);
+  const personToShowDetail = setToShowDetail
+    ? (personBySetId.get(setToShowDetail.id) ?? null)
+    : null;
+  const classToShowDetail =
+    personToShowDetail && classByPersonId.has(personToShowDetail.id)
+      ? classByPersonId.get(personToShowDetail.id)
+      : undefined;
+  const previousPersonToShowDetail = setToShowDetail
+    ? (previousPersonBySetId.get(setToShowDetail.id) ?? null)
+    : null;
+  const detailComponents = setToShowDetail
+    ? componentsBySetId.get(setToShowDetail.id)
+    : undefined;
+  const detailSupplemental = setToShowDetail
+    ? (supplementalBySetId.get(setToShowDetail.id) ?? [])
+    : [];
+  const detailAvailability = setToShowDetail
+    ? deriveAvailability(
+        setToShowDetail,
+        personToShowDetail,
+        personToShowDetail
+          ? classDetailByPersonId.get(personToShowDetail.id)
+          : undefined,
+      )
+    : null;
   const returnDateDefault = new Date().toISOString().slice(0, 10);
   const returnSupplementalComponents = [
     componentsToReturn?.get("adapter")?.component
@@ -1163,11 +1258,19 @@ export default async function SetsPage({
               Sets und Inventar
             </h1>
           </div>
-          <form action="/auth/sign-out" method="post">
-            <button className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-medium transition hover:bg-white">
-              Abmelden
-            </button>
-          </form>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-medium transition hover:bg-white"
+              href="/sets/w1"
+            >
+              Wagen W1
+            </Link>
+            <form action="/auth/sign-out" method="post">
+              <button className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-medium transition hover:bg-white">
+                Abmelden
+              </button>
+            </form>
+          </div>
         </header>
 
         <SectionTabs active="sets" />
@@ -1213,7 +1316,7 @@ export default async function SetsPage({
         />
 
           {sets.length > 0 ? (
-            <SetsTable rows={setRows} />
+            <SetsTable releaseAction={releaseReturnedSet} rows={setRows} />
           ) : (
             <div className="px-4 py-8 text-sm text-zinc-600">
               Keine Sets fuer die aktuelle Auswahl gefunden.
@@ -1254,6 +1357,94 @@ export default async function SetsPage({
             </div>
           ) : null}
         </section>
+
+        {setToShowDetail ? (
+          <div className="fixed inset-0 z-40 bg-zinc-950/25">
+            <aside className="ml-auto flex h-full w-full max-w-3xl flex-col overflow-y-auto border-l border-zinc-200 bg-white shadow-2xl">
+              <div className="sticky top-0 z-10 flex flex-wrap items-start justify-between gap-4 border-b border-zinc-200 bg-white px-6 py-5">
+                <div>
+                  <p className="text-sm font-medium text-zinc-500">
+                    Set-Liste
+                  </p>
+                  <h2 className="mt-1 text-2xl font-semibold tracking-tight">
+                    Datensatz anzeigen
+                  </h2>
+                  <p className="mt-2 text-sm text-zinc-600">
+                    Set {setToShowDetail.legacy_set_id}
+                  </p>
+                </div>
+                <Link
+                  className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-semibold transition hover:bg-zinc-50"
+                  href={detailCloseHref}
+                >
+                  Schließen
+                </Link>
+              </div>
+
+              <div className="grid gap-6 px-6 py-6">
+                <section className="grid gap-3">
+                  <h3 className="font-semibold">Set</h3>
+                  <dl className="grid gap-3 sm:grid-cols-2">
+                    <DetailField label="Setnummer" value={setToShowDetail.legacy_set_id} />
+                    <DetailField label="Verfügbarkeit" value={detailAvailability} />
+                    <DetailField label="Zustand" value={setToShowDetail.condition} />
+                    <DetailField label="Lagerort" value={setToShowDetail.storage_label} />
+                    <DetailField label="Legacy-Status" value={setToShowDetail.legacy_status} />
+                    <DetailField label="Marker" value={setToShowDetail.marker} />
+                  </dl>
+                </section>
+
+                <section className="grid gap-3">
+                  <h3 className="font-semibold">Person</h3>
+                  <dl className="grid gap-3 sm:grid-cols-2">
+                    <DetailField
+                      label="Aktuelle Person"
+                      value={formatPerson(personToShowDetail, classToShowDetail)}
+                    />
+                    <DetailField
+                      label="Letzter Nutzer"
+                      value={
+                        personToShowDetail
+                          ? null
+                          : formatPerson(previousPersonToShowDetail)
+                      }
+                    />
+                  </dl>
+                </section>
+
+                <section className="grid gap-3">
+                  <h3 className="font-semibold">Komponenten</h3>
+                  <dl className="grid gap-3 sm:grid-cols-2">
+                    <DetailField
+                      label="iPad"
+                      value={componentLabel(detailComponents?.get("ipad")?.component ?? null)}
+                    />
+                    <DetailField
+                      label="Pencil"
+                      value={componentLabel(detailComponents?.get("pencil")?.component ?? null)}
+                    />
+                    <DetailField
+                      label="Tastatur"
+                      value={componentLabel(detailComponents?.get("keyboard")?.component ?? null)}
+                    />
+                    <DetailField
+                      label="Adapter"
+                      value={componentLabel(detailComponents?.get("adapter")?.component ?? null)}
+                    />
+                    <DetailField
+                      label="Zusatzmaterial"
+                      value={
+                        detailSupplemental.length > 0
+                          ? detailSupplemental.map(supplementalLabel).join(", ")
+                          : null
+                      }
+                    />
+                  </dl>
+                </section>
+              </div>
+            </aside>
+          </div>
+        ) : null}
 
         {setToEditStorage ? (
           <div className="fixed inset-0 z-40 bg-zinc-950/25">

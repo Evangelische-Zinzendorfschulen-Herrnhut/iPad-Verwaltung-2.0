@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { getCurrentAppUser, hasAnyRole } from "@/lib/auth/current-user";
@@ -7,6 +8,10 @@ import { SectionTabs } from "../section-tabs";
 import { DamageCasesTable } from "./damage-cases-table";
 import { DamageCasesFilterForm } from "./damage-cases-filter-form";
 import { FieldIcon } from "./field-icon";
+
+export const metadata: Metadata = {
+  title: "Schäden | iPad-Verwaltung",
+};
 
 type DamageCaseRow = {
   id: string;
@@ -31,6 +36,7 @@ type DamageCaseRow = {
     person_type?: string;
   } | null;
   inventory_set: {
+    id: string;
     legacy_set_id: number;
     storage_label: string | null;
   } | null;
@@ -42,6 +48,22 @@ type DamageCaseRow = {
     legacy_inventory_number: string;
     model?: string | null;
   } | null;
+};
+
+type PreviousPersonAssignmentRow = {
+  set_id: string;
+  person:
+    | {
+        first_name: string | null;
+        last_name: string | null;
+        email: string | null;
+      }
+    | {
+        first_name: string | null;
+        last_name: string | null;
+        email: string | null;
+      }[]
+    | null;
 };
 
 type RawDamageCaseRow = Omit<
@@ -167,6 +189,23 @@ function buildCloseDetailHref(params: Record<string, string | string[] | undefin
   return queryString ? `/schadensfaelle?${queryString}` : "/schadensfaelle";
 }
 
+function buildCloseStorageHref(
+  params: Record<string, string | string[] | undefined>,
+) {
+  const nextParams = new URLSearchParams();
+
+  for (const key of ["q", "status", "type", "billing", "page"]) {
+    const value = getSingleParam(params, key).trim();
+
+    if (value) {
+      nextParams.set(key, value);
+    }
+  }
+
+  const queryString = nextParams.toString();
+  return queryString ? `/schadensfaelle?${queryString}` : "/schadensfaelle";
+}
+
 function buildEditHref(
   params: Record<string, string | string[] | undefined>,
   id: string,
@@ -194,6 +233,15 @@ function appendFlagToHref(href: string, key: string, value: string) {
 function nullableText(formData: FormData, key: string) {
   const value = String(formData.get(key) ?? "").trim();
   return value || null;
+}
+
+function requiredText(value: FormDataEntryValue | null) {
+  return String(value ?? "").trim();
+}
+
+function optionalText(value: FormDataEntryValue | null) {
+  const text = String(value ?? "").trim();
+  return text || null;
 }
 
 async function updateDamageCase(formData: FormData) {
@@ -289,6 +337,40 @@ async function updateDamageCase(formData: FormData) {
   }
 
   redirect(appendFlagToHref(returnTo, "damage_updated", "1"));
+}
+
+async function updateSetStorage(formData: FormData) {
+  "use server";
+
+  const appUser = await getCurrentAppUser();
+
+  if (!appUser) {
+    redirect("/login");
+  }
+
+  if (!hasAnyRole(appUser, ["admin", "ipad_verwaltung"])) {
+    redirect("/");
+  }
+
+  const setId = requiredText(formData.get("set_id"));
+  const returnTo = requiredText(formData.get("return_to")) || "/schadensfaelle";
+  const storageLabel = optionalText(formData.get("storage_label"));
+
+  if (!setId) {
+    redirect(returnTo);
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("inventory_set")
+    .update({ storage_label: storageLabel })
+    .eq("id", setId);
+
+  if (error) {
+    throw error;
+  }
+
+  redirect(returnTo);
 }
 
 function normalizeJoin<T>(value: T | T[] | null) {
@@ -418,6 +500,7 @@ export default async function SchadensfaellePage({
   const billingFilter = getSingleParam(params, "billing");
   const detailId = getSingleParam(params, "detail");
   const editId = getSingleParam(params, "edit");
+  const storageSetId = getSingleParam(params, "storage");
   const page = getPageParam(params);
   const appUser = await getCurrentAppUser();
 
@@ -435,7 +518,7 @@ export default async function SchadensfaellePage({
   let damageQuery = supabase
     .from("damage_case")
     .select(
-      "id,damage_number,legacy_damage_id,case_type,affected_item,status,legacy_status,legacy_exchange_status,legacy_insurance_warranty,reported_at,occurred_at,short_description,billing_assessment,import_hint,person:person_id(first_name,last_name,email),inventory_set:set_id(legacy_set_id,storage_label),component:component_id(legacy_inventory_number,model),replacement_component:replacement_component_id(legacy_inventory_number)",
+      "id,damage_number,legacy_damage_id,case_type,affected_item,status,legacy_status,legacy_exchange_status,legacy_insurance_warranty,reported_at,occurred_at,short_description,billing_assessment,import_hint,person:person_id(first_name,last_name,email),inventory_set:set_id(id,legacy_set_id,storage_label),component:component_id(legacy_inventory_number,model),replacement_component:replacement_component_id(legacy_inventory_number)",
     )
     .order("reported_at", { ascending: false })
     .order("damage_number", { ascending: false })
@@ -474,7 +557,7 @@ export default async function SchadensfaellePage({
       ? supabase
           .from("damage_case")
           .select(
-            "id,damage_number,legacy_damage_id,legacy_source,legacy_source_id,case_type,affected_item,status,legacy_status,legacy_exchange_status,legacy_insurance_warranty,reported_at,occurred_at,replacement_issued_at,short_description,detail_description,incident_description,location,witnesses,handler,internal_note,affected_components_raw,import_status,import_hint,billing_assessment,created_at,updated_at,person:person_id(id,first_name,last_name,email,person_type),inventory_set:set_id(legacy_set_id,storage_label),replacement_set:replacement_set_id(legacy_set_id),component:component_id(legacy_inventory_number,model),replacement_component:replacement_component_id(legacy_inventory_number),created_by_user:created_by(email)",
+            "id,damage_number,legacy_damage_id,legacy_source,legacy_source_id,case_type,affected_item,status,legacy_status,legacy_exchange_status,legacy_insurance_warranty,reported_at,occurred_at,replacement_issued_at,short_description,detail_description,incident_description,location,witnesses,handler,internal_note,affected_components_raw,import_status,import_hint,billing_assessment,created_at,updated_at,person:person_id(id,first_name,last_name,email,person_type),inventory_set:set_id(id,legacy_set_id,storage_label),replacement_set:replacement_set_id(legacy_set_id),component:component_id(legacy_inventory_number,model),replacement_component:replacement_component_id(legacy_inventory_number),created_by_user:created_by(email)",
           )
           .eq("id", detailId || editId)
           .maybeSingle()
@@ -512,6 +595,54 @@ export default async function SchadensfaellePage({
   const rangeStart = (currentPage - 1) * PAGE_SIZE;
   const rangeEnd = rangeStart + PAGE_SIZE;
   const visibleCases = filteredCases.slice(rangeStart, rangeEnd);
+  const visibleSetIds = Array.from(
+    new Set(
+      visibleCases
+        .map((caseRow) => caseRow.inventory_set?.id)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  );
+  const previousAssignmentsResult =
+    visibleSetIds.length > 0
+      ? await supabase
+          .from("set_person_assignment")
+          .select("set_id,person:person_id(first_name,last_name,email)")
+          .not("returned_at", "is", null)
+          .in("set_id", visibleSetIds)
+          .order("returned_at", { ascending: false })
+      : { data: [], error: null };
+
+  if (previousAssignmentsResult.error) {
+    throw previousAssignmentsResult.error;
+  }
+
+  const previousPersonBySetId = new Map<
+    string,
+    { first_name: string | null; last_name: string | null; email: string | null }
+  >();
+
+  for (const assignment of (previousAssignmentsResult.data ??
+    []) as PreviousPersonAssignmentRow[]) {
+    if (previousPersonBySetId.has(assignment.set_id)) {
+      continue;
+    }
+
+    const person = normalizeJoin(assignment.person);
+
+    if (person) {
+      previousPersonBySetId.set(assignment.set_id, person);
+    }
+  }
+  const visibleRows = visibleCases.map((caseRow) => ({
+    ...caseRow,
+    previousPerson: caseRow.person
+      ? null
+      : (previousPersonBySetId.get(caseRow.inventory_set?.id ?? "") ?? null),
+  }));
+  const setToEditStorage =
+    visibleCases.find((caseRow) => caseRow.inventory_set?.id === storageSetId)
+      ?.inventory_set ?? null;
+  const storageCloseHref = buildCloseStorageHref(params);
   const displayedFrom = filteredCount === 0 ? 0 : rangeStart + 1;
   const displayedTo = Math.min(currentPage * PAGE_SIZE, filteredCount);
   const hasActiveFilters = Boolean(
@@ -625,7 +756,7 @@ export default async function SchadensfaellePage({
           {visibleCases.length > 0 ? (
             <DamageCasesTable
               canManage={canManageDamageCases}
-              cases={visibleCases}
+              cases={visibleRows}
             />
           ) : (
             <div className="px-4 py-8 text-sm text-zinc-600">
@@ -668,6 +799,59 @@ export default async function SchadensfaellePage({
           ) : null}
         </section>
       </section>
+
+      {canManageDamageCases && setToEditStorage ? (
+        <div className="fixed inset-0 z-40 bg-zinc-950/25">
+          <aside className="ml-auto flex h-full w-full max-w-lg flex-col border-l border-zinc-200 bg-white shadow-2xl">
+            <div className="flex flex-wrap items-start justify-between gap-4 border-b border-zinc-200 px-6 py-5">
+              <div>
+                <p className="text-sm font-medium text-zinc-500">
+                  Schadensfälle
+                </p>
+                <h2 className="mt-1 text-2xl font-semibold tracking-tight">
+                  Lagerort ändern
+                </h2>
+                <p className="mt-2 text-sm text-zinc-600">
+                  Set {setToEditStorage.legacy_set_id}
+                </p>
+              </div>
+              <Link
+                className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-semibold transition hover:bg-zinc-50"
+                href={storageCloseHref}
+              >
+                Schließen
+              </Link>
+            </div>
+
+            <form action={updateSetStorage} className="grid gap-5 px-6 py-6">
+              <input name="set_id" type="hidden" value={setToEditStorage.id} />
+              <input name="return_to" type="hidden" value={storageCloseHref} />
+
+              <label className="flex flex-col gap-1 text-sm font-medium">
+                Lagerort
+                <input
+                  className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
+                  defaultValue={setToEditStorage.storage_label ?? ""}
+                  name="storage_label"
+                  placeholder="z. B. W1 - 04, Schrank1 oder Regal1"
+                />
+              </label>
+
+              <div className="flex flex-wrap justify-end gap-2 border-t border-zinc-200 pt-4">
+                <Link
+                  className="rounded-md border border-zinc-300 px-4 py-2 text-sm font-semibold transition hover:bg-zinc-50"
+                  href={storageCloseHref}
+                >
+                  Abbrechen
+                </Link>
+                <button className="rounded-md bg-zinc-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-zinc-800">
+                  Speichern
+                </button>
+              </div>
+            </form>
+          </aside>
+        </div>
+      ) : null}
 
       {detailId && detailCase ? (
         <div className="fixed inset-0 z-40 bg-zinc-950/20">

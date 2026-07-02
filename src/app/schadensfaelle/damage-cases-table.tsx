@@ -15,12 +15,18 @@ export type DamageCaseListRow = {
   } | null;
   import_hint: string | null;
   inventory_set: {
+    id: string;
     legacy_set_id: number;
     storage_label: string | null;
   } | null;
   legacy_damage_id: number | null;
   damage_number: number;
   person: {
+    first_name: string | null;
+    last_name: string | null;
+    email: string | null;
+  } | null;
+  previousPerson: {
     first_name: string | null;
     last_name: string | null;
     email: string | null;
@@ -39,6 +45,8 @@ type ContextMenuState = {
   editHref: string;
   href: string;
   reportHref: string;
+  setLabel: string | null;
+  storageHref: string | null;
   x: number;
   y: number;
 } | null;
@@ -115,11 +123,25 @@ export function DamageCasesTable({ canManage, cases }: DamageCasesTableProps) {
     const editParams = new URLSearchParams(searchParams.toString());
     editParams.set("edit", caseId);
     editParams.delete("detail");
+    const storageParams = new URLSearchParams(searchParams.toString());
+    const caseRow = cases.find((row) => row.id === caseId) ?? null;
+
+    if (canManage && caseRow?.inventory_set) {
+      storageParams.set("storage", caseRow.inventory_set.id);
+      storageParams.delete("detail");
+      storageParams.delete("edit");
+    }
 
     setContextMenu({
       editHref: `${pathname}?${editParams.toString()}`,
       href: `${pathname}?${params.toString()}`,
       reportHref: `/schadensfaelle/${caseId}/report`,
+      setLabel: caseRow?.inventory_set
+        ? `Set ${caseRow.inventory_set.legacy_set_id}`
+        : null,
+      storageHref: canManage && caseRow?.inventory_set
+        ? `${pathname}?${storageParams.toString()}`
+        : null,
       x: event.clientX,
       y: event.clientY,
     });
@@ -154,7 +176,15 @@ export function DamageCasesTable({ canManage, cases }: DamageCasesTableProps) {
                   {caseRow.reported_at}
                 </td>
                 <td className="w-52 truncate px-4 py-3">
-                  {formatPerson(caseRow.person)}
+                  {caseRow.person ? (
+                    formatPerson(caseRow.person)
+                  ) : caseRow.previousPerson ? (
+                    <span className="text-zinc-400">
+                      ehemals {formatPerson(caseRow.previousPerson)}
+                    </span>
+                  ) : (
+                    "-"
+                  )}
                 </td>
                 <td className="w-20 px-4 py-3">{formatSet(caseRow.inventory_set)}</td>
                 <td className="w-32 truncate px-4 py-3">
@@ -200,6 +230,19 @@ export function DamageCasesTable({ canManage, cases }: DamageCasesTableProps) {
           >
             Schadensbericht PDF
           </Link>
+          {contextMenu.storageHref ? (
+            <Link
+              className="block w-full rounded px-3 py-2 text-left font-medium hover:bg-zinc-100"
+              href={contextMenu.storageHref}
+            >
+              Lagerort ändern
+            </Link>
+          ) : null}
+          {contextMenu.setLabel ? (
+            <p className="border-t border-zinc-100 px-3 py-2 text-xs text-zinc-500">
+              {contextMenu.setLabel}
+            </p>
+          ) : null}
         </div>
       ) : null}
     </>

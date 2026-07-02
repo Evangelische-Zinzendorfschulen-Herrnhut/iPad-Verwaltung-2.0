@@ -8,7 +8,7 @@ draft
 
 Angemeldete Nutzer sehen auf der Startseite zwischen Anmeldebestätigung und
 Arbeitsbereich-Links kompakte Auswertungen zu den wichtigsten Listen. Die
-Auswertungen helfen, Bestände, Set-Verfügbarkeit, Personenstatus und
+Auswertungen helfen, Set-Verfügbarkeit, aktive Personen nach Typ und
 Schadensfälle schnell einzuschätzen.
 
 ## Zielgruppe
@@ -27,7 +27,6 @@ Schadensfälle schnell einzuschätzen.
 ## Datenobjekte
 
 - Person
-- Komponente
 - Set
 - Set-Person-Zuordnung
 - Schadensfall
@@ -50,7 +49,7 @@ geändert werden, ist kein zusätzlicher Audit-Log erforderlich.
 - Das Dashboard erscheint auf der Startseite zwischen Anmeldebestätigung und
   Arbeitsbereich-Links.
 - Die Auswertungen werden als Kreisdiagramme dargestellt.
-- Mindestens Sets, Komponenten, Personen und Schadensfälle werden ausgewertet.
+- Mindestens Sets, aktive Personen und Schadensfälle werden ausgewertet.
 - Leere Datenbestände werden verständlich dargestellt.
 - Nicht angemeldete Nutzer sehen keine aggregierten Fachdaten.
 

@@ -14,11 +14,14 @@ export type AssignmentTableRow = {
   id: string;
   issuedAt: string;
   person: string;
+  releaseReturnTo: string;
+  releasable: boolean;
   returnComplete: boolean | null;
   returnHref: string | null;
   returnProtocolHref: string | null;
   returnedAt: string;
   setHref: string;
+  setId: string;
   setLabel: string;
   status: string;
   storageHref: string | null;
@@ -26,20 +29,24 @@ export type AssignmentTableRow = {
 };
 
 type AssignmentsTableProps = {
+  releaseAction: (formData: FormData) => void | Promise<void>;
   rows: AssignmentTableRow[];
 };
 
 type ContextMenuState = {
   editHref: string;
   label: string;
+  releaseReturnTo: string;
+  releasable: boolean;
   returnHref: string | null;
   returnProtocolHref: string | null;
   storageHref: string | null;
+  setId: string;
   x: number;
   y: number;
 } | null;
 
-export function AssignmentsTable({ rows }: AssignmentsTableProps) {
+export function AssignmentsTable({ releaseAction, rows }: AssignmentsTableProps) {
   const [contextMenu, setContextMenu] = useState<ContextMenuState>(null);
 
   useEffect(() => {
@@ -70,8 +77,11 @@ export function AssignmentsTable({ rows }: AssignmentsTableProps) {
     setContextMenu({
       editHref: row.editHref,
       label: `${row.setLabel} · ${row.person}`,
+      releaseReturnTo: row.releaseReturnTo,
+      releasable: row.releasable,
       returnHref: row.returnHref,
       returnProtocolHref: row.returnProtocolHref,
+      setId: row.setId,
       storageHref: row.storageHref,
       x: event.clientX,
       y: event.clientY,
@@ -164,7 +174,20 @@ export function AssignmentsTable({ rows }: AssignmentsTableProps) {
                         Protokoll
                       </a>
                     ) : null}
-                    {!row.returnHref && !row.returnProtocolHref ? (
+                    {row.releasable ? (
+                      <form action={releaseAction}>
+                        <input name="set_id" type="hidden" value={row.setId} />
+                        <input
+                          name="return_to"
+                          type="hidden"
+                          value={row.releaseReturnTo}
+                        />
+                        <button className="rounded-md border border-emerald-300 px-3 py-2 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-50">
+                          Freigeben
+                        </button>
+                      </form>
+                    ) : null}
+                    {!row.returnHref && !row.returnProtocolHref && !row.releasable ? (
                       <span className="text-zinc-400">-</span>
                     ) : null}
                   </div>
@@ -212,6 +235,19 @@ export function AssignmentsTable({ rows }: AssignmentsTableProps) {
             >
               Lagerort ändern
             </Link>
+          ) : null}
+          {contextMenu.releasable ? (
+            <form action={releaseAction}>
+              <input name="set_id" type="hidden" value={contextMenu.setId} />
+              <input
+                name="return_to"
+                type="hidden"
+                value={contextMenu.releaseReturnTo}
+              />
+              <button className="block w-full rounded px-3 py-2 text-left font-medium text-emerald-700 hover:bg-emerald-50">
+                Zurücksetzen und freigeben
+              </button>
+            </form>
           ) : null}
           <p className="border-t border-zinc-100 px-3 py-2 text-xs text-zinc-500">
             {contextMenu.label}

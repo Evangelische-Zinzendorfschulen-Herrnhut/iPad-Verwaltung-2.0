@@ -20,6 +20,7 @@ type DamageCaseDetail = {
   affected_item: string;
   billing_assessment: string;
   case_type: string;
+  problem_type: string | null;
   created_at: string;
   damage_number: number;
   detail_description: string | null;
@@ -138,6 +139,15 @@ function affectedItemLabel(value: string) {
   return labels[value] ?? value;
 }
 
+function problemTypeLabel(value: string | null) {
+  const labels: Record<string, string> = {
+    hardware: "Hardware",
+    software: "Software",
+  };
+
+  return value ? (labels[value] ?? value) : "-";
+}
+
 function Field({
   label,
   value,
@@ -190,7 +200,7 @@ export default async function SchadensfallDetailPage({ params }: DetailPageProps
   const { data, error } = await supabase
     .from("damage_case")
     .select(
-      "id,damage_number,legacy_damage_id,legacy_source,legacy_source_id,case_type,affected_item,status,legacy_status,legacy_exchange_status,legacy_insurance_warranty,reported_at,occurred_at,replacement_issued_at,short_description,detail_description,incident_description,location,witnesses,handler,internal_note,affected_components_raw,import_status,import_hint,billing_assessment,created_at,updated_at,person:person_id(first_name,last_name,email,person_type),inventory_set:set_id(legacy_set_id),replacement_set:replacement_set_id(legacy_set_id),component:component_id(legacy_inventory_number,model),replacement_component:replacement_component_id(legacy_inventory_number,model),created_by_user:created_by(email)",
+      "id,damage_number,legacy_damage_id,legacy_source,legacy_source_id,case_type,problem_type,affected_item,status,legacy_status,legacy_exchange_status,legacy_insurance_warranty,reported_at,occurred_at,replacement_issued_at,short_description,detail_description,incident_description,location,witnesses,handler,internal_note,affected_components_raw,import_status,import_hint,billing_assessment,created_at,updated_at,person:person_id(first_name,last_name,email,person_type),inventory_set:set_id(legacy_set_id),replacement_set:replacement_set_id(legacy_set_id),component:component_id(legacy_inventory_number,model),replacement_component:replacement_component_id(legacy_inventory_number,model),created_by_user:created_by(email)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -232,6 +242,14 @@ export default async function SchadensfallDetailPage({ params }: DetailPageProps
         <FieldGroup title="Kernangaben">
           <Field label="Status" value={damageCase.status} />
           <Field label="Art" value={damageCase.case_type} />
+          <Field
+            label="Problemart"
+            value={
+              damageCase.case_type === "technisches_problem"
+                ? problemTypeLabel(damageCase.problem_type)
+                : null
+            }
+          />
           <Field
             label="Betroffen"
             value={affectedItemLabel(damageCase.affected_item)}

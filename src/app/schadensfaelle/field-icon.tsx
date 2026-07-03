@@ -59,6 +59,7 @@ const iconMap: Record<string, { icon: IconDefinition; color: string }> = {
   Meldedatum: { icon: faCalendarDays, color: "text-blue-600 bg-blue-50" },
   Ort: { icon: faLocationDot, color: "text-red-600 bg-red-50" },
   Person: { icon: faUser, color: "text-sky-600 bg-sky-50" },
+  Problemart: { icon: faCircleInfo, color: "text-amber-600 bg-amber-50" },
   Quelle: { icon: faFileImport, color: "text-fuchsia-600 bg-fuchsia-50" },
   "Quelle-ID": { icon: faHashtag, color: "text-fuchsia-600 bg-fuchsia-50" },
   Schadenbeschreibung: { icon: faFileLines, color: "text-zinc-600 bg-zinc-50" },

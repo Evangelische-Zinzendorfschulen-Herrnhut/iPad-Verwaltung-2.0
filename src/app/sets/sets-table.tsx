@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { MouseEvent, useEffect, useState } from "react";
 
@@ -10,6 +11,8 @@ export type SetsTableRow = {
   detailHref: string;
   id: string;
   ipad: string;
+  ipadMdmHref: string | null;
+  issueHref: string | null;
   keyboard: string;
   legacySetId: number;
   legacyStatus: string | null;
@@ -33,6 +36,7 @@ type SetsTableProps = {
 type ContextMenuState = {
   damageHref: string | null;
   detailHref: string;
+  issueHref: string | null;
   problemHref: string | null;
   releaseReturnTo: string;
   releasable: boolean;
@@ -73,6 +77,7 @@ export function SetsTable({ releaseAction, rows }: SetsTableProps) {
     setContextMenu({
       damageHref: row.damageHref,
       detailHref: row.detailHref,
+      issueHref: row.issueHref,
       problemHref: row.problemHref,
       releaseReturnTo: row.releaseReturnTo,
       releasable: row.releasable,
@@ -89,19 +94,18 @@ export function SetsTable({ releaseAction, rows }: SetsTableProps) {
   return (
     <>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[1120px] border-collapse text-left text-sm">
+        <table className="w-full min-w-[1220px] border-collapse text-left text-sm">
           <thead className="bg-zinc-100 text-zinc-600">
             <tr>
               <th className="px-4 py-3 font-medium">Set</th>
               <th className="px-4 py-3 font-medium">Person</th>
-              <th className="px-4 py-3 font-medium">iPad</th>
-              <th className="px-4 py-3 font-medium">Pencil</th>
-              <th className="px-4 py-3 font-medium">Tastatur</th>
+              <th className="px-4 py-3 font-medium whitespace-nowrap">iPad</th>
+              <th className="px-4 py-3 font-medium whitespace-nowrap">Pencil</th>
+              <th className="px-4 py-3 font-medium whitespace-nowrap">Tastatur</th>
               <th className="px-4 py-3 font-medium">Lagerort</th>
               <th className="px-4 py-3 font-medium">Verfuegbarkeit</th>
               <th className="px-4 py-3 font-medium">Zustand</th>
               <th className="px-4 py-3 font-medium">Legacy</th>
-              <th className="px-4 py-3 font-medium">Aktion</th>
             </tr>
           </thead>
           <tbody>
@@ -123,51 +127,37 @@ export function SetsTable({ releaseAction, rows }: SetsTableProps) {
                     "-"
                   )}
                 </td>
-                <td className="px-4 py-3">{row.ipad}</td>
-                <td className="px-4 py-3">{row.pencil}</td>
-                <td className="px-4 py-3">{row.keyboard}</td>
+                <td className="px-4 py-3 whitespace-nowrap align-middle">
+                  <span className="inline-flex items-center gap-2 align-middle">
+                    <span>{row.ipad}</span>
+                    {row.ipadMdmHref ? (
+                      <a
+                        aria-label={`iPad ${row.ipad} im MDM öffnen`}
+                        className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full align-middle transition hover:scale-105"
+                        href={row.ipadMdmHref}
+                        rel="noreferrer"
+                        target="_blank"
+                        title="Im MDM öffnen"
+                      >
+                        <Image
+                          alt=""
+                          aria-hidden="true"
+                          className="block h-5 w-5"
+                          height={20}
+                          src="/arrow_right.svg"
+                          width={20}
+                        />
+                      </a>
+                    ) : null}
+                  </span>
+                </td>
+                <td className="px-4 py-3 whitespace-nowrap">{row.pencil}</td>
+                <td className="px-4 py-3 whitespace-nowrap">{row.keyboard}</td>
                 <td className="px-4 py-3">{row.storageLabel}</td>
                 <td className="px-4 py-3">{row.availability}</td>
                 <td className="px-4 py-3">{row.condition}</td>
                 <td className="px-4 py-3 text-zinc-600">
                   {row.legacyStatus ?? "-"}
-                </td>
-                <td className="px-4 py-3">
-                  {row.damageHref || row.problemHref || row.releasable ? (
-                    <div className="flex flex-wrap gap-2">
-                      {row.releasable ? (
-                        <form action={releaseAction}>
-                          <input name="set_id" type="hidden" value={row.id} />
-                          <input
-                            name="return_to"
-                            type="hidden"
-                            value={row.releaseReturnTo}
-                          />
-                          <button className="rounded-md border border-emerald-300 px-3 py-2 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-50">
-                            Zurücksetzen und freigeben
-                          </button>
-                        </form>
-                      ) : null}
-                      {row.damageHref ? (
-                        <Link
-                          className="rounded-md border border-zinc-300 px-3 py-2 text-xs font-semibold transition hover:bg-zinc-50"
-                          href={row.damageHref}
-                        >
-                          Schaden/Verlust
-                        </Link>
-                      ) : null}
-                      {row.problemHref ? (
-                        <Link
-                          className="rounded-md border border-zinc-300 px-3 py-2 text-xs font-semibold transition hover:bg-zinc-50"
-                          href={row.problemHref}
-                        >
-                          Problem
-                        </Link>
-                      ) : null}
-                    </div>
-                  ) : (
-                    <span className="text-zinc-400">-</span>
-                  )}
                 </td>
               </tr>
             ))}
@@ -202,6 +192,14 @@ export function SetsTable({ releaseAction, rows }: SetsTableProps) {
               href={contextMenu.returnSetHref}
             >
               Set zurücknehmen
+            </Link>
+          ) : null}
+          {contextMenu.issueHref ? (
+            <Link
+              className="block w-full rounded px-3 py-2 text-left font-medium hover:bg-zinc-100"
+              href={contextMenu.issueHref}
+            >
+              Set ausgeben
             </Link>
           ) : null}
           {contextMenu.damageHref ? (

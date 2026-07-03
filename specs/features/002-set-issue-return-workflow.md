@@ -52,6 +52,25 @@ Die aktuelle Set-Zuordnung wird separat gespeichert. Der zweite Zahlenblock der 
 7. System setzt Ausleihe auf `aktiv` und Komponenten auf `ausgegeben`.
 8. System schreibt Audit-Logs.
 
+## Erster Umsetzungsschnitt: Ausgabe aus der Setliste
+
+Aus der Setliste kann ein fachlich freies Set ueber das Kontextmenue ausgegeben werden.
+
+1. Nutzer oeffnet bei einem freien Set `Set ausgeben`.
+2. System zeigt Setnummer, Hauptkomponenten und ein Formular zur Personenauswahl.
+3. Nutzer waehlt eine aktive Person, Ausgabedatum und optionale interne Ausgabenotiz.
+4. System prueft serverseitig:
+   - Set hat keine aktive Ausleihe.
+   - Set ist `frei`.
+   - Set-Zustand ist `ok` oder `beschädigt, nutzbar`.
+   - iPad, Pencil und Tastatur sind aktuell dem Set zugeordnet.
+   - Keine Hauptkomponente ist `defekt` oder `gesperrt, kein MDM`.
+5. System legt eine aktive `set_person_assignment` an.
+6. System setzt `inventory_set.assigned_person_id` und `availability` auf `ausgegeben`.
+7. System zeigt das Set danach in der Setliste als ausgegeben beziehungsweise bei Schuelern der Klassen 5/6 fachlich als zugeordnet.
+
+Assumption: Im ersten Umsetzungsschnitt werden Ausgabe-Vollstaendigkeitschecks und Zusatzmaterial noch nicht strukturiert im Ausgabeformular dokumentiert. Diese Details werden im Rueckgabe- und spaeteren erweiterten Ausgabeprotokoll nachgezogen.
+
 ## Hauptworkflow: Rueckgabe
 
 1. Nutzer oeffnet eine aktive Ausleihe.

@@ -19,6 +19,7 @@ type DamageCaseRow = {
   affected_item: string;
   billing_assessment: string;
   case_type: string;
+  problem_type: string | null;
   damage_number: number;
   detail_description: string | null;
   handler: string | null;
@@ -199,6 +200,15 @@ function caseTypeLabel(value: string) {
   };
 
   return labels[value] ?? value;
+}
+
+function problemTypeLabel(value: string | null) {
+  const labels: Record<string, string> = {
+    hardware: "Hardware",
+    software: "Software",
+  };
+
+  return value ? (labels[value] ?? value) : "-";
 }
 
 function affectedItemLabel(value: string) {
@@ -436,6 +446,13 @@ function buildPdfContent(data: {
   y = tableSection(commands, y, "Meldung", [
     { label: "Schadensnummer", value: reportTitle(damageCase) },
     { label: "Bezeichnung", value: caseTypeLabel(damageCase.case_type) },
+    {
+      label: "Problemart",
+      value:
+        damageCase.case_type === "technisches_problem"
+          ? problemTypeLabel(damageCase.problem_type)
+          : "-",
+    },
     { label: "Datum der Schadensmeldung", value: formatDateTime(damageCase.reported_at) },
     { label: "iPad-ID", value: componentLabel(ipadComponent) },
     { label: "Bearbeiter", value: damageCase.handler || "-" },
@@ -565,7 +582,7 @@ export async function GET(_request: Request, { params }: ReportRouteProps) {
   const { data, error } = await supabase
     .from("damage_case")
     .select(
-      "id,damage_number,case_type,affected_item,status,reported_at,occurred_at,replacement_issued_at,short_description,detail_description,incident_description,location,witnesses,handler,internal_note,billing_assessment,legacy_exchange_status,legacy_insurance_warranty,person:person_id(id,first_name,last_name,email,person_type),inventory_set:set_id(id,legacy_set_id),replacement_set:replacement_set_id(legacy_set_id),component:component_id(category,legacy_inventory_number,model,invoice_position:invoice_position_id(invoice:invoice_id(invoice_date))),replacement_component:replacement_component_id(legacy_inventory_number,model)",
+      "id,damage_number,case_type,problem_type,affected_item,status,reported_at,occurred_at,replacement_issued_at,short_description,detail_description,incident_description,location,witnesses,handler,internal_note,billing_assessment,legacy_exchange_status,legacy_insurance_warranty,person:person_id(id,first_name,last_name,email,person_type),inventory_set:set_id(id,legacy_set_id),replacement_set:replacement_set_id(legacy_set_id),component:component_id(category,legacy_inventory_number,model,invoice_position:invoice_position_id(invoice:invoice_id(invoice_date))),replacement_component:replacement_component_id(legacy_inventory_number,model)",
     )
     .eq("id", id)
     .maybeSingle();

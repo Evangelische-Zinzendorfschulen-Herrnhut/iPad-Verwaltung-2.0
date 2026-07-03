@@ -18,6 +18,7 @@ type DamageCaseRow = {
   damage_number: number;
   legacy_damage_id: number | null;
   case_type: string;
+  problem_type: string | null;
   affected_item: string;
   status: string;
   legacy_status: string | null;
@@ -250,6 +251,7 @@ async function updateDamageCase(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   const returnTo = String(formData.get("return_to") ?? "/schadensfaelle");
   const caseType = String(formData.get("case_type") ?? "");
+  const problemType = String(formData.get("problem_type") ?? "");
   const affectedItem = String(formData.get("affected_item") ?? "");
   const status = String(formData.get("status") ?? "");
   const reportedAt = String(formData.get("reported_at") ?? "");
@@ -259,6 +261,7 @@ async function updateDamageCase(formData: FormData) {
   const shortDescription = String(formData.get("short_description") ?? "").trim();
 
   const validCaseTypes = ["schaden", "verlust", "technisches_problem"];
+  const validProblemTypes = ["hardware", "software"];
   const validAffectedItems = [
     "adapter",
     "charging_cable",
@@ -286,12 +289,16 @@ async function updateDamageCase(formData: FormData) {
     "abrechenbar",
     "nicht_abrechenbar",
   ];
+  const normalizedProblemType =
+    caseType === "schaden" || caseType === "verlust" ? "hardware" : problemType;
 
   if (
     !id ||
     !reportedAt ||
     !shortDescription ||
     !validCaseTypes.includes(caseType) ||
+    (caseType === "technisches_problem" &&
+      !validProblemTypes.includes(normalizedProblemType)) ||
     !validAffectedItems.includes(affectedItem) ||
     !validStatuses.includes(status) ||
     !validBillingAssessments.includes(billingAssessment)
@@ -310,12 +317,13 @@ async function updateDamageCase(formData: FormData) {
   }
 
   const supabase = await createClient();
-  const { error } = await supabase
+  const { data: updatedDamageCase, error } = await supabase
     .from("damage_case")
     .update({
       affected_item: affectedItem,
       billing_assessment: billingAssessment,
       case_type: caseType,
+      problem_type: normalizedProblemType || null,
       detail_description: nullableText(formData, "detail_description"),
       handler: nullableText(formData, "handler"),
       incident_description: nullableText(formData, "incident_description"),
@@ -330,10 +338,30 @@ async function updateDamageCase(formData: FormData) {
       status,
       witnesses: nullableText(formData, "witnesses"),
     })
-    .eq("id", id);
+    .eq("id", id)
+    .select("component_id")
+    .single();
 
   if (error) {
     throw error;
+  }
+
+  if (
+    caseType === "technisches_problem" &&
+    normalizedProblemType === "hardware" &&
+    updatedDamageCase?.component_id
+  ) {
+    const { error: componentConditionError } = await supabase
+      .from("inventory_component")
+      .update({
+        condition: "defekt",
+        legacy_status: "defekt",
+      })
+      .eq("id", updatedDamageCase.component_id);
+
+    if (componentConditionError) {
+      throw componentConditionError;
+    }
   }
 
   redirect(appendFlagToHref(returnTo, "damage_updated", "1"));
@@ -422,6 +450,15 @@ function affectedItemLabel(value: string) {
   };
 
   return labels[value] ?? value;
+}
+
+function problemTypeLabel(value: string | null) {
+  const labels: Record<string, string> = {
+    hardware: "Hardware",
+    software: "Software",
+  };
+
+  return value ? (labels[value] ?? value) : "-";
 }
 
 function Field({
@@ -518,7 +555,7 @@ export default async function SchadensfaellePage({
   let damageQuery = supabase
     .from("damage_case")
     .select(
-      "id,damage_number,legacy_damage_id,case_type,affected_item,status,legacy_status,legacy_exchange_status,legacy_insurance_warranty,reported_at,occurred_at,short_description,billing_assessment,import_hint,person:person_id(first_name,last_name,email),inventory_set:set_id(id,legacy_set_id,storage_label),component:component_id(legacy_inventory_number,model),replacement_component:replacement_component_id(legacy_inventory_number)",
+      "id,damage_number,legacy_damage_id,case_type,problem_type,affected_item,status,legacy_status,legacy_exchange_status,legacy_insurance_warranty,reported_at,occurred_at,short_description,billing_assessment,import_hint,person:person_id(first_name,last_name,email),inventory_set:set_id(id,legacy_set_id,storage_label),component:component_id(legacy_inventory_number,model),replacement_component:replacement_component_id(legacy_inventory_number)",
     )
     .order("reported_at", { ascending: false })
     .order("damage_number", { ascending: false })
@@ -557,7 +594,7 @@ export default async function SchadensfaellePage({
       ? supabase
           .from("damage_case")
           .select(
-            "id,damage_number,legacy_damage_id,legacy_source,legacy_source_id,case_type,affected_item,status,legacy_status,legacy_exchange_status,legacy_insurance_warranty,reported_at,occurred_at,replacement_issued_at,short_description,detail_description,incident_description,location,witnesses,handler,internal_note,affected_components_raw,import_status,import_hint,billing_assessment,created_at,updated_at,person:person_id(id,first_name,last_name,email,person_type),inventory_set:set_id(id,legacy_set_id,storage_label),replacement_set:replacement_set_id(legacy_set_id),component:component_id(legacy_inventory_number,model),replacement_component:replacement_component_id(legacy_inventory_number),created_by_user:created_by(email)",
+            "id,damage_number,legacy_damage_id,legacy_source,legacy_source_id,case_type,problem_type,affected_item,status,legacy_status,legacy_exchange_status,legacy_insurance_warranty,reported_at,occurred_at,replacement_issued_at,short_description,detail_description,incident_description,location,witnesses,handler,internal_note,affected_components_raw,import_status,import_hint,billing_assessment,created_at,updated_at,person:person_id(id,first_name,last_name,email,person_type),inventory_set:set_id(id,legacy_set_id,storage_label),replacement_set:replacement_set_id(legacy_set_id),component:component_id(legacy_inventory_number,model),replacement_component:replacement_component_id(legacy_inventory_number),created_by_user:created_by(email)",
           )
           .eq("id", detailId || editId)
           .maybeSingle()
@@ -902,6 +939,10 @@ export default async function SchadensfaellePage({
                 <dl className="grid gap-4 p-4 md:grid-cols-2 xl:grid-cols-3">
                   <Field label="Art" value={detailCase.case_type} />
                   <Field
+                    label="Problemart"
+                    value={problemTypeLabel(detailCase.problem_type)}
+                  />
+                  <Field
                     label="Betroffen"
                     value={affectedItemLabel(detailCase.affected_item)}
                   />
@@ -1028,7 +1069,7 @@ export default async function SchadensfaellePage({
 
               <section className="grid gap-4 rounded-lg border border-zinc-200 p-4">
                 <h3 className="font-semibold">Kernangaben</h3>
-                <div className="grid gap-4 md:grid-cols-3">
+                <div className="grid gap-4 md:grid-cols-4">
                   <FormField label="Vorgangsart">
                     <select
                       className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
@@ -1041,6 +1082,24 @@ export default async function SchadensfaellePage({
                       <option value="technisches_problem">
                         Technisches Problem
                       </option>
+                    </select>
+                  </FormField>
+
+                  <FormField label="Problemart">
+                    <select
+                      className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
+                      defaultValue={
+                        editCase.problem_type ??
+                        (editCase.case_type === "schaden" ||
+                        editCase.case_type === "verlust"
+                          ? "hardware"
+                          : "")
+                      }
+                      name="problem_type"
+                    >
+                      <option value="">Nicht zutreffend</option>
+                      <option value="hardware">Hardware</option>
+                      <option value="software">Software</option>
                     </select>
                   </FormField>
 

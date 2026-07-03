@@ -54,6 +54,15 @@ Der erste Schnitt bildet noch nicht den vollstaendigen Eltern-PDF- und Abrechnun
 
 Alternativ kann der Nutzer aus der Set-Liste `Problem melden` starten. Dann ist `technisches Problem` als Vorgangsart vorausgewaehlt. Das Formular nutzt die gleichen Grunddaten, blendet aber Hergang und Zeugen aus, bezeichnet die Detailbeschreibung als `Problembeschreibung` und erlaubt, den Lagerort des Sets direkt mit dem Vorgang zu aktualisieren.
 
+Bei einem technischen Problem muss der Nutzer die Problemart auswaehlen:
+
+- `Hardware`: Die betroffene konkrete Komponente wird beim Speichern als `defekt` markiert, sofern eine Komponente ausgewaehlt ist. Falls keine konkrete Komponente ausgewaehlt ist, bleibt der Vorgang zur technischen Klaerung offen.
+- `Software`: Es wird kein Geraet automatisch als defekt markiert. Die Bearbeitung besteht fachlich darin, das Softwareproblem zu loesen oder das iPad zurueckzusetzen.
+
+Bei Schadens- und Verlustmeldungen wird die Problemart immer mit `Hardware` gespeichert. Das Formular `Schaden oder Verlust melden` belegt die Problemart deshalb mit `Hardware` vor, und bestehende Schadens- oder Verlustdatensaetze werden entsprechend korrigiert.
+
+Bei beiden Problemarten kann fachlich ein Komponenten- oder Setwechsel erforderlich sein. Die Problemart ersetzt deshalb nicht die Austauschentscheidung; Ersatzset, Ersatzkomponente, Austauschstatus und Ersatz-Ausgabedatum bleiben fuer Hardware- und Softwareprobleme erfassbar.
+
 Fuer freie Sets koennen Schaeden, Verluste oder technische Probleme ebenfalls aus der Set-Liste angelegt werden. In diesem Fall wird der Vorgang mit Set und betroffenen Komponenten gespeichert, aber ohne aktuelle Person und ohne aktuelle Set-Person-Zuordnung. Das dient Bestandsklaerung, Lagerpruefung und Reparaturvorbereitung. Personenbezogene Folgeprozesse wie Setwechsel oder Eltern-/Schuelerkommunikation greifen erst, wenn eine Personenzuordnung vorhanden ist oder spaeter fachlich ergaenzt wird.
 
 Neue Schadensfaelle erhalten zusaetzlich zur technischen UUID eine fortlaufende `damage_number` als menschlich lesbare Schadensnummer. Die UUID bleibt Primaerschluessel; die Schadensnummer wird fuer Suche, Anzeige und Kommunikation genutzt.
@@ -83,6 +92,7 @@ Aus der Schadensfallliste koennen bestehende Datensaetze von `admin` und `ipad_v
 Bearbeitbar sind im ersten Schritt die fachlichen Bearbeitungsfelder:
 
 - Vorgangsart
+- Problemart bei technischen Problemen: Hardware oder Software
 - betroffener Gegenstand
 - Status
 - Melde- und Ereignisdatum
@@ -129,6 +139,7 @@ Assumption: Fuer den ersten UI-Schritt reicht `offen` als Startstatus, wenn alle
 - aktuell zugeordnete Person
 - aktuelle Set-Person-Zuordnung
 - Vorgangsart: Schaden, Verlust oder technisches Problem
+- Problemart bei technischen Problemen: Hardware oder Software
 - betroffen: ganzes Set, konkrete Komponente, Netzteil, Kabel oder sonstiges Zubehör
 - Meldedatum
 - Kurzbeschreibung
@@ -197,6 +208,9 @@ Assumption: Das Legacy-Feld `VersicherungGarantie` wird in der UI fachlich als `
 
 - Aus einem fachlich `ausgegeben`en Set kann ein Schadens-/Verlustvorgang angelegt werden.
 - Aus einem fachlich `ausgegeben`en Set kann ein technisches Problem mit vorausgewaehlter Vorgangsart angelegt werden.
+- Bei technischen Problemen ist die Problemart `Hardware` oder `Software` ein Pflichtfeld.
+- Bei technischen Problemen mit Problemart `Hardware` und konkreter Komponente wird die Komponente beim Speichern als `defekt` markiert.
+- Bei technischen Problemen mit Problemart `Software` wird keine Komponente automatisch als `defekt` markiert; der Vorgang bleibt fuer Loesung oder Zuruecksetzen bearbeitbar.
 - Aus einem fachlich `frei`en Set kann ein Schadens-, Verlust- oder Problemvorgang ohne Person und ohne aktive Set-Person-Zuordnung angelegt werden.
 - Bei technischen Problemen werden Hergang und Zeugen im Formular nicht angezeigt; statt Schadenbeschreibung wird Problembeschreibung angezeigt.
 - Beim Anlegen eines technischen Problems kann der Lagerort des Sets gesetzt oder geleert werden.

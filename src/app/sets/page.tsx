@@ -33,6 +33,7 @@ type ComponentAssignmentRow = {
     legacy_inventory_number: string;
     category: string;
     model: string | null;
+    serial_number: string | null;
     condition: string;
     legacy_status: string | null;
   } | null;
@@ -89,6 +90,15 @@ type SchoolClassOptionRow = {
   id: string;
   label: string;
   grade_level: number | null;
+};
+
+type PersonOptionRow = {
+  id: string;
+  legacy_user_id: number | null;
+  first_name: string | null;
+  last_name: string | null;
+  email: string | null;
+  person_type: string;
 };
 
 type SetSort = "set" | "person" | "class";
@@ -195,6 +205,41 @@ function buildDetailHref(
 }
 
 function buildCloseDetailHref(
+  params: Record<string, string | string[] | undefined>,
+) {
+  const nextParams = new URLSearchParams();
+
+  for (const key of ["q", "availability", "condition", "class", "sort", "page"]) {
+    const value = getSingleParam(params, key).trim();
+
+    if (value) {
+      nextParams.set(key, value);
+    }
+  }
+
+  const queryString = nextParams.toString();
+  return queryString ? `/sets?${queryString}` : "/sets";
+}
+
+function buildIssueHref(
+  params: Record<string, string | string[] | undefined>,
+  setId: string,
+) {
+  const nextParams = new URLSearchParams();
+
+  for (const key of ["q", "availability", "condition", "class", "sort", "page"]) {
+    const value = getSingleParam(params, key).trim();
+
+    if (value) {
+      nextParams.set(key, value);
+    }
+  }
+
+  nextParams.set("issue", setId);
+  return `/sets?${nextParams.toString()}`;
+}
+
+function buildCloseIssueHref(
   params: Record<string, string | string[] | undefined>,
 ) {
   const nextParams = new URLSearchParams();
@@ -351,6 +396,16 @@ function formatPerson(
   return person.person_type === "schueler" && schoolClassLabel
     ? `${label} (${schoolClassLabel})`
     : label;
+}
+
+function formatPersonOption(person: PersonOptionRow) {
+  const name = [person.last_name, person.first_name].filter(Boolean).join(", ");
+  const label = name || person.email || "Unbenannte Person";
+  const suffix = [person.person_type, person.email && name ? person.email : null]
+    .filter(Boolean)
+    .join(" · ");
+
+  return suffix ? `${label} (${suffix})` : label;
 }
 
 function componentLabel(component: ComponentAssignmentRow["component"]) {
@@ -644,6 +699,156 @@ async function updateSetStorage(formData: FormData) {
   redirect(returnTo);
 }
 
+async function issueSet(formData: FormData) {
+  "use server";
+
+  const appUser = await getCurrentAppUser();
+
+  if (!appUser) {
+    redirect("/login");
+  }
+
+  if (!hasAnyRole(appUser, ["admin", "ipad_verwaltung"])) {
+    redirect("/");
+  }
+
+  const setId = normalizeRequiredText(formData.get("set_id"));
+  const personId = normalizeRequiredText(formData.get("person_id"));
+  const returnTo = normalizeRequiredText(formData.get("return_to")) || "/sets";
+  const issuedAt =
+    normalizeRequiredText(formData.get("issued_at")) ||
+    new Date().toISOString().slice(0, 10);
+  const issueNote = normalizeOptionalText(formData.get("issue_note"));
+
+  if (!setId || !personId) {
+    redirect(returnTo);
+  }
+
+  const supabase = await createClient();
+  const [
+    { data: set, error: setError },
+    { data: person, error: personError },
+    { data: activeAssignment, error: activeAssignmentError },
+    { data: componentAssignments, error: componentAssignmentsError },
+    { data: minLegacyAssignment },
+  ] = await Promise.all([
+    supabase
+      .from("inventory_set")
+      .select("id,legacy_set_id,availability,condition")
+      .eq("id", setId)
+      .maybeSingle(),
+    supabase
+      .from("person")
+      .select("id,legacy_user_id,status")
+      .eq("id", personId)
+      .maybeSingle(),
+    supabase
+      .from("set_person_assignment")
+      .select("id")
+      .eq("set_id", setId)
+      .is("returned_at", null)
+      .maybeSingle(),
+    supabase
+      .from("set_component_assignment")
+      .select("role,component:component_id(condition)")
+      .eq("set_id", setId)
+      .is("valid_until", null),
+    supabase
+      .from("set_person_assignment")
+      .select("legacy_assignment_id")
+      .lt("legacy_assignment_id", 0)
+      .order("legacy_assignment_id", { ascending: true })
+      .limit(1)
+      .maybeSingle(),
+  ]);
+
+  if (setError) {
+    throw setError;
+  }
+
+  if (personError) {
+    throw personError;
+  }
+
+  if (activeAssignmentError) {
+    throw activeAssignmentError;
+  }
+
+  if (componentAssignmentsError) {
+    throw componentAssignmentsError;
+  }
+
+  if (!set || !person || person.status !== "aktiv" || activeAssignment) {
+    redirect(`${returnTo}${returnTo.includes("?") ? "&" : "?"}error=issue_invalid`);
+  }
+
+  const requiredRoles = new Set(["ipad", "pencil", "keyboard"]);
+  const blockingConditions = new Set(["defekt", "gesperrt_kein_mdm"]);
+  const validComponents = (componentAssignments ?? []).filter((assignment) => {
+    const component = Array.isArray(assignment.component)
+      ? assignment.component[0]
+      : assignment.component;
+
+    return (
+      requiredRoles.has(assignment.role) &&
+      component &&
+      !blockingConditions.has(component.condition)
+    );
+  });
+
+  if (
+    set.availability !== "frei" ||
+    !["ok", "beschädigt_nutzbar"].includes(set.condition) ||
+    validComponents.length < 3
+  ) {
+    redirect(`${returnTo}${returnTo.includes("?") ? "&" : "?"}error=issue_blocked`);
+  }
+
+  const nextLegacyAssignmentId =
+    minLegacyAssignment?.legacy_assignment_id &&
+    minLegacyAssignment.legacy_assignment_id < 0
+      ? minLegacyAssignment.legacy_assignment_id - 1
+      : -1;
+  const combinedNote = [
+    issueNote,
+    `Manuelle Ausgabe am ${issuedAt} über Set-Liste.`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const { error: insertError } = await supabase
+    .from("set_person_assignment")
+    .insert({
+      issued_at: issuedAt,
+      issue_note: combinedNote || null,
+      legacy_assignment_id: nextLegacyAssignmentId,
+      legacy_status: "manual_issue",
+      legacy_user_id: person.legacy_user_id ?? 0,
+      person_id: personId,
+      set_id: setId,
+    });
+
+  if (insertError) {
+    throw insertError;
+  }
+
+  const { error: updateSetError } = await supabase
+    .from("inventory_set")
+    .update({
+      assigned_person_id: personId,
+      availability: "ausgegeben",
+      legacy_user_id: person.legacy_user_id,
+      notes: combinedNote || null,
+    })
+    .eq("id", setId);
+
+  if (updateSetError) {
+    throw updateSetError;
+  }
+
+  redirect(`${returnTo}${returnTo.includes("?") ? "&" : "?"}issued=1`);
+}
+
 export default async function SetsPage({
   searchParams,
 }: {
@@ -656,6 +861,7 @@ export default async function SetsPage({
   const classFilter = getSingleParam(params, "class");
   const damageSetId = getSingleParam(params, "damage");
   const detailSetId = getSingleParam(params, "detail");
+  const issueSetId = getSingleParam(params, "issue");
   const problemSetId = getSingleParam(params, "problem");
   const returnSetId = getSingleParam(params, "return");
   const storageSetId = getSingleParam(params, "storage");
@@ -672,14 +878,27 @@ export default async function SetsPage({
   }
 
   const supabase = await createClient();
-  const canEditSetStorage = hasAnyRole(appUser, ["admin", "ipad_verwaltung"]);
-  const { data: classOptionData } = await supabase
-    .from("school_class")
-    .select("id,label,grade_level")
-    .eq("active", true)
-    .order("grade_level", { ascending: true, nullsFirst: false })
-    .order("label", { ascending: true });
+  const canManageSets = hasAnyRole(appUser, ["admin", "ipad_verwaltung"]);
+  const canEditSetStorage = canManageSets;
+  const [{ data: classOptionData }, { data: personOptionData }] = await Promise.all([
+    supabase
+      .from("school_class")
+      .select("id,label,grade_level")
+      .eq("active", true)
+      .order("grade_level", { ascending: true, nullsFirst: false })
+      .order("label", { ascending: true }),
+    canManageSets
+      ? supabase
+          .from("person")
+          .select("id,legacy_user_id,first_name,last_name,email,person_type")
+          .eq("status", "aktiv")
+          .order("last_name", { ascending: true, nullsFirst: false })
+          .order("first_name", { ascending: true, nullsFirst: false })
+          .limit(5000)
+      : Promise.resolve({ data: [] }),
+  ]);
   const classOptions = (classOptionData ?? []) as SchoolClassOptionRow[];
+  const personOptions = (personOptionData ?? []) as PersonOptionRow[];
   let setQuery = supabase
     .from("inventory_set")
     .select(
@@ -1036,7 +1255,7 @@ export default async function SetsPage({
     setIds.length > 0
       ? await supabase
           .from("set_component_assignment")
-          .select("set_id,role,component:component_id(legacy_inventory_number,category,model,condition,legacy_status)")
+          .select("set_id,role,component:component_id(legacy_inventory_number,category,model,serial_number,condition,legacy_status)")
           .is("valid_until", null)
           .in("set_id", setIds)
       : { data: [] };
@@ -1138,6 +1357,13 @@ export default async function SetsPage({
       detailHref: buildDetailHref(params, set.id),
       id: set.id,
       ipad: componentLabel(ipad),
+      ipadMdmHref: ipad?.serial_number
+        ? `https://mdm.evssn.de/#/devices/inventory?page=0&limit=100&search=${encodeURIComponent(ipad.serial_number)}`
+        : null,
+      issueHref:
+        canManageSets && availability === "frei" && set.condition === "ok"
+          ? buildIssueHref(params, set.id)
+          : null,
       keyboard: componentLabel(keyboard),
       legacySetId: set.legacy_set_id,
       legacyStatus: set.legacy_status,
@@ -1169,6 +1395,7 @@ export default async function SetsPage({
     };
   });
   const setToShowDetail = sets.find((set) => set.id === detailSetId) ?? null;
+  const setToIssue = sets.find((set) => set.id === issueSetId) ?? null;
   const setToReturn = sets.find((set) => set.id === returnSetId) ?? null;
   const setToEditStorage = sets.find((set) => set.id === storageSetId) ?? null;
   const assignmentToReturn = setToReturn
@@ -1192,6 +1419,7 @@ export default async function SetsPage({
   const returnCloseHref = buildCloseReturnHref(params);
   const storageCloseHref = buildCloseStorageHref(params);
   const detailCloseHref = buildCloseDetailHref(params);
+  const issueCloseHref = buildCloseIssueHref(params);
   const personToShowDetail = setToShowDetail
     ? (personBySetId.get(setToShowDetail.id) ?? null)
     : null;
@@ -1208,6 +1436,9 @@ export default async function SetsPage({
   const detailSupplemental = setToShowDetail
     ? (supplementalBySetId.get(setToShowDetail.id) ?? [])
     : [];
+  const issueComponents = setToIssue
+    ? componentsBySetId.get(setToIssue.id)
+    : undefined;
   const detailAvailability = setToShowDetail
     ? deriveAvailability(
         setToShowDetail,
@@ -1218,6 +1449,7 @@ export default async function SetsPage({
       )
     : null;
   const returnDateDefault = new Date().toISOString().slice(0, 10);
+  const issueDateDefault = returnDateDefault;
   const returnSupplementalComponents = [
     componentsToReturn?.get("adapter")?.component
       ? {
@@ -1255,22 +1487,14 @@ export default async function SetsPage({
               iPad-Verwaltung 2.0
             </Link>
             <h1 className="mt-3 text-3xl font-semibold tracking-tight">
-              Sets und Inventar
+              Sets und Komponenten
             </h1>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Link
-              className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-medium transition hover:bg-white"
-              href="/sets/w1"
-            >
-              Wagen W1
-            </Link>
-            <form action="/auth/sign-out" method="post">
-              <button className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-medium transition hover:bg-white">
-                Abmelden
-              </button>
-            </form>
-          </div>
+          <form action="/auth/sign-out" method="post">
+            <button className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-medium transition hover:bg-white">
+              Abmelden
+            </button>
+          </form>
         </header>
 
         <SectionTabs active="sets" />
@@ -1446,6 +1670,100 @@ export default async function SetsPage({
           </div>
         ) : null}
 
+        {setToIssue && canManageSets ? (
+          <div className="fixed inset-0 z-40 bg-zinc-950/25">
+            <aside className="ml-auto flex h-full w-full max-w-3xl flex-col overflow-y-auto border-l border-zinc-200 bg-white shadow-2xl">
+              <div className="sticky top-0 z-10 flex flex-wrap items-start justify-between gap-4 border-b border-zinc-200 bg-white px-6 py-5">
+                <div>
+                  <p className="text-sm font-medium text-zinc-500">
+                    Set-Liste
+                  </p>
+                  <h2 className="mt-1 text-2xl font-semibold tracking-tight">
+                    Set ausgeben
+                  </h2>
+                  <p className="mt-2 text-sm text-zinc-600">
+                    Set {setToIssue.legacy_set_id}
+                  </p>
+                </div>
+                <Link
+                  className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-semibold transition hover:bg-zinc-50"
+                  href={issueCloseHref}
+                >
+                  Schließen
+                </Link>
+              </div>
+
+              <form action={issueSet} className="grid gap-6 px-6 py-6">
+                <input name="set_id" type="hidden" value={setToIssue.id} />
+                <input name="return_to" type="hidden" value={issueCloseHref} />
+
+                <section className="grid gap-3 rounded-lg border border-zinc-200 p-4">
+                  <h3 className="font-semibold">Set</h3>
+                  <dl className="grid gap-3 sm:grid-cols-2">
+                    <DetailField label="iPad" value={componentLabel(issueComponents?.get("ipad")?.component ?? null)} />
+                    <DetailField label="Pencil" value={componentLabel(issueComponents?.get("pencil")?.component ?? null)} />
+                    <DetailField label="Tastatur" value={componentLabel(issueComponents?.get("keyboard")?.component ?? null)} />
+                    <DetailField label="Zustand" value={setToIssue.condition} />
+                    <DetailField label="Lagerort" value={setToIssue.storage_label} />
+                  </dl>
+                </section>
+
+                <section className="grid gap-4 rounded-lg border border-zinc-200 p-4">
+                  <h3 className="font-semibold">Ausgabe</h3>
+
+                  <label className="flex flex-col gap-1 text-sm font-medium">
+                    Person
+                    <select
+                      className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
+                      name="person_id"
+                      required
+                    >
+                      <option value="">Person auswählen</option>
+                      {personOptions.map((person) => (
+                        <option key={person.id} value={person.id}>
+                          {formatPersonOption(person)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="flex flex-col gap-1 text-sm font-medium md:max-w-52">
+                    Ausgabedatum
+                    <input
+                      className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
+                      defaultValue={issueDateDefault}
+                      name="issued_at"
+                      required
+                      type="date"
+                    />
+                  </label>
+
+                  <label className="flex flex-col gap-1 text-sm font-medium">
+                    Interne Ausgabenotiz
+                    <textarea
+                      className="min-h-24 rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
+                      name="issue_note"
+                      placeholder="Optional, z. B. Zubehör, Besonderheiten oder Ausgabeort"
+                    />
+                  </label>
+                </section>
+
+                <div className="flex flex-wrap justify-end gap-2 border-t border-zinc-200 pt-4">
+                  <Link
+                    className="rounded-md border border-zinc-300 px-4 py-2 text-sm font-semibold transition hover:bg-zinc-50"
+                    href={issueCloseHref}
+                  >
+                    Abbrechen
+                  </Link>
+                  <button className="rounded-md bg-zinc-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-zinc-800">
+                    Ausgabe speichern
+                  </button>
+                </div>
+              </form>
+            </aside>
+          </div>
+        ) : null}
+
         {setToEditStorage ? (
           <div className="fixed inset-0 z-40 bg-zinc-950/25">
             <aside className="ml-auto flex h-full w-full max-w-lg flex-col border-l border-zinc-200 bg-white shadow-2xl">
@@ -1505,7 +1823,7 @@ export default async function SetsPage({
               <div className="flex flex-wrap items-start justify-between gap-4 border-b border-zinc-200 px-6 py-4">
                 <div>
                   <p className="text-sm font-medium text-zinc-500">
-                    Sets und Inventar
+                    Sets und Komponenten
                   </p>
                   <h2 className="mt-1 text-xl font-semibold tracking-tight">
                     Problem melden
@@ -1538,7 +1856,7 @@ export default async function SetsPage({
               <div className="flex flex-wrap items-start justify-between gap-4 border-b border-zinc-200 px-6 py-4">
                 <div>
                   <p className="text-sm font-medium text-zinc-500">
-                    Sets und Inventar
+                    Sets und Komponenten
                   </p>
                   <h2 className="mt-1 text-xl font-semibold tracking-tight">
                     Schaden oder Verlust melden

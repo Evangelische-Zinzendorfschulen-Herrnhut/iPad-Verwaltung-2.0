@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 
 const foundations = [
   { label: "Personen und Klassen", href: "/personen" },
-  { label: "Komponenten und Sets", href: "/sets" },
+  { label: "Sets und Komponenten", href: "/sets" },
   { label: "Geräteliste", href: "/geraete" },
   { label: "Schadensfälle", href: "/schadensfaelle" },
   { label: "Aus- und Rückgabeliste", href: "/ausgaben" },

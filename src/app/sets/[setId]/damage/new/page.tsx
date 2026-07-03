@@ -161,6 +161,7 @@ async function applyReplacementSetIssue({
   damageNumber,
   damagedComponentId,
   issuedAt,
+  markDamagedPartsDefective,
   personId,
   replacementSetId,
   setId,
@@ -169,6 +170,7 @@ async function applyReplacementSetIssue({
   damageNumber: number;
   damagedComponentId: string | null;
   issuedAt: string;
+  markDamagedPartsDefective: boolean;
   personId: string;
   replacementSetId: string;
   setId: string;
@@ -302,7 +304,7 @@ async function applyReplacementSetIssue({
       .update({
         assigned_person_id: null,
         availability: "blockiert",
-        condition: "defekt",
+        condition: markDamagedPartsDefective ? "defekt" : "unklar",
         legacy_user_id: null,
         notes: note,
       })
@@ -317,7 +319,7 @@ async function applyReplacementSetIssue({
         notes: note,
       })
       .eq("id", replacementSetId),
-    componentIdToMarkDefective
+    markDamagedPartsDefective && componentIdToMarkDefective
       ? supabase
           .from("inventory_component")
           .update({
@@ -345,12 +347,14 @@ async function applyReplacementComponentIssue({
   damagedComponentId,
   damageNumber,
   effectiveAt,
+  markDamagedComponentDefective,
   replacementComponentId,
   setId,
 }: {
   damagedComponentId: string;
   damageNumber: number;
   effectiveAt: string;
+  markDamagedComponentDefective: boolean;
   replacementComponentId: string;
   setId: string;
 }) {
@@ -491,13 +495,15 @@ async function applyReplacementComponentIssue({
 
   const [damagedComponentUpdate, targetSetUpdate, sourceSetUpdate] =
     await Promise.all([
-      supabase
-        .from("inventory_component")
-        .update({
-          condition: "defekt",
-          legacy_status: "defekt",
-        })
-        .eq("id", damagedComponentId),
+      markDamagedComponentDefective
+        ? supabase
+            .from("inventory_component")
+            .update({
+              condition: "defekt",
+              legacy_status: "defekt",
+            })
+            .eq("id", damagedComponentId)
+        : Promise.resolve({ error: null }),
       supabase
         .from("inventory_set")
         .update({ notes: note })
@@ -533,6 +539,7 @@ async function createDamageCase(formData: FormData) {
   const assignmentId = String(formData.get("assignment_id") ?? "");
   const personId = String(formData.get("person_id") ?? "");
   const caseType = String(formData.get("case_type") ?? "");
+  const problemType = String(formData.get("problem_type") ?? "");
   const affectedItem = String(formData.get("affected_item") ?? "");
   const status = String(formData.get("status") ?? "offen");
   const componentId = String(formData.get("component_id") ?? "");
@@ -558,7 +565,18 @@ async function createDamageCase(formData: FormData) {
   const storageLabel = String(formData.get("storage_label") ?? "").trim();
   const returnTo = String(formData.get("return_to") ?? "/sets");
 
-  if (!setId || !caseType || !affectedItem || !reportedAt) {
+  const validProblemTypes = ["hardware", "software"];
+  const normalizedProblemType =
+    caseType === "schaden" || caseType === "verlust" ? "hardware" : problemType;
+
+  if (
+    !setId ||
+    !caseType ||
+    !affectedItem ||
+    !reportedAt ||
+    (caseType === "technisches_problem" &&
+      !validProblemTypes.includes(normalizedProblemType))
+  ) {
     redirect(appendFlagToHref(returnTo, "error", "missing_required"));
   }
 
@@ -624,6 +642,7 @@ async function createDamageCase(formData: FormData) {
       replacement_component_id: replacementComponentId || null,
       replacement_set_id: replacementSetId || null,
       case_type: caseType,
+      problem_type: normalizedProblemType || null,
       affected_item: affectedItem,
       status,
       reported_at: reportedAt,
@@ -650,6 +669,8 @@ async function createDamageCase(formData: FormData) {
 
   if (damageCase) {
     const shortDescription = `Schaden ${damageCase.damage_number}: ${preliminaryShortDescription}`;
+    const shouldMarkDamagedPartsDefective =
+      caseType !== "technisches_problem" || normalizedProblemType === "hardware";
     const { error: updateError } = await supabase
       .from("damage_case")
       .update({ short_description: shortDescription })
@@ -670,6 +691,7 @@ async function createDamageCase(formData: FormData) {
         damageNumber: damageCase.damage_number,
         damagedComponentId: componentId || null,
         issuedAt: replacementIssuedAt || reportedAt,
+        markDamagedPartsDefective: shouldMarkDamagedPartsDefective,
         personId,
         replacementSetId,
         setId,
@@ -685,9 +707,28 @@ async function createDamageCase(formData: FormData) {
         damagedComponentId: componentId,
         damageNumber: damageCase.damage_number,
         effectiveAt: replacementIssuedAt || reportedAt,
+        markDamagedComponentDefective: shouldMarkDamagedPartsDefective,
         replacementComponentId,
         setId,
       });
+    }
+
+    if (
+      caseType === "technisches_problem" &&
+      normalizedProblemType === "hardware" &&
+      componentId
+    ) {
+      const { error: componentConditionError } = await supabase
+        .from("inventory_component")
+        .update({
+          condition: "defekt",
+          legacy_status: "defekt",
+        })
+        .eq("id", componentId);
+
+      if (componentConditionError) {
+        throw componentConditionError;
+      }
     }
   }
 
@@ -854,7 +895,7 @@ export default async function DamageNewPage({
         {!embedded ? (
           <div>
             <Link className="text-sm font-medium text-zinc-500" href="/sets">
-              Sets und Inventar
+              Sets und Komponenten
             </Link>
             <h1 className="mt-3 text-3xl font-semibold tracking-tight">
               {isProblemMode ? "Problem melden" : "Schaden oder Verlust melden"}
@@ -921,6 +962,17 @@ export default async function DamageNewPage({
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
+            <FormFieldLabel label="Problemart">
+              <select
+                className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
+                defaultValue="hardware"
+                name="problem_type"
+              >
+                <option value="hardware">Hardware</option>
+                <option value="software">Software</option>
+              </select>
+            </FormFieldLabel>
+
             <FormFieldLabel label="Betroffen">
               <select
                 className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"

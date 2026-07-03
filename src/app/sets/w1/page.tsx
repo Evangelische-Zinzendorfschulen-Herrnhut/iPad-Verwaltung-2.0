@@ -32,7 +32,7 @@ export default async function W1SetsPage() {
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <Link className="text-sm font-medium text-zinc-500" href="/sets">
-              Sets und Inventar
+              Sets und Komponenten
             </Link>
             <h1 className="mt-3 text-3xl font-semibold tracking-tight">
               Wagen W1

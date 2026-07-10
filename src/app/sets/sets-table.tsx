@@ -13,6 +13,7 @@ export type SetsTableRow = {
   ipad: string;
   ipadMdmHref: string | null;
   issueHref: string | null;
+  issueLabel: string | null;
   keyboard: string;
   legacySetId: number;
   legacyStatus: string | null;
@@ -37,6 +38,7 @@ type ContextMenuState = {
   damageHref: string | null;
   detailHref: string;
   issueHref: string | null;
+  issueLabel: string | null;
   problemHref: string | null;
   releaseReturnTo: string;
   releasable: boolean;
@@ -78,6 +80,7 @@ export function SetsTable({ releaseAction, rows }: SetsTableProps) {
       damageHref: row.damageHref,
       detailHref: row.detailHref,
       issueHref: row.issueHref,
+      issueLabel: row.issueLabel,
       problemHref: row.problemHref,
       releaseReturnTo: row.releaseReturnTo,
       releasable: row.releasable,
@@ -127,7 +130,7 @@ export function SetsTable({ releaseAction, rows }: SetsTableProps) {
                     "-"
                   )}
                 </td>
-                <td className="px-4 py-3 whitespace-nowrap align-middle">
+                <td className="inventory-number px-4 py-3 whitespace-nowrap align-middle">
                   <span className="inline-flex items-center gap-2 align-middle">
                     <span>{row.ipad}</span>
                     {row.ipadMdmHref ? (
@@ -151,8 +154,8 @@ export function SetsTable({ releaseAction, rows }: SetsTableProps) {
                     ) : null}
                   </span>
                 </td>
-                <td className="px-4 py-3 whitespace-nowrap">{row.pencil}</td>
-                <td className="px-4 py-3 whitespace-nowrap">{row.keyboard}</td>
+                <td className="inventory-number px-4 py-3 whitespace-nowrap">{row.pencil}</td>
+                <td className="inventory-number px-4 py-3 whitespace-nowrap">{row.keyboard}</td>
                 <td className="px-4 py-3">{row.storageLabel}</td>
                 <td className="px-4 py-3">{row.availability}</td>
                 <td className="px-4 py-3">{row.condition}</td>
@@ -168,6 +171,7 @@ export function SetsTable({ releaseAction, rows }: SetsTableProps) {
       {contextMenu ? (
         <div
           className="fixed z-50 min-w-64 rounded-md border border-zinc-200 bg-white p-1 text-sm shadow-lg"
+          onClick={(event) => event.stopPropagation()}
           style={{ left: contextMenu.x, top: contextMenu.y }}
         >
           <Link
@@ -199,7 +203,7 @@ export function SetsTable({ releaseAction, rows }: SetsTableProps) {
               className="block w-full rounded px-3 py-2 text-left font-medium hover:bg-zinc-100"
               href={contextMenu.issueHref}
             >
-              Set ausgeben
+              {contextMenu.issueLabel ?? "Set ausgeben"}
             </Link>
           ) : null}
           {contextMenu.damageHref ? (

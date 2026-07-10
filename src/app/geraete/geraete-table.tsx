@@ -117,7 +117,7 @@ export function GeraeteTable({
                 key={row.id}
                 onContextMenu={(event) => openContextMenu(event, row)}
               >
-                <td className="whitespace-nowrap px-4 py-3 font-semibold">
+                <td className="inventory-number whitespace-nowrap px-4 py-3 font-semibold">
                   {row.legacyInventoryNumber}
                 </td>
                 <td className="px-4 py-3">{row.categoryLabel}</td>
@@ -213,7 +213,7 @@ export function GeraeteTable({
               Umtausch/Reparatur nur bei defekten Geräten
             </p>
           )}
-          <p className="border-t border-zinc-100 px-3 py-2 text-xs text-zinc-500">
+          <p className="inventory-number border-t border-zinc-100 px-3 py-2 text-xs text-zinc-500">
             {contextMenu.inventoryNumber}
           </p>
         </div>

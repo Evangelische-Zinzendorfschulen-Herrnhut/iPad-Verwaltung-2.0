@@ -730,7 +730,7 @@ export default async function GeraetePage({
                 <p className="text-sm font-medium text-zinc-500">
                   Gerät bearbeiten
                 </p>
-                <h2 className="mt-1 text-2xl font-semibold tracking-tight">
+                <h2 className="inventory-number mt-1 text-2xl font-semibold tracking-tight">
                   {editComponent.legacy_inventory_number}
                 </h2>
               </div>
@@ -758,7 +758,7 @@ export default async function GeraetePage({
                   <label className="flex flex-col gap-1 text-sm font-medium">
                     Inventarnummer
                     <input
-                      className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
+                      className="inventory-number rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
                       defaultValue={editComponent.legacy_inventory_number}
                       name="legacy_inventory_number"
                       required
@@ -932,7 +932,7 @@ export default async function GeraetePage({
                 <p className="text-sm font-medium text-zinc-500">
                   Geräte-Lagerort
                 </p>
-                <h2 className="mt-1 text-2xl font-semibold tracking-tight">
+                <h2 className="inventory-number mt-1 text-2xl font-semibold tracking-tight">
                   {storageComponent.legacy_inventory_number}
                 </h2>
               </div>

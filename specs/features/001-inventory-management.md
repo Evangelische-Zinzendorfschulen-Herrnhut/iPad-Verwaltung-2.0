@@ -40,13 +40,16 @@ Die Schule braucht eine verlaessliche Uebersicht ueber alle Komponenten eines iP
 7. System aktualisiert Set-Zustand und Set-Verfuegbarkeit.
 8. System schreibt Audit-Logs.
 
-## Workflow: Wagenuebersicht W1 anzeigen
+## Workflow: Lagerliste anzeigen
 
-1. Nutzer oeffnet die zusaetzliche Liste `Wagen W1` aus der Set-Liste.
-2. System zeigt alle Sets, deren Set-Lagerort mit `W1` beginnt.
-3. System sortiert erkannte Wagenplaetze 1 bis 30 aufsteigend und zeigt Sets ohne erkannten Platz danach.
-4. System zeigt pro Set Platz, Setnummer, aktuelle Person, Klasse, iPad, Pencil, Tastatur, Verfuegbarkeit, Zustand und Lagerort.
-5. Nutzer kann die W1-Uebersicht als XLSX herunterladen.
+1. Nutzer oeffnet die zusaetzliche Lagerliste aus der Set-Liste.
+2. System zeigt als Default alle Sets, deren Set-Lagerort mit `W1` beginnt.
+3. Nutzer kann den Lagerort per Dropdown auf W1 bis W6, Schrank1, Schrank2, Regal1 oder alle Lagerorte filtern.
+4. Nutzer kann zusaetzlich frei nach Person, Setnummer oder Inventarnummern der Set-Komponenten suchen.
+5. System sortiert erkannte Wagenplaetze 1 bis 30 aufsteigend und zeigt Sets ohne erkannten Platz danach.
+6. System zeigt pro Set Platz, Setnummer, aktuelle Person, Klasse, iPad, Pencil, Tastatur, Verfuegbarkeit, Zustand und Lagerort.
+7. Nutzer kann aus der Lagerliste per Kontextmenue Set-Ausgabe- und Ruecknahme-Workflows starten, sofern die Rolle dazu berechtigt ist.
+8. Nutzer kann die gefilterte Lagerliste als XLSX herunterladen.
 
 ## Datenobjekte
 
@@ -73,7 +76,8 @@ Die Schule braucht eine verlaessliche Uebersicht ueber alle Komponenten eines iP
 - Bei W1 bis W6 soll der konkrete Platz 1-30 dokumentiert werden.
 - Sets koennen einer Person zugeordnet sein und trotzdem physisch im Lager oder Wagen liegen, insbesondere bei Schuelern der 5. und 6. Klassen.
 - Wagenplaetze sollen vorrangig komplette Sets enthalten.
-- Fuer Wagen W1 gibt es eine zusaetzliche Uebersichtsliste mit XLSX-Export.
+- Fuer Lagerorte gibt es eine zusaetzliche Lagerliste mit Defaultfilter W1 und XLSX-Export.
+- Die Lagerliste kann frei nach Person, Setnummer und Inventarnummern der Set-Komponenten durchsucht werden.
 
 ## Offene Fragen
 

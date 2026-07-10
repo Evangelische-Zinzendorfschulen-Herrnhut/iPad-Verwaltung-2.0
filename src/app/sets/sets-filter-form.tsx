@@ -176,7 +176,8 @@ export function SetsFilterForm({
           value={sort}
         >
           <option value="set">Setnummer</option>
-          <option value="person">Person</option>
+          <option value="person">Person, Nachname</option>
+          <option value="first_name">Person, Vorname</option>
           <option value="class">Klasse</option>
         </select>
       </label>

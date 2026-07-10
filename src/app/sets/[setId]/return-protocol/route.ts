@@ -11,6 +11,7 @@ type SetRow = {
 
 type ComponentAssignmentRow = {
   role: string;
+  valid_until: string | null;
   component: {
     legacy_inventory_number: string;
     manufacturer: string | null;
@@ -152,6 +153,33 @@ function componentSerial(component: ComponentAssignmentRow["component"]) {
   return component?.serial_number ?? "-";
 }
 
+function latestComponentAssignment(
+  assignments: ComponentAssignmentRow[],
+  role: string,
+) {
+  const roleAssignments = assignments.filter((assignment) => assignment.role === role);
+  const activeAssignment = roleAssignments.find(
+    (assignment) => assignment.valid_until === null,
+  );
+
+  if (activeAssignment) {
+    return activeAssignment.component;
+  }
+
+  const [latestAssignment] = roleAssignments.sort((first, second) => {
+    const firstTime = first.valid_until
+      ? new Date(first.valid_until).getTime()
+      : Number.MAX_SAFE_INTEGER;
+    const secondTime = second.valid_until
+      ? new Date(second.valid_until).getTime()
+      : Number.MAX_SAFE_INTEGER;
+
+    return secondTime - firstTime;
+  });
+
+  return latestAssignment?.component ?? null;
+}
+
 function encodeWinAnsi(value: string) {
   return value
     .replaceAll("–", "-")
@@ -233,6 +261,7 @@ function buildPdfContent(data: {
   ipad: ComponentAssignmentRow["component"];
   keyboard: ComponentAssignmentRow["component"];
   pencil: ComponentAssignmentRow["component"];
+  adapter: ComponentAssignmentRow["component"];
   person: PersonAssignmentRow["person"];
   returnDefects: string | null;
   returnChecks: ReturnChecks;
@@ -309,12 +338,13 @@ function buildPdfContent(data: {
     textLine(48, 468, "Sonstiges", 10, "F2"),
     checkbox(48, 445, data.returnChecks.powerAdapter),
     textLine(64, 448, "Netzteil", 10),
-    checkbox(48, 417, data.returnChecks.chargingCable),
-    textLine(64, 420, "Ladekabel", 10),
-    checkbox(48, 389, data.returnChecks.adapter),
-    textLine(64, 392, "Lightning-USB-Adapter", 10),
-    checkbox(215, 389, data.returnChecks.hdmiCable),
-    textLine(231, 392, "HDMI-Kabel", 10),
+    checkbox(215, 445, data.returnChecks.chargingCable),
+    textLine(231, 448, "Ladekabel", 10),
+    checkbox(48, 417, data.returnChecks.adapter),
+    textLine(64, 420, "Lightning-USB-Adapter", 10),
+    textLine(215, 420, `Inventar-Nr.: ${componentInventory(data.adapter)}`, 10),
+    checkbox(48, 389, data.returnChecks.hdmiCable),
+    textLine(64, 392, "HDMI-Kabel", 10),
     line(48, 382, 548, 382),
     checkbox(48, 350, returnedCompletely),
     textLine(
@@ -441,9 +471,8 @@ export async function GET(
     supabase
       .from("set_component_assignment")
       .select(
-        "role,component:component_id(legacy_inventory_number,manufacturer,model,serial_number)",
+        "role,valid_until,component:component_id(legacy_inventory_number,manufacturer,model,serial_number)",
       )
-      .is("valid_until", null)
       .eq("set_id", setId),
     supabase
       .from("set_person_assignment")
@@ -478,14 +507,13 @@ export async function GET(
     ...assignment,
     component: normalizeJoined(assignment.component),
   }));
-  const componentsByRole = new Map<string, ComponentAssignmentRow["component"]>();
-
-  for (const assignment of componentAssignments) {
-    componentsByRole.set(assignment.role, assignment.component);
-  }
+  const ipad = latestComponentAssignment(componentAssignments, "ipad");
+  const keyboard = latestComponentAssignment(componentAssignments, "keyboard");
+  const pencil = latestComponentAssignment(componentAssignments, "pencil");
+  const adapter = latestComponentAssignment(componentAssignments, "adapter");
 
   const returnRequirements: ReturnRequirements = {
-    adapter: componentsByRole.has("adapter"),
+    adapter: Boolean(adapter),
     hdmiCable: (supplementalAssignmentsResult.data ?? []).some(
       (assignment) => assignment.item_type === "hdmi_cable",
     ),
@@ -521,10 +549,11 @@ export async function GET(
   }
 
   const content = buildPdfContent({
+    adapter,
     classLabel,
-    ipad: componentsByRole.get("ipad") ?? null,
-    keyboard: componentsByRole.get("keyboard") ?? null,
-    pencil: componentsByRole.get("pencil") ?? null,
+    ipad,
+    keyboard,
+    pencil,
     person,
     returnDefects: rawPersonAssignment?.return_defects ?? null,
     returnChecks,

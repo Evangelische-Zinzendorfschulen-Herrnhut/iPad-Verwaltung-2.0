@@ -54,20 +54,25 @@ Die aktuelle Set-Zuordnung wird separat gespeichert. Der zweite Zahlenblock der 
 
 ## Erster Umsetzungsschnitt: Ausgabe aus der Setliste
 
-Aus der Setliste kann ein fachlich freies Set ueber das Kontextmenue ausgegeben werden.
+Aus der Setliste kann ein fachlich freies Set ueber das Kontextmenue fuer die Ausgabe vorbereitet und danach tatsaechlich ausgegeben werden.
 
-1. Nutzer oeffnet bei einem freien Set `Set ausgeben`.
+1. Nutzer oeffnet bei einem freien Set `Set vorbereiten`.
 2. System zeigt Setnummer, Hauptkomponenten und ein Formular zur Personenauswahl.
-3. Nutzer waehlt eine aktive Person, Ausgabedatum und optionale interne Ausgabenotiz.
+3. Nutzer waehlt eine aktive Person, kann den Lagerort anpassen und erfasst optional eine interne Vorbereitungsnotiz.
 4. System prueft serverseitig:
    - Set hat keine aktive Ausleihe.
    - Set ist `frei`.
    - Set-Zustand ist `ok` oder `beschädigt, nutzbar`.
    - iPad, Pencil und Tastatur sind aktuell dem Set zugeordnet.
    - Keine Hauptkomponente ist `defekt` oder `gesperrt, kein MDM`.
-5. System legt eine aktive `set_person_assignment` an.
-6. System setzt `inventory_set.assigned_person_id` und `availability` auf `ausgegeben`.
-7. System zeigt das Set danach in der Setliste als ausgegeben beziehungsweise bei Schuelern der Klassen 5/6 fachlich als zugeordnet.
+5. System legt eine vorbereitete `set_person_assignment` ohne `issued_at` an.
+6. System setzt `inventory_set.assigned_person_id` und `availability` auf `zugeordnet`; der Lagerort bleibt dokumentiert beziehungsweise wird wie angegeben aktualisiert.
+7. Nutzer oeffnet bei einem vorbereiteten Set `Set ausgeben`.
+8. Nutzer bestaetigt das Ausgabedatum und kann eine interne Ausgabenotiz ergaenzen.
+9. System setzt `set_person_assignment.issued_at`, setzt `inventory_set.availability` auf `ausgegeben` und leert den Lagerort des Sets.
+10. System zeigt das Set danach in der Setliste als ausgegeben beziehungsweise bei Schuelern der Klassen 5/6 fachlich als zugeordnet.
+
+Vorbereitete Sets erscheinen in der Aus- und Rueckgabeliste mit Status `Vorbereitet`. Aus der Liste kann die tatsaechliche Ausgabe ebenfalls direkt abgeschlossen werden; dabei wird das aktuelle Datum als Ausgabedatum gesetzt.
 
 Assumption: Im ersten Umsetzungsschnitt werden Ausgabe-Vollstaendigkeitschecks und Zusatzmaterial noch nicht strukturiert im Ausgabeformular dokumentiert. Diese Details werden im Rueckgabe- und spaeteren erweiterten Ausgabeprotokoll nachgezogen.
 

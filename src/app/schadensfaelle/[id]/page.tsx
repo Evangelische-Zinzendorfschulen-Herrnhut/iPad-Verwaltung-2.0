@@ -155,12 +155,21 @@ function Field({
   label: string;
   value: string | number | null | undefined;
 }) {
+  const usesInventoryFont = [
+    "Komponente",
+    "Ersatzkomponente",
+  ].includes(label);
+
   return (
     <div>
       <dt className="text-xs font-medium uppercase tracking-wide text-zinc-500">
         {label}
       </dt>
-      <dd className="mt-1 whitespace-pre-wrap text-sm text-zinc-950">
+      <dd
+        className={`mt-1 whitespace-pre-wrap text-sm text-zinc-950 ${
+          usesInventoryFont ? "inventory-number" : ""
+        }`}
+      >
         {value || "-"}
       </dd>
     </div>

@@ -62,7 +62,7 @@ export function DamageReplacementFields({
     <>
       <FormFieldLabel label="Komponente">
         <select
-          className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
+          className="inventory-number rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
           name="component_id"
           onChange={(event) => setComponentId(event.target.value)}
           value={componentId}
@@ -78,7 +78,7 @@ export function DamageReplacementFields({
 
       <FormFieldLabel label="Ersatzkomponente">
         <select
-          className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2 disabled:bg-zinc-100 disabled:text-zinc-500"
+          className="inventory-number rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2 disabled:bg-zinc-100 disabled:text-zinc-500"
           disabled={!selectedComponent}
           name="replacement_component_id"
         >

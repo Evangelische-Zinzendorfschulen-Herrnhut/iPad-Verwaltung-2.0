@@ -515,6 +515,111 @@ async function updateSetStorage(formData: FormData) {
   redirect(returnTo);
 }
 
+async function completePreparedIssue(formData: FormData) {
+  "use server";
+
+  const appUser = await getCurrentAppUser();
+
+  if (!appUser) {
+    redirect("/login");
+  }
+
+  if (!hasAnyRole(appUser, ["admin", "ipad_verwaltung"])) {
+    redirect("/");
+  }
+
+  const setId = normalizeRequiredText(formData.get("set_id"));
+  const returnTo = normalizeRequiredText(formData.get("return_to")) || "/ausgaben";
+  const issuedAt =
+    normalizeOptionalText(formData.get("issued_at")) ||
+    new Date().toISOString().slice(0, 10);
+
+  if (!setId) {
+    redirect(returnTo);
+  }
+
+  const supabase = await createClient();
+  const [
+    { data: set, error: setError },
+    { data: assignment, error: assignmentError },
+  ] = await Promise.all([
+    supabase
+      .from("inventory_set")
+      .select("id,availability,condition")
+      .eq("id", setId)
+      .maybeSingle(),
+    supabase
+      .from("set_person_assignment")
+      .select("id,issue_note,person:person_id(id,legacy_user_id,status)")
+      .eq("set_id", setId)
+      .is("returned_at", null)
+      .is("issued_at", null)
+      .maybeSingle(),
+  ]);
+
+  if (setError) {
+    throw setError;
+  }
+
+  if (assignmentError) {
+    throw assignmentError;
+  }
+
+  const assignmentPerson = Array.isArray(assignment?.person)
+    ? assignment?.person[0]
+    : assignment?.person;
+
+  if (
+    !set ||
+    !assignment ||
+    !assignmentPerson ||
+    assignmentPerson.status !== "aktiv" ||
+    set.availability !== "zugeordnet" ||
+    !["ok", "beschädigt_nutzbar"].includes(set.condition)
+  ) {
+    redirect(returnTo);
+  }
+
+  const combinedNote = [
+    assignment.issue_note,
+    `Tatsächliche Ausgabe am ${issuedAt} über Aus- und Rückgabeliste.`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const { error: assignmentUpdateError } = await supabase
+    .from("set_person_assignment")
+    .update({
+      issued_at: issuedAt,
+      issue_note: combinedNote || null,
+      legacy_status: "manual_issue",
+      legacy_user_id: assignmentPerson.legacy_user_id ?? 0,
+    })
+    .eq("id", assignment.id)
+    .is("returned_at", null)
+    .is("issued_at", null);
+
+  if (assignmentUpdateError) {
+    throw assignmentUpdateError;
+  }
+
+  const { error: setUpdateError } = await supabase
+    .from("inventory_set")
+    .update({
+      availability: "ausgegeben",
+      legacy_user_id: assignmentPerson.legacy_user_id,
+      notes: combinedNote || null,
+      storage_label: null,
+    })
+    .eq("id", setId);
+
+  if (setUpdateError) {
+    throw setUpdateError;
+  }
+
+  redirect(returnTo);
+}
+
 export default async function AusgabenPage({
   searchParams,
 }: {
@@ -798,10 +903,12 @@ export default async function AusgabenPage({
     sort === "name_asc"
       ? sortedAssignments.slice(rangeStart, rangeStart + PAGE_SIZE)
       : sortedAssignments;
+  const issueReturnTo = buildCloseStorageHref(params);
   const rows: AssignmentTableRow[] = visibleAssignments.map((assignment) => {
     const setId = assignment.set?.id ?? "";
     const legacySetId = assignment.set?.legacy_set_id;
     const isActive = !assignment.returned_at;
+    const isPrepared = isActive && !assignment.issued_at;
     const returnComplete = deriveReturnComplete(assignment);
 
     return {
@@ -811,6 +918,7 @@ export default async function AusgabenPage({
       editHref: buildEditHref(params, assignment.id),
       id: assignment.id,
       issuedAt: formatDate(assignment.issued_at),
+      issueHref: isPrepared && setId ? issueReturnTo : null,
       person: formatPerson(assignment.person),
       releaseReturnTo: buildCloseStorageHref(params),
       releasable:
@@ -821,14 +929,14 @@ export default async function AusgabenPage({
         assignment.set?.condition === "ok",
       returnComplete,
       returnHref:
-        isActive && setId ? `/sets?return=${setId}` : null,
+        isActive && !isPrepared && setId ? `/sets?return=${setId}` : null,
       returnProtocolHref:
         !isActive && setId ? `/sets/${setId}/return-protocol` : null,
       returnedAt: formatDate(assignment.returned_at),
       setHref: setId ? `/sets?q=${legacySetId ?? ""}&sort=set` : "/sets",
       setId,
       setLabel: legacySetId ? `Set ${legacySetId}` : "Set -",
-      status: isActive ? "Aktiv" : "Zurückgegeben",
+      status: isPrepared ? "Vorbereitet" : isActive ? "Aktiv" : "Zurückgegeben",
       storageHref:
         canEditSetStorage && setId ? buildStorageHref(params, setId) : null,
       storageLabel: assignment.set?.storage_label || "-",
@@ -1032,7 +1140,11 @@ export default async function AusgabenPage({
           />
 
           {rows.length > 0 ? (
-            <AssignmentsTable releaseAction={releaseReturnedSet} rows={rows} />
+            <AssignmentsTable
+              issueAction={completePreparedIssue}
+              releaseAction={releaseReturnedSet}
+              rows={rows}
+            />
           ) : (
             <div className="px-4 py-8 text-sm text-zinc-600">
               Keine Aus- oder Rückgaben für die aktuelle Auswahl gefunden.
@@ -1313,7 +1425,7 @@ export default async function AusgabenPage({
                                   />
                                   <span>
                                     {component.label}
-                                    <span className="block text-xs font-normal text-zinc-500">
+                                    <span className="inventory-number block text-xs font-normal text-zinc-500">
                                       {component.value}
                                     </span>
                                   </span>

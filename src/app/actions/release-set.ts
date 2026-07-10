@@ -47,15 +47,21 @@ export async function releaseReturnedSet(formData: FormData) {
     redirect(returnTo);
   }
 
-  const { error: setError } = await supabase
+  const { data: releasedSet, error: setError } = await supabase
     .from("inventory_set")
     .update({ availability: "frei" })
     .eq("id", setId)
     .eq("availability", "blockiert")
-    .eq("condition", "ok");
+    .eq("condition", "ok")
+    .select("id")
+    .maybeSingle();
 
   if (setError) {
     throw setError;
+  }
+
+  if (!releasedSet) {
+    redirect(`${returnTo}${returnTo.includes("?") ? "&" : "?"}error=release_failed`);
   }
 
   redirect(returnTo);

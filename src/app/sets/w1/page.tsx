@@ -5,13 +5,55 @@ import { redirect } from "next/navigation";
 import { getCurrentAppUser, hasAnyRole } from "@/lib/auth/current-user";
 import { SectionTabs } from "../../section-tabs";
 import { loadWagenOverview } from "../wagen-overview";
+import { WagenTable } from "./wagen-table";
 
 export const metadata: Metadata = {
-  title: "W1 | iPad-Verwaltung",
+  title: "Lagerliste | iPad-Verwaltung",
 };
 
-export default async function W1SetsPage() {
+const storageFilters = [
+  { label: "Wagen W1", value: "W1" },
+  { label: "Wagen W2", value: "W2" },
+  { label: "Wagen W3", value: "W3" },
+  { label: "Wagen W4", value: "W4" },
+  { label: "Wagen W5", value: "W5" },
+  { label: "Wagen W6", value: "W6" },
+  { label: "Schrank1", value: "Schrank1" },
+  { label: "Schrank2", value: "Schrank2" },
+  { label: "Regal1", value: "Regal1" },
+  { label: "Alle Lagerorte", value: "all" },
+];
+
+function getSingleParam(
+  searchParams: Record<string, string | string[] | undefined>,
+  key: string,
+) {
+  const value = searchParams[key];
+
+  if (Array.isArray(value)) {
+    return value[0] ?? "";
+  }
+
+  return value ?? "";
+}
+
+function getStorageFilter(
+  searchParams: Record<string, string | string[] | undefined>,
+) {
+  const storage = getSingleParam(searchParams, "storage");
+
+  return storageFilters.some((filter) => filter.value === storage)
+    ? storage
+    : "W1";
+}
+
+export default async function W1SetsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const appUser = await getCurrentAppUser();
+  const params = await searchParams;
 
   if (!appUser) {
     redirect("/login");
@@ -21,10 +63,42 @@ export default async function W1SetsPage() {
     redirect("/");
   }
 
-  const rows = await loadWagenOverview("W1");
+  const canManageSets = hasAnyRole(appUser, ["admin", "ipad_verwaltung"]);
+  const selectedStorage = getStorageFilter(params);
+  const query = getSingleParam(params, "q").trim();
+  const selectedStorageLabel =
+    storageFilters.find((filter) => filter.value === selectedStorage)?.label
+    ?? "Wagen W1";
+  const rows = await loadWagenOverview(
+    selectedStorage === "all" ? null : selectedStorage,
+    query,
+  );
   const occupiedPlaces = rows.filter((row) => row.storagePlace).length;
   const assignedSets = rows.filter((row) => row.person).length;
   const incompleteSets = rows.filter((row) => row.condition !== "ok").length;
+  const isWagenFilter = /^W[1-6]$/.test(selectedStorage);
+  const storageSummaryLabel =
+    selectedStorage === "all"
+      ? "Sets mit Lagerort"
+      : `Sets in ${selectedStorageLabel}`;
+  const emptyStateLabel =
+    selectedStorage === "all"
+      ? "Keine Sets mit Lagerort gefunden."
+      : `Keine Sets mit Lagerort ${selectedStorageLabel} gefunden.`;
+  const exportParams = new URLSearchParams();
+
+  if (selectedStorage !== "W1") {
+    exportParams.set("storage", selectedStorage);
+  }
+
+  if (query) {
+    exportParams.set("q", query);
+  }
+
+  const exportQuery = exportParams.toString();
+  const exportHref = exportQuery
+    ? `/sets/w1/export.xlsx?${exportQuery}`
+    : "/sets/w1/export.xlsx";
 
   return (
     <main className="min-h-screen bg-zinc-50 text-zinc-950">
@@ -35,13 +109,13 @@ export default async function W1SetsPage() {
               Sets und Komponenten
             </Link>
             <h1 className="mt-3 text-3xl font-semibold tracking-tight">
-              Wagen W1
+              Lagerliste
             </h1>
           </div>
           <div className="flex flex-wrap gap-2">
             <a
               className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-medium transition hover:bg-white"
-              href="/sets/w1/export.xlsx"
+              href={exportHref}
             >
               XLSX herunterladen
             </a>
@@ -57,12 +131,14 @@ export default async function W1SetsPage() {
 
         <div className="grid gap-3 sm:grid-cols-3">
           <div className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
-            <p className="text-sm text-zinc-500">Sets in W1</p>
+            <p className="text-sm text-zinc-500">{storageSummaryLabel}</p>
             <p className="mt-2 text-2xl font-semibold">{rows.length}</p>
           </div>
           <div className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
             <p className="text-sm text-zinc-500">Plätze erkannt</p>
-            <p className="mt-2 text-2xl font-semibold">{occupiedPlaces}/30</p>
+            <p className="mt-2 text-2xl font-semibold">
+              {isWagenFilter ? `${occupiedPlaces}/30` : occupiedPlaces}
+            </p>
           </div>
           <div className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
             <p className="text-sm text-zinc-500">Auffälligkeiten</p>
@@ -78,59 +154,49 @@ export default async function W1SetsPage() {
                 {assignedSets} Sets sind aktuell einer Person zugeordnet.
               </p>
             </div>
-            <Link
-              className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-semibold transition hover:bg-zinc-50"
-              href="/sets"
-            >
-              Alle Sets
-            </Link>
+            <div className="flex flex-wrap items-end gap-3">
+              <form className="flex flex-wrap items-end gap-3" method="get">
+                <label className="flex flex-col gap-1 text-sm font-medium">
+                  Lagerort
+                  <select
+                    className="min-w-44 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm"
+                    defaultValue={selectedStorage}
+                    name="storage"
+                  >
+                    {storageFilters.map((filter) => (
+                      <option key={filter.value} value={filter.value}>
+                        {filter.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1 text-sm font-medium">
+                  Suche
+                  <input
+                    className="min-w-64 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm"
+                    defaultValue={query}
+                    name="q"
+                    placeholder="Person, Set oder Inventarnummer"
+                  />
+                </label>
+                <button className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-semibold transition hover:bg-zinc-50">
+                  Filtern
+                </button>
+              </form>
+              <Link
+                className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-semibold transition hover:bg-zinc-50"
+                href="/sets"
+              >
+                Alle Sets
+              </Link>
+            </div>
           </div>
 
           {rows.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[1180px] border-collapse text-left text-sm">
-                <thead className="bg-zinc-100 text-zinc-600">
-                  <tr>
-                    <th className="px-4 py-3 font-medium">Platz</th>
-                    <th className="px-4 py-3 font-medium">Set</th>
-                    <th className="px-4 py-3 font-medium">Person</th>
-                    <th className="px-4 py-3 font-medium">Klasse</th>
-                    <th className="px-4 py-3 font-medium">iPad</th>
-                    <th className="px-4 py-3 font-medium">Pencil</th>
-                    <th className="px-4 py-3 font-medium">Tastatur</th>
-                    <th className="px-4 py-3 font-medium">Verfügbarkeit</th>
-                    <th className="px-4 py-3 font-medium">Zustand</th>
-                    <th className="px-4 py-3 font-medium">Lagerort</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((row) => (
-                    <tr
-                      className="border-t border-zinc-100 hover:bg-zinc-50"
-                      key={row.id}
-                    >
-                      <td className="px-4 py-3 font-semibold">
-                        {row.storagePlace ?? "-"}
-                      </td>
-                      <td className="px-4 py-3 font-semibold">
-                        {row.legacySetId}
-                      </td>
-                      <td className="px-4 py-3">{row.person || "-"}</td>
-                      <td className="px-4 py-3">{row.classLabel || "-"}</td>
-                      <td className="px-4 py-3">{row.ipad || "-"}</td>
-                      <td className="px-4 py-3">{row.pencil || "-"}</td>
-                      <td className="px-4 py-3">{row.keyboard || "-"}</td>
-                      <td className="px-4 py-3">{row.availability}</td>
-                      <td className="px-4 py-3">{row.condition}</td>
-                      <td className="px-4 py-3">{row.storageLabel || "-"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <WagenTable canManageSets={canManageSets} rows={rows} />
           ) : (
             <div className="px-4 py-8 text-sm text-zinc-600">
-              Keine Sets mit Lagerort W1 gefunden.
+              {emptyStateLabel}
             </div>
           )}
         </section>

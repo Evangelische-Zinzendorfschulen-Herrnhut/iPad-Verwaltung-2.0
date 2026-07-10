@@ -13,6 +13,7 @@ export type AssignmentTableRow = {
   editHref: string;
   id: string;
   issuedAt: string;
+  issueHref: string | null;
   person: string;
   releaseReturnTo: string;
   releasable: boolean;
@@ -29,12 +30,14 @@ export type AssignmentTableRow = {
 };
 
 type AssignmentsTableProps = {
+  issueAction: (formData: FormData) => void | Promise<void>;
   releaseAction: (formData: FormData) => void | Promise<void>;
   rows: AssignmentTableRow[];
 };
 
 type ContextMenuState = {
   editHref: string;
+  issueHref: string | null;
   label: string;
   releaseReturnTo: string;
   releasable: boolean;
@@ -46,7 +49,11 @@ type ContextMenuState = {
   y: number;
 } | null;
 
-export function AssignmentsTable({ releaseAction, rows }: AssignmentsTableProps) {
+export function AssignmentsTable({
+  issueAction,
+  releaseAction,
+  rows,
+}: AssignmentsTableProps) {
   const [contextMenu, setContextMenu] = useState<ContextMenuState>(null);
 
   useEffect(() => {
@@ -76,6 +83,7 @@ export function AssignmentsTable({ releaseAction, rows }: AssignmentsTableProps)
     event.preventDefault();
     setContextMenu({
       editHref: row.editHref,
+      issueHref: row.issueHref,
       label: `${row.setLabel} · ${row.person}`,
       releaseReturnTo: row.releaseReturnTo,
       releasable: row.releasable,
@@ -148,6 +156,8 @@ export function AssignmentsTable({ releaseAction, rows }: AssignmentsTableProps)
                     className={
                       row.status === "Aktiv"
                         ? "rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700"
+                        : row.status === "Vorbereitet"
+                          ? "rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700"
                         : "rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-semibold text-zinc-700"
                     }
                   >
@@ -163,6 +173,15 @@ export function AssignmentsTable({ releaseAction, rows }: AssignmentsTableProps)
                       >
                         Zurücknehmen
                       </Link>
+                    ) : null}
+                    {row.issueHref ? (
+                      <form action={issueAction}>
+                        <input name="set_id" type="hidden" value={row.setId} />
+                        <input name="return_to" type="hidden" value={row.issueHref} />
+                        <button className="rounded-md border border-zinc-300 px-3 py-2 text-xs font-semibold transition hover:bg-zinc-50">
+                          Set ausgeben
+                        </button>
+                      </form>
                     ) : null}
                     {row.returnProtocolHref ? (
                       <a
@@ -187,7 +206,10 @@ export function AssignmentsTable({ releaseAction, rows }: AssignmentsTableProps)
                         </button>
                       </form>
                     ) : null}
-                    {!row.returnHref && !row.returnProtocolHref && !row.releasable ? (
+                    {!row.returnHref &&
+                    !row.issueHref &&
+                    !row.returnProtocolHref &&
+                    !row.releasable ? (
                       <span className="text-zinc-400">-</span>
                     ) : null}
                   </div>
@@ -217,6 +239,15 @@ export function AssignmentsTable({ releaseAction, rows }: AssignmentsTableProps)
             >
               Set zurücknehmen
             </Link>
+          ) : null}
+          {contextMenu.issueHref ? (
+            <form action={issueAction}>
+              <input name="set_id" type="hidden" value={contextMenu.setId} />
+              <input name="return_to" type="hidden" value={contextMenu.issueHref} />
+              <button className="block w-full rounded px-3 py-2 text-left font-medium hover:bg-zinc-100">
+                Set ausgeben
+              </button>
+            </form>
           ) : null}
           {contextMenu.returnProtocolHref ? (
             <a

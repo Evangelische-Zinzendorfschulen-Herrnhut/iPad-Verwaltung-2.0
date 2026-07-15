@@ -7,7 +7,8 @@ type SectionTabsProps = {
     | "wagen-w1"
     | "ausgaben"
     | "geraete"
-    | "schadensfaelle";
+    | "schadensfaelle"
+    | "aufgaben";
 };
 
 const tabs = [
@@ -16,6 +17,7 @@ const tabs = [
   { key: "ausgaben", label: "Aus-/Rückgaben", href: "/ausgaben" },
   { key: "geraete", label: "Geräte", href: "/geraete" },
   { key: "schadensfaelle", label: "Schadensfälle", href: "/schadensfaelle" },
+  { key: "aufgaben", label: "Aufgaben", href: "/aufgaben" },
   { key: "wagen-w1", label: "Lagerliste", href: "/sets/w1" },
 ] as const;
 

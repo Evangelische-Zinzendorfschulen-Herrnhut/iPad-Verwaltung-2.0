@@ -16,6 +16,7 @@
 9. Werden Sets oder einzelne Komponenten per Barcode/QR-Code gescannt?
 10. Welche Status sind im Alltag wirklich relevant?
 11. Temporaer an Schueler ausgegebene Lightning-USB-Adapter sollen nach 14 Tagen zurueckgefordert oder angemahnt werden.
+12. Aufgabenverwaltung startet admin-only. Welche Aufgaben sollen spaeter an `ipad_verwaltung`, `buchhaltung` oder weitere Rollen gehen?
 
 ## Prioritaet 3: Finanzen
 

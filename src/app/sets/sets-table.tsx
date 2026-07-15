@@ -6,8 +6,10 @@ import { MouseEvent, useEffect, useState } from "react";
 
 export type SetsTableRow = {
   availability: string;
+  components: SetTaskComponentOption[];
   condition: string;
   damageHref: string | null;
+  devicesHref: string;
   detailHref: string;
   id: string;
   ipad: string;
@@ -29,12 +31,20 @@ export type SetsTableRow = {
   storageLabel: string;
 };
 
+export type SetTaskComponentOption = {
+  id: string;
+  label: string;
+  role: string;
+};
+
 type SetsTableProps = {
   releaseAction: (formData: FormData) => void | Promise<void>;
   rows: SetsTableRow[];
+  taskAction: (formData: FormData) => void | Promise<void>;
 };
 
 type ContextMenuState = {
+  components: SetTaskComponentOption[];
   damageHref: string | null;
   detailHref: string;
   issueHref: string | null;
@@ -51,8 +61,16 @@ type ContextMenuState = {
   y: number;
 } | null;
 
-export function SetsTable({ releaseAction, rows }: SetsTableProps) {
+type TaskDrawerState = {
+  components: SetTaskComponentOption[];
+  returnTo: string;
+  setId: string;
+  setLabel: string;
+} | null;
+
+export function SetsTable({ releaseAction, rows, taskAction }: SetsTableProps) {
   const [contextMenu, setContextMenu] = useState<ContextMenuState>(null);
+  const [taskDrawer, setTaskDrawer] = useState<TaskDrawerState>(null);
 
   useEffect(() => {
     function closeMenu() {
@@ -61,7 +79,11 @@ export function SetsTable({ releaseAction, rows }: SetsTableProps) {
 
     function closeOnEscape(event: KeyboardEvent) {
       if (event.key === "Escape") {
-        setContextMenu(null);
+        if (taskDrawer) {
+          setTaskDrawer(null);
+        } else {
+          setContextMenu(null);
+        }
       }
     }
 
@@ -72,11 +94,12 @@ export function SetsTable({ releaseAction, rows }: SetsTableProps) {
       window.removeEventListener("click", closeMenu);
       window.removeEventListener("keydown", closeOnEscape);
     };
-  }, []);
+  }, [taskDrawer]);
 
   function openContextMenu(event: MouseEvent<HTMLTableRowElement>, row: SetsTableRow) {
     event.preventDefault();
     setContextMenu({
+      components: row.components,
       damageHref: row.damageHref,
       detailHref: row.detailHref,
       issueHref: row.issueHref,
@@ -92,6 +115,20 @@ export function SetsTable({ releaseAction, rows }: SetsTableProps) {
       x: event.clientX,
       y: event.clientY,
     });
+  }
+
+  function openTaskDrawer() {
+    if (!contextMenu) {
+      return;
+    }
+
+    setTaskDrawer({
+      components: contextMenu.components,
+      returnTo: contextMenu.releaseReturnTo,
+      setId: contextMenu.setId,
+      setLabel: contextMenu.setLabel,
+    });
+    setContextMenu(null);
   }
 
   return (
@@ -158,7 +195,26 @@ export function SetsTable({ releaseAction, rows }: SetsTableProps) {
                 <td className="inventory-number px-4 py-3 whitespace-nowrap">{row.keyboard}</td>
                 <td className="px-4 py-3">{row.storageLabel}</td>
                 <td className="px-4 py-3">{row.availability}</td>
-                <td className="px-4 py-3">{row.condition}</td>
+                <td className="px-4 py-3">
+                  <span className="inline-flex items-center gap-2 align-middle">
+                    <Link
+                      aria-label={`Geräte von Set ${row.legacySetId} anzeigen`}
+                      className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full align-middle transition hover:scale-105"
+                      href={row.devicesHref}
+                      title="Geräte dieses Sets anzeigen"
+                    >
+                      <Image
+                        alt=""
+                        aria-hidden="true"
+                        className="block h-5 w-5"
+                        height={20}
+                        src="/arrow_right_orange.svg"
+                        width={20}
+                      />
+                    </Link>
+                    <span>{row.condition}</span>
+                  </span>
+                </td>
                 <td className="px-4 py-3 text-zinc-600">
                   {row.legacyStatus ?? "-"}
                 </td>
@@ -230,6 +286,13 @@ export function SetsTable({ releaseAction, rows }: SetsTableProps) {
               Lagerort ändern
             </Link>
           ) : null}
+          <button
+            className="block w-full rounded px-3 py-2 text-left font-medium hover:bg-zinc-100"
+            onClick={openTaskDrawer}
+            type="button"
+          >
+            Aufgabe erstellen
+          </button>
           {contextMenu.releasable ? (
             <form action={releaseAction}>
               <input name="set_id" type="hidden" value={contextMenu.setId} />
@@ -246,6 +309,120 @@ export function SetsTable({ releaseAction, rows }: SetsTableProps) {
           <p className="border-t border-zinc-100 px-3 py-2 text-xs text-zinc-500">
             {contextMenu.setLabel}
           </p>
+        </div>
+      ) : null}
+
+      {taskDrawer ? (
+        <div
+          className="fixed inset-0 z-40 bg-zinc-950/25"
+          onClick={() => setTaskDrawer(null)}
+        >
+          <aside
+            aria-label={`Aufgabe fuer ${taskDrawer.setLabel} erstellen`}
+            className="ml-auto flex h-full w-full max-w-lg flex-col border-l border-zinc-200 bg-white shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <header className="border-b border-zinc-200 px-6 py-5">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm font-medium uppercase tracking-wide text-zinc-500">
+                    Aufgabe erstellen
+                  </p>
+                  <h2 className="mt-1 text-xl font-semibold">
+                    {taskDrawer.setLabel}
+                  </h2>
+                </div>
+                <button
+                  className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-semibold transition hover:bg-zinc-50"
+                  onClick={() => setTaskDrawer(null)}
+                  type="button"
+                >
+                  Schließen
+                </button>
+              </div>
+            </header>
+
+            <form action={taskAction} className="flex flex-1 flex-col">
+              <input name="set_id" type="hidden" value={taskDrawer.setId} />
+              <input name="return_to" type="hidden" value={taskDrawer.returnTo} />
+
+              <div className="grid flex-1 content-start gap-4 overflow-y-auto px-6 py-5">
+                <label className="grid gap-1 text-sm font-medium">
+                  Bezug
+                  <select
+                    className="rounded-md border border-zinc-300 bg-white px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
+                    name="target"
+                    defaultValue="set"
+                  >
+                    <option value="set">Ganzes {taskDrawer.setLabel}</option>
+                    {taskDrawer.components.map((component) => (
+                      <option
+                        key={component.id}
+                        value={`component:${component.id}`}
+                      >
+                        {component.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="grid gap-1 text-sm font-medium">
+                  Titel
+                  <input
+                    className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
+                    name="title"
+                    placeholder="Aufgabe"
+                    required
+                  />
+                </label>
+
+                <label className="grid gap-1 text-sm font-medium">
+                  Beschreibung
+                  <textarea
+                    className="min-h-28 rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
+                    name="description"
+                    placeholder="Optional"
+                  />
+                </label>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <label className="grid gap-1 text-sm font-medium">
+                    Priorität
+                    <select
+                      className="rounded-md border border-zinc-300 bg-white px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
+                      name="priority"
+                      defaultValue="normal"
+                    >
+                      <option value="normal">Normal</option>
+                      <option value="hoch">Hoch</option>
+                    </select>
+                  </label>
+
+                  <label className="grid gap-1 text-sm font-medium">
+                    Fällig
+                    <input
+                      className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
+                      name="due_date"
+                      type="date"
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <footer className="flex justify-end gap-2 border-t border-zinc-200 px-6 py-4">
+                <button
+                  className="rounded-md border border-zinc-300 px-4 py-2 text-sm font-semibold transition hover:bg-zinc-50"
+                  onClick={() => setTaskDrawer(null)}
+                  type="button"
+                >
+                  Abbrechen
+                </button>
+                <button className="rounded-md bg-zinc-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-zinc-800">
+                  Aufgabe anlegen
+                </button>
+              </footer>
+            </form>
+          </aside>
         </div>
       ) : null}
     </>

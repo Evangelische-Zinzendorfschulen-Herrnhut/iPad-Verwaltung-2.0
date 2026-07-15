@@ -14,6 +14,7 @@ const foundations = [
   { label: "Geräteliste", href: "/geraete" },
   { label: "Schadensfälle", href: "/schadensfaelle" },
   { label: "Aus- und Rückgabeliste", href: "/ausgaben" },
+  { label: "Aufgaben", href: "/aufgaben" },
   { label: "Legacy-Import", href: null },
 ];
 

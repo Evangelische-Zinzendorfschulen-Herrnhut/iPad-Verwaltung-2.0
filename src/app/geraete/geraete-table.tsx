@@ -175,6 +175,7 @@ export function GeraeteTable({
       {contextMenu ? (
         <div
           className="fixed z-50 min-w-60 rounded-md border border-zinc-200 bg-white p-1 text-sm shadow-lg"
+          onClick={(event) => event.stopPropagation()}
           style={{ left: contextMenu.x, top: contextMenu.y }}
         >
           {contextMenu.editHref ? (

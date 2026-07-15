@@ -392,17 +392,27 @@ async function completeComponentRepair(formData: FormData) {
   }
 
   const supabase = await createClient();
-  const { error } = await supabase
+  const { data: repairedComponent, error } = await supabase
     .from("inventory_component")
-    .update({ condition: "ok" })
+    .update({
+      condition: "ok",
+      legacy_status: "ok",
+      notes: "Umtausch/Reparatur abgeschlossen.",
+    })
     .eq("id", componentId)
-    .eq("condition", "defekt");
+    .eq("condition", "defekt")
+    .select("id")
+    .maybeSingle();
 
   if (error) {
     throw error;
   }
 
-  redirect(returnTo);
+  redirect(
+    `${returnTo}${returnTo.includes("?") ? "&" : "?"}${
+      repairedComponent ? "repair_completed=1" : "repair_unchanged=1"
+    }`,
+  );
 }
 
 async function updateComponentStorage(formData: FormData) {

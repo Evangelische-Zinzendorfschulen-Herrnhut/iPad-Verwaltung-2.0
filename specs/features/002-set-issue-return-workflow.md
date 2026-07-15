@@ -58,19 +58,21 @@ Aus der Setliste kann ein fachlich freies Set ueber das Kontextmenue fuer die Au
 
 1. Nutzer oeffnet bei einem freien Set `Set vorbereiten`.
 2. System zeigt Setnummer, Hauptkomponenten und ein Formular zur Personenauswahl.
-3. Nutzer waehlt eine aktive Person, kann den Lagerort anpassen und erfasst optional eine interne Vorbereitungsnotiz.
-4. System prueft serverseitig:
+3. System zeigt aktive Personen als filterbare und sortierbare Liste mit eigenen Spalten fuer Name, Klasse, Personentyp und E-Mail.
+4. Nutzer kann die Personenauswahl per Freitext und per Klassen-Dropdown filtern.
+5. Nutzer waehlt eine aktive Person aus der Liste, kann den Lagerort anpassen und erfasst optional eine interne Vorbereitungsnotiz.
+6. System prueft serverseitig:
    - Set hat keine aktive Ausleihe.
    - Set ist `frei`.
    - Set-Zustand ist `ok` oder `beschädigt, nutzbar`.
    - iPad, Pencil und Tastatur sind aktuell dem Set zugeordnet.
    - Keine Hauptkomponente ist `defekt` oder `gesperrt, kein MDM`.
-5. System legt eine vorbereitete `set_person_assignment` ohne `issued_at` an.
-6. System setzt `inventory_set.assigned_person_id` und `availability` auf `zugeordnet`; der Lagerort bleibt dokumentiert beziehungsweise wird wie angegeben aktualisiert.
-7. Nutzer oeffnet bei einem vorbereiteten Set `Set ausgeben`.
-8. Nutzer bestaetigt das Ausgabedatum und kann eine interne Ausgabenotiz ergaenzen.
-9. System setzt `set_person_assignment.issued_at`, setzt `inventory_set.availability` auf `ausgegeben` und leert den Lagerort des Sets.
-10. System zeigt das Set danach in der Setliste als ausgegeben beziehungsweise bei Schuelern der Klassen 5/6 fachlich als zugeordnet.
+7. System legt eine vorbereitete `set_person_assignment` ohne `issued_at` an.
+8. System setzt `inventory_set.assigned_person_id` und `availability` auf `zugeordnet`; der Lagerort bleibt dokumentiert beziehungsweise wird wie angegeben aktualisiert.
+9. Nutzer oeffnet bei einem vorbereiteten Set `Set ausgeben`.
+10. Nutzer bestaetigt das Ausgabedatum und kann eine interne Ausgabenotiz ergaenzen.
+11. System setzt `set_person_assignment.issued_at`, setzt `inventory_set.availability` auf `ausgegeben` und leert den Lagerort des Sets.
+12. System zeigt das Set danach in der Setliste als ausgegeben beziehungsweise bei Schuelern der Klassen 5/6 fachlich als zugeordnet.
 
 Vorbereitete Sets erscheinen in der Aus- und Rueckgabeliste mit Status `Vorbereitet`. Aus der Liste kann die tatsaechliche Ausgabe ebenfalls direkt abgeschlossen werden; dabei wird das aktuelle Datum als Ausgabedatum gesetzt.
 

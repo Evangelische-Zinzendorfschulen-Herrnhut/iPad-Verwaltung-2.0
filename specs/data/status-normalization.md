@@ -104,6 +104,11 @@ Priorität:
 
 Der Legacy-Wert `Sets.SetStatus` bleibt als Legacy-Status erhalten, ist aber nicht die führende Quelle.
 
+Assumption: Listen und Arbeitsansichten zeigen den aus aktueller Komponenten-Zuordnung
+abgeleiteten Set-Zustand an. Der gespeicherte Wert in `inventory_set.condition`
+wird bei Workflow-Aenderungen nachgezogen, darf aber nicht alleinige Quelle fuer
+die Anzeige sein, wenn iPad, Pencil oder Tastatur aktuell fehlen.
+
 ## Set-Verfügbarkeit
 
 Zielwerte:

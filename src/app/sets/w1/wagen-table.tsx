@@ -1,6 +1,8 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
+import { usePathname, useSearchParams } from "next/navigation";
 import { MouseEvent, useEffect, useState } from "react";
 
 import type { WagenOverviewRow } from "../wagen-overview";
@@ -11,15 +13,19 @@ type WagenTableProps = {
 };
 
 type ContextMenuState = {
+  detailHref: string;
   issueHref: string | null;
   issueLabel: string | null;
   returnHref: string | null;
+  setId: string;
   setLabel: string;
   x: number;
   y: number;
 } | null;
 
 export function WagenTable({ canManageSets, rows }: WagenTableProps) {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [contextMenu, setContextMenu] = useState<ContextMenuState>(null);
 
   useEffect(() => {
@@ -46,19 +52,26 @@ export function WagenTable({ canManageSets, rows }: WagenTableProps) {
     event: MouseEvent<HTMLTableRowElement>,
     row: WagenOverviewRow,
   ) {
-    if (!canManageSets || (!row.issueHref && !row.returnHref)) {
-      return;
-    }
-
     event.preventDefault();
     setContextMenu({
+      detailHref: row.detailHref,
       issueHref: row.issueHref,
       issueLabel: row.issueLabel,
       returnHref: row.returnHref,
+      setId: row.id,
       setLabel: `Set ${row.legacySetId}`,
       x: event.clientX,
       y: event.clientY,
     });
+  }
+
+  function buildLocalIssueHref(setId: string) {
+    const nextParams = new URLSearchParams(searchParams.toString());
+    nextParams.set("issue", setId);
+    nextParams.delete("prepared");
+    nextParams.delete("error");
+
+    return `${pathname}?${nextParams.toString()}`;
   }
 
   return (
@@ -102,7 +115,30 @@ export function WagenTable({ canManageSets, rows }: WagenTableProps) {
                   )}
                 </td>
                 <td className="px-4 py-3">{row.classLabel || "-"}</td>
-                <td className="inventory-number px-4 py-3">{row.ipad || "-"}</td>
+                <td className="inventory-number whitespace-nowrap px-4 py-3 align-middle">
+                  <span className="inline-flex items-center gap-2 align-middle">
+                    <span>{row.ipad || "-"}</span>
+                    {row.ipadMdmHref ? (
+                      <a
+                        aria-label={`iPad ${row.ipad} im MDM öffnen`}
+                        className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full align-middle transition hover:scale-105"
+                        href={row.ipadMdmHref}
+                        rel="noreferrer"
+                        target="_blank"
+                        title="Im MDM öffnen"
+                      >
+                        <Image
+                          alt=""
+                          aria-hidden="true"
+                          className="block h-5 w-5"
+                          height={20}
+                          src="/arrow_right.svg"
+                          width={20}
+                        />
+                      </a>
+                    ) : null}
+                  </span>
+                </td>
                 <td className="inventory-number px-4 py-3">{row.pencil || "-"}</td>
                 <td className="inventory-number px-4 py-3">
                   {row.keyboard || "-"}
@@ -122,15 +158,25 @@ export function WagenTable({ canManageSets, rows }: WagenTableProps) {
           onClick={(event) => event.stopPropagation()}
           style={{ left: contextMenu.x, top: contextMenu.y }}
         >
-          {contextMenu.issueHref ? (
+          <Link
+            className="block w-full rounded px-3 py-2 text-left font-medium hover:bg-zinc-100"
+            href={contextMenu.detailHref}
+          >
+            Datensatz anzeigen
+          </Link>
+          {canManageSets && contextMenu.issueHref ? (
             <Link
               className="block w-full rounded px-3 py-2 text-left font-medium hover:bg-zinc-100"
-              href={contextMenu.issueHref}
+              href={
+                contextMenu.issueLabel === "Set ausgeben"
+                  ? contextMenu.issueHref
+                  : buildLocalIssueHref(contextMenu.setId)
+              }
             >
               {contextMenu.issueLabel ?? "Set ausgeben"}
             </Link>
           ) : null}
-          {contextMenu.returnHref ? (
+          {canManageSets && contextMenu.returnHref ? (
             <Link
               className="block w-full rounded px-3 py-2 text-left font-medium hover:bg-zinc-100"
               href={contextMenu.returnHref}

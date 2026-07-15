@@ -7,6 +7,10 @@ import { createClient } from "@/lib/supabase/server";
 import { releaseReturnedSet } from "../actions/release-set";
 import { SectionTabs } from "../section-tabs";
 import DamageNewPage from "./[setId]/damage/new/page";
+import {
+  PersonSelectionList,
+  type PersonSelectionOption,
+} from "./person-selection-list";
 import { SetsFilterForm } from "./sets-filter-form";
 import { SetsTable, type SetsTableRow } from "./sets-table";
 
@@ -30,6 +34,7 @@ type ComponentAssignmentRow = {
   set_id: string;
   role: string;
   component: {
+    id: string;
     legacy_inventory_number: string;
     category: string;
     model: string | null;
@@ -398,16 +403,6 @@ function formatPerson(
     : label;
 }
 
-function formatPersonOption(person: PersonOptionRow) {
-  const name = [person.last_name, person.first_name].filter(Boolean).join(", ");
-  const label = name || person.email || "Unbenannte Person";
-  const suffix = [person.person_type, person.email && name ? person.email : null]
-    .filter(Boolean)
-    .join(" · ");
-
-  return suffix ? `${label} (${suffix})` : label;
-}
-
 function componentLabel(component: ComponentAssignmentRow["component"]) {
   if (!component) {
     return "-";
@@ -415,6 +410,28 @@ function componentLabel(component: ComponentAssignmentRow["component"]) {
 
   const model = component.model ? ` · ${component.model}` : "";
   return `${component.legacy_inventory_number}${model}`;
+}
+
+function deriveSetCondition(
+  storedCondition: string,
+  components: Map<string, ComponentAssignmentRow> | undefined,
+) {
+  const requiredComponents = ["ipad", "pencil", "keyboard"]
+    .map((role) => components?.get(role)?.component ?? null);
+
+  if (requiredComponents.some((component) => !component)) {
+    return "unvollständig";
+  }
+
+  if (requiredComponents.some((component) => component?.condition === "defekt")) {
+    return "defekt";
+  }
+
+  if (requiredComponents.some((component) => component?.condition === "unklar")) {
+    return "unklar";
+  }
+
+  return storedCondition === "unklar" ? "ok" : storedCondition;
 }
 
 function pencilAccessory(component: ComponentAssignmentRow["component"]) {
@@ -577,6 +594,7 @@ async function returnSet(formData: FormData) {
   const returnedAt =
     normalizeRequiredText(formData.get("returned_at")) ||
     new Date().toISOString().slice(0, 10);
+  const storageLabel = normalizeOptionalText(formData.get("storage_label"));
   const returnNote = normalizeOptionalText(formData.get("return_note"));
   const returnDefects = normalizeOptionalText(formData.get("return_defects"));
   const returnResolutions = normalizeOptionalText(
@@ -672,6 +690,7 @@ async function returnSet(formData: FormData) {
       availability: "blockiert",
       condition: missingRequiredParts ? "unvollständig" : "ok",
       legacy_user_id: null,
+      storage_label: storageLabel,
     })
     .eq("id", setId);
 
@@ -879,6 +898,109 @@ async function issueSet(formData: FormData) {
   redirect(`${returnTo}${returnTo.includes("?") ? "&" : "?"}prepared=1`);
 }
 
+async function createTaskForSet(formData: FormData) {
+  "use server";
+
+  const appUser = await getCurrentAppUser();
+
+  if (!appUser) {
+    redirect("/login");
+  }
+
+  if (!hasAnyRole(appUser, ["admin"])) {
+    redirect("/");
+  }
+
+  const setId = normalizeRequiredText(formData.get("set_id"));
+  const target = normalizeRequiredText(formData.get("target")) || "set";
+  const title = normalizeRequiredText(formData.get("title"));
+  const description = normalizeOptionalText(formData.get("description"));
+  const priority =
+    normalizeRequiredText(formData.get("priority")) === "hoch"
+      ? "hoch"
+      : "normal";
+  const dueDate = normalizeOptionalText(formData.get("due_date"));
+  const returnTo = normalizeRequiredText(formData.get("return_to")) || "/sets";
+
+  if (!setId || !title) {
+    redirect(returnTo);
+  }
+
+  const supabase = await createClient();
+
+  if (target === "set") {
+    const { data: set, error: setError } = await supabase
+      .from("inventory_set")
+      .select("id")
+      .eq("id", setId)
+      .maybeSingle();
+
+    if (setError) {
+      throw setError;
+    }
+
+    if (!set) {
+      redirect(returnTo);
+    }
+
+    const { error } = await supabase.from("task").insert({
+      created_by_user_id: appUser.id,
+      description,
+      due_date: dueDate,
+      priority,
+      related_object_id: setId,
+      related_object_type: "set",
+      title,
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    redirect(returnTo);
+  }
+
+  const componentId = target.startsWith("component:")
+    ? target.slice("component:".length)
+    : "";
+
+  if (!componentId) {
+    redirect(returnTo);
+  }
+
+  const { data: assignment, error: assignmentError } = await supabase
+    .from("set_component_assignment")
+    .select("id")
+    .eq("set_id", setId)
+    .eq("component_id", componentId)
+    .is("valid_until", null)
+    .maybeSingle();
+
+  if (assignmentError) {
+    throw assignmentError;
+  }
+
+  if (!assignment) {
+    redirect(returnTo);
+  }
+
+  const { error } = await supabase.from("task").insert({
+    created_by_user_id: appUser.id,
+    description,
+    due_date: dueDate,
+    priority,
+    related_object_id: componentId,
+    related_object_type: "komponente",
+    title,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  redirect(returnTo);
+}
+
 async function completeSetIssue(formData: FormData) {
   "use server";
 
@@ -1036,6 +1158,42 @@ export default async function SetsPage({
   ]);
   const classOptions = (classOptionData ?? []) as SchoolClassOptionRow[];
   const personOptions = (personOptionData ?? []) as PersonOptionRow[];
+  const personOptionClassByPersonId = new Map<string, string>();
+
+  for (const personIdBatch of chunkValues(
+    personOptions.map((person) => person.id),
+  )) {
+    const { data: personOptionClassData, error: personOptionClassError } =
+      await supabase
+        .from("person_class_assignment")
+        .select("person_id,school_class:school_class_id(label,grade_level)")
+        .is("valid_until", null)
+        .in("person_id", personIdBatch);
+
+    if (personOptionClassError) {
+      throw personOptionClassError;
+    }
+
+    for (const assignment of (personOptionClassData ?? []) as RawPersonClassAssignmentRow[]) {
+      const schoolClass = normalizeJoined(assignment.school_class);
+
+      if (schoolClass) {
+        personOptionClassByPersonId.set(assignment.person_id, schoolClass.label);
+      }
+    }
+  }
+
+  const personSelectionOptions: PersonSelectionOption[] = personOptions.map(
+    (person) => ({
+      classLabel: personOptionClassByPersonId.get(person.id) ?? null,
+      email: person.email,
+      firstName: person.first_name,
+      id: person.id,
+      lastName: person.last_name,
+      legacyUserId: person.legacy_user_id,
+      personType: person.person_type,
+    }),
+  );
   let setQuery = supabase
     .from("inventory_set")
     .select(
@@ -1409,8 +1567,8 @@ export default async function SetsPage({
   const componentAssignmentsResult =
     setIds.length > 0
       ? await supabase
-          .from("set_component_assignment")
-          .select("set_id,role,component:component_id(legacy_inventory_number,category,model,serial_number,condition,legacy_status)")
+        .from("set_component_assignment")
+        .select("set_id,role,component:component_id(id,legacy_inventory_number,category,model,serial_number,condition,legacy_status)")
           .is("valid_until", null)
           .in("set_id", setIds)
       : { data: [] };
@@ -1502,14 +1660,45 @@ export default async function SetsPage({
     const availability = deriveAvailability(set, person, schoolClass, currentAssignment);
     const isPreparedIssue = Boolean(currentAssignment && !currentAssignment.issued_at);
     const previousPerson = previousPersonBySetId.get(set.id) ?? null;
+    const condition = deriveSetCondition(set.condition, components);
+    const componentOptions = ["ipad", "pencil", "keyboard", "adapter"]
+      .map((role) => {
+        const component = components?.get(role)?.component ?? null;
+
+        if (!component) {
+          return null;
+        }
+
+        const labels: Record<string, string> = {
+          adapter: "Adapter",
+          ipad: "iPad",
+          keyboard: "Tastatur",
+          pencil: "Pencil",
+        };
+
+        return {
+          id: component.id,
+          label: `${labels[role] ?? role}: ${componentLabel(component)}`,
+          role,
+        };
+      })
+      .filter(
+        (component): component is {
+          id: string;
+          label: string;
+          role: string;
+        } => Boolean(component),
+      );
 
     return {
       availability,
-      condition: set.condition,
+      components: componentOptions,
+      condition,
       damageHref:
         availability === "ausgegeben" || availability === "frei"
           ? buildDamageHref(params, set.id)
           : null,
+      devicesHref: `/geraete?set=${set.legacy_set_id}`,
       detailHref: buildDetailHref(params, set.id),
       id: set.id,
       ipad: componentLabel(ipad),
@@ -1519,7 +1708,7 @@ export default async function SetsPage({
       issueHref:
         canManageSets &&
         (availability === "frei" || isPreparedIssue) &&
-        set.condition === "ok"
+        condition === "ok"
           ? buildIssueHref(params, set.id)
           : null,
       issueLabel: isPreparedIssue ? "Set ausgeben" : "Set vorbereiten",
@@ -1708,7 +1897,11 @@ export default async function SetsPage({
         />
 
           {sets.length > 0 ? (
-            <SetsTable releaseAction={releaseReturnedSet} rows={setRows} />
+            <SetsTable
+              releaseAction={releaseReturnedSet}
+              rows={setRows}
+              taskAction={createTaskForSet}
+            />
           ) : (
             <div className="px-4 py-8 text-sm text-zinc-600">
               Keine Sets fuer die aktuelle Auswahl gefunden.
@@ -1895,21 +2088,10 @@ export default async function SetsPage({
                       )}
                     />
                   ) : (
-                    <label className="flex flex-col gap-1 text-sm font-medium">
-                      Person
-                      <select
-                        className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
-                        name="person_id"
-                        required
-                      >
-                        <option value="">Person auswählen</option>
-                        {personOptions.map((person) => (
-                          <option key={person.id} value={person.id}>
-                            {formatPersonOption(person)}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
+                    <div className="grid gap-1 text-sm font-medium">
+                      <span>Person</span>
+                      <PersonSelectionList people={personSelectionOptions} />
+                    </div>
                   )}
 
                   {isPreparedIssue ? (
@@ -2130,15 +2312,27 @@ export default async function SetsPage({
                       </p>
                     </div>
 
-                    <label className="flex flex-col gap-1 text-sm font-medium md:max-w-52">
-                      Rückgabedatum
-                      <input
-                        className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
-                        defaultValue={returnDateDefault}
-                        name="returned_at"
-                        type="date"
-                      />
-                    </label>
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <label className="flex flex-col gap-1 text-sm font-medium">
+                        Rückgabedatum
+                        <input
+                          className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
+                          defaultValue={returnDateDefault}
+                          name="returned_at"
+                          type="date"
+                        />
+                      </label>
+
+                      <label className="flex flex-col gap-1 text-sm font-medium">
+                        Lagerort
+                        <input
+                          className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
+                          defaultValue={setToReturn.storage_label ?? ""}
+                          name="storage_label"
+                          placeholder="z. B. W4 - 04"
+                        />
+                      </label>
+                    </div>
                   </section>
 
                   <section className="grid gap-4 rounded-lg border border-zinc-200 p-4">

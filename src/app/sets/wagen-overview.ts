@@ -59,6 +59,7 @@ type ComponentRow = {
   legacy_inventory_number: string | null;
   model: string | null;
   condition: string | null;
+  serial_number: string | null;
 };
 
 type RawComponentAssignmentRow = {
@@ -71,8 +72,10 @@ export type WagenOverviewRow = {
   availability: string;
   classLabel: string;
   condition: string;
+  detailHref: string;
   id: string;
   ipad: string;
+  ipadMdmHref: string | null;
   keyboard: string;
   legacySetId: number;
   legacyStatus: string;
@@ -124,6 +127,29 @@ function componentLabel(component: ComponentRow | null) {
       : "";
 
   return `${component.legacy_inventory_number ?? ""}${model}${condition}`.trim();
+}
+
+function deriveSetCondition(
+  storedCondition: string,
+  components: Map<string, ComponentRow | null> | undefined,
+) {
+  const requiredComponents = ["ipad", "pencil", "keyboard"].map(
+    (role) => components?.get(role) ?? null,
+  );
+
+  if (requiredComponents.some((component) => !component)) {
+    return "unvollständig";
+  }
+
+  if (requiredComponents.some((component) => component?.condition === "defekt")) {
+    return "defekt";
+  }
+
+  if (requiredComponents.some((component) => component?.condition === "unklar")) {
+    return "unklar";
+  }
+
+  return storedCondition === "unklar" ? "ok" : storedCondition;
 }
 
 function deriveAvailability(
@@ -221,7 +247,7 @@ export async function loadWagenOverview(
         supabase
           .from("set_component_assignment")
           .select(
-            "set_id,role,component:component_id(legacy_inventory_number,model,condition)",
+            "set_id,role,component:component_id(legacy_inventory_number,model,condition,serial_number)",
           )
           .is("valid_until", null)
           .in("set_id", setIdBatch),
@@ -340,16 +366,22 @@ export async function loadWagenOverview(
       const previousPerson = previousPersonBySetId.get(set.id) ?? null;
       const schoolClass = person ? classByPersonId.get(person.id) : undefined;
       const components = componentsBySetId.get(set.id);
+      const ipadComponent = components?.get("ipad") ?? null;
       const issuedAt = issuedAtBySetId.get(set.id) ?? null;
       const availability = deriveAvailability(set, person, schoolClass, issuedAt);
       const isPrepared = Boolean(person && !issuedAt);
+      const condition = deriveSetCondition(set.condition, components);
 
       return {
         availability,
         classLabel: schoolClass?.label ?? "",
-        condition: set.condition,
+        condition,
+        detailHref: `/sets?detail=${set.id}`,
         id: set.id,
-        ipad: componentLabel(components?.get("ipad") ?? null),
+        ipad: componentLabel(ipadComponent),
+        ipadMdmHref: ipadComponent?.serial_number
+          ? `https://mdm.evssn.de/#/devices/inventory?page=0&limit=100&search=${encodeURIComponent(ipadComponent.serial_number)}`
+          : null,
         keyboard: componentLabel(components?.get("keyboard") ?? null),
         legacySetId: set.legacy_set_id,
         legacyStatus: set.legacy_status ?? "",
@@ -360,7 +392,7 @@ export async function loadWagenOverview(
             ? formatPerson(previousPerson)
             : "",
         issueHref:
-          (availability === "frei" || isPrepared) && set.condition === "ok"
+          (availability === "frei" || isPrepared) && condition === "ok"
             ? `/sets?issue=${set.id}`
             : null,
         issueLabel: isPrepared ? "Set ausgeben" : "Set vorbereiten",

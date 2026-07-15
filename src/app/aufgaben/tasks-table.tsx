@@ -48,7 +48,6 @@ type ContextMenuState = {
 
 type DrawerState =
   | {
-      mode: "detail" | "edit";
       task: TaskListRow;
     }
   | null;
@@ -87,17 +86,6 @@ function formatDate(value: string | null) {
   }
 
   return new Intl.DateTimeFormat("de-DE").format(new Date(`${value}T00:00:00`));
-}
-
-function formatDateTime(value: string | null) {
-  if (!value) {
-    return "-";
-  }
-
-  return new Intl.DateTimeFormat("de-DE", {
-    dateStyle: "short",
-    timeStyle: "short",
-  }).format(new Date(value));
 }
 
 function isOverdue(task: TaskListRow) {
@@ -262,21 +250,22 @@ export function TasksTable({
     });
   }
 
-  function openDrawer(mode: "detail" | "edit") {
+  function openDrawer() {
     if (!contextMenu) {
       return;
     }
 
-    setDrawer({ mode, task: contextMenu.task });
+    setDrawer({ task: contextMenu.task });
     setContextMenu(null);
   }
 
   return (
     <>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[980px] table-fixed border-collapse text-left text-sm">
+        <table className="w-full min-w-[1120px] table-fixed border-collapse text-left text-sm">
           <thead className="bg-zinc-100 text-zinc-600">
             <tr>
+              <th className="w-44 px-4 py-3 font-medium">ID</th>
               <th className="w-36 px-4 py-3 font-medium">Faelligkeit</th>
               <th className="w-28 px-4 py-3 font-medium">Prioritaet</th>
               <th className="w-40 px-4 py-3 font-medium">Status</th>
@@ -296,6 +285,9 @@ export function TasksTable({
                     key={task.id}
                     onContextMenu={(event) => openContextMenu(event, task)}
                   >
+                    <td className="w-44 break-all px-4 py-3 font-mono text-xs text-zinc-600">
+                      {task.id}
+                    </td>
                     <td className="w-36 px-4 py-3">
                       <span
                         className={
@@ -359,7 +351,7 @@ export function TasksTable({
               })
             ) : (
               <tr>
-                <td className="px-4 py-8 text-center text-zinc-500" colSpan={6}>
+                <td className="px-4 py-8 text-center text-zinc-500" colSpan={7}>
                   Keine Aufgaben gefunden.
                 </td>
               </tr>
@@ -376,14 +368,7 @@ export function TasksTable({
         >
           <button
             className="block w-full rounded px-3 py-2 text-left font-medium hover:bg-zinc-100"
-            onClick={() => openDrawer("detail")}
-            type="button"
-          >
-            Aufgabe anzeigen
-          </button>
-          <button
-            className="block w-full rounded px-3 py-2 text-left font-medium hover:bg-zinc-100"
-            onClick={() => openDrawer("edit")}
+            onClick={() => openDrawer()}
             type="button"
           >
             Aufgabe bearbeiten
@@ -400,11 +385,7 @@ export function TasksTable({
           onClick={() => setDrawer(null)}
         >
           <aside
-            aria-label={
-              drawer.mode === "detail"
-                ? "Aufgabe anzeigen"
-                : "Aufgabe bearbeiten"
-            }
+            aria-label="Aufgabe bearbeiten"
             className="ml-auto flex h-full w-full max-w-xl flex-col overflow-y-auto border-l border-zinc-200 bg-white shadow-2xl"
             onClick={(event) => event.stopPropagation()}
           >
@@ -412,7 +393,7 @@ export function TasksTable({
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-sm font-medium uppercase tracking-wide text-zinc-500">
-                    {drawer.mode === "detail" ? "Aufgabe" : "Aufgabe bearbeiten"}
+                    Aufgabe bearbeiten
                   </p>
                   <h2 className="mt-1 text-xl font-semibold">
                     {drawer.task.title}
@@ -428,56 +409,7 @@ export function TasksTable({
               </div>
             </header>
 
-            {drawer.mode === "detail" ? (
-              <>
-                <dl className="grid gap-3 px-6 py-5">
-                  <DetailField label="Titel" value={drawer.task.title} />
-                  <DetailField
-                    label="Beschreibung"
-                    value={drawer.task.description}
-                  />
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <DetailField
-                      label="Status"
-                      value={statusLabel(drawer.task.status)}
-                    />
-                    <DetailField
-                      label="Priorität"
-                      value={priorityLabel(drawer.task.priority)}
-                    />
-                    <DetailField
-                      label="Fällig am"
-                      value={formatDate(drawer.task.due_date)}
-                    />
-                    <DetailField
-                      label="Erledigt am"
-                      value={formatDateTime(drawer.task.completed_at)}
-                    />
-                  </div>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <DetailField
-                      label="Fachbezug"
-                      value={relatedObjectLabel(drawer.task.related_object_type)}
-                    />
-                    <RelatedObjectField task={drawer.task} />
-                    <DetailField
-                      label="Angelegt von"
-                      value={drawer.task.created_by_user?.email}
-                    />
-                    <DetailField
-                      label="Erledigt von"
-                      value={drawer.task.completed_by_user?.email}
-                    />
-                    <DetailField
-                      label="Angelegt am"
-                      value={formatDateTime(drawer.task.created_at)}
-                    />
-                  </div>
-                </dl>
-                <RelatedLinks task={drawer.task} />
-              </>
-            ) : (
-              <form action={updateAction} className="flex flex-1 flex-col">
+            <form action={updateAction} className="flex flex-1 flex-col">
                 <input name="id" type="hidden" value={drawer.task.id} />
                 <input name="return_to" type="hidden" value={returnTo} />
 
@@ -564,8 +496,7 @@ export function TasksTable({
                     Speichern
                   </button>
                 </footer>
-              </form>
-            )}
+            </form>
           </aside>
         </div>
       ) : null}

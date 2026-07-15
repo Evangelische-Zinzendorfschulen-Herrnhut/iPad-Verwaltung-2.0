@@ -10,6 +10,7 @@ import {
   type PersonSelectionOption,
 } from "../person-selection-list";
 import { loadWagenOverview } from "../wagen-overview";
+import { StorageFilterForm } from "./storage-filter-form";
 import { WagenTable } from "./wagen-table";
 
 export const metadata: Metadata = {
@@ -277,20 +278,6 @@ export default async function W1SetsPage({
     selectedStorage === "all"
       ? "Keine Sets mit Lagerort gefunden."
       : `Keine Sets mit Lagerort ${selectedStorageLabel} gefunden.`;
-  const exportParams = new URLSearchParams();
-
-  if (selectedStorage !== "W1") {
-    exportParams.set("storage", selectedStorage);
-  }
-
-  if (query) {
-    exportParams.set("q", query);
-  }
-
-  const exportQuery = exportParams.toString();
-  const exportHref = exportQuery
-    ? `/sets/w1/export.xlsx?${exportQuery}`
-    : "/sets/w1/export.xlsx";
   const supabase = await createClient();
   const { data: personOptionData, error: personOptionError } = canManageSets
     ? await supabase
@@ -370,12 +357,6 @@ export default async function W1SetsPage({
             </h1>
           </div>
           <div className="flex flex-wrap gap-2">
-            <a
-              className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-medium transition hover:bg-white"
-              href={exportHref}
-            >
-              XLSX herunterladen
-            </a>
             <form action="/auth/sign-out" method="post">
               <button className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-medium transition hover:bg-white">
                 Abmelden
@@ -412,34 +393,12 @@ export default async function W1SetsPage({
               </p>
             </div>
             <div className="flex flex-wrap items-end gap-3">
-              <form className="flex flex-wrap items-end gap-3" method="get">
-                <label className="flex flex-col gap-1 text-sm font-medium">
-                  Lagerort
-                  <select
-                    className="min-w-44 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm"
-                    defaultValue={selectedStorage}
-                    name="storage"
-                  >
-                    {storageFilters.map((filter) => (
-                      <option key={filter.value} value={filter.value}>
-                        {filter.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="flex flex-col gap-1 text-sm font-medium">
-                  Suche
-                  <input
-                    className="min-w-64 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm"
-                    defaultValue={query}
-                    name="q"
-                    placeholder="Person, Set oder Inventarnummer"
-                  />
-                </label>
-                <button className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-semibold transition hover:bg-zinc-50">
-                  Filtern
-                </button>
-              </form>
+              <StorageFilterForm
+                key={`${selectedStorage}:${query}`}
+                query={query}
+                selectedStorage={selectedStorage}
+                storageFilters={storageFilters}
+              />
               <Link
                 className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-semibold transition hover:bg-zinc-50"
                 href="/sets"

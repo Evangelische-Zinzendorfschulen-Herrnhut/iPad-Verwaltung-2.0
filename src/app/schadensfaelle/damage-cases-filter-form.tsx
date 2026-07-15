@@ -13,6 +13,7 @@ import {
 
 type DamageCasesFilterFormProps = {
   billing: string;
+  damageNumber: string;
   hasActiveFilters: boolean;
   query: string;
   status: string;
@@ -21,6 +22,7 @@ type DamageCasesFilterFormProps = {
 
 export function DamageCasesFilterForm({
   billing,
+  damageNumber,
   hasActiveFilters,
   query,
   status,
@@ -29,20 +31,27 @@ export function DamageCasesFilterForm({
   const pathname = usePathname();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const [damage, setDamage] = useState(damageNumber);
   const [search, setSearch] = useState(query);
 
   const buildSearchParams = useCallback(
     (nextValues: {
       billing?: string;
+      damage?: string;
       q?: string;
       status?: string;
       type?: string;
     }) => {
       const params = new URLSearchParams();
+      const nextDamage = nextValues.damage ?? damage;
       const nextQuery = nextValues.q ?? search;
       const nextStatus = nextValues.status ?? status;
       const nextType = nextValues.type ?? type;
       const nextBilling = nextValues.billing ?? billing;
+
+      if (nextDamage.trim()) {
+        params.set("damage", nextDamage.trim());
+      }
 
       if (nextQuery.trim()) {
         params.set("q", nextQuery.trim());
@@ -62,12 +71,13 @@ export function DamageCasesFilterForm({
 
       return params;
     },
-    [billing, search, status, type],
+    [billing, damage, search, status, type],
   );
 
   const updateUrl = useCallback(
     (nextValues: {
       billing?: string;
+      damage?: string;
       q?: string;
       status?: string;
       type?: string;
@@ -86,10 +96,15 @@ export function DamageCasesFilterForm({
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    updateUrl({ q: search });
+    updateUrl({ damage, q: search });
   }
 
   function handleInputChange(event: ChangeEvent<HTMLInputElement>) {
+    if (event.target.name === "damage") {
+      setDamage(event.target.value);
+      return;
+    }
+
     setSearch(event.target.value);
   }
 
@@ -99,17 +114,17 @@ export function DamageCasesFilterForm({
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
-      if (search !== query) {
-        updateUrl({ q: search });
+      if (damage !== damageNumber || search !== query) {
+        updateUrl({ damage, q: search });
       }
     }, 350);
 
     return () => window.clearTimeout(timeout);
-  }, [query, search, updateUrl]);
+  }, [damage, damageNumber, query, search, updateUrl]);
 
   return (
     <form
-      className="grid gap-3 border-b border-zinc-200 px-4 py-4 md:grid-cols-[minmax(220px,1fr)_170px_170px_170px_auto]"
+      className="grid gap-3 border-b border-zinc-200 px-4 py-4 md:grid-cols-[minmax(220px,1fr)_140px_170px_170px_170px_auto]"
       onSubmit={handleSubmit}
     >
       <label className="flex flex-col gap-1 text-sm font-medium">
@@ -121,6 +136,19 @@ export function DamageCasesFilterForm({
           placeholder="Beschreibung, Person, Set oder Inventar"
           type="search"
           value={search}
+        />
+      </label>
+
+      <label className="flex flex-col gap-1 text-sm font-medium">
+        Schadens-ID
+        <input
+          className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
+          inputMode="numeric"
+          name="damage"
+          onChange={handleInputChange}
+          placeholder="z. B. 295"
+          type="search"
+          value={damage}
         />
       </label>
 

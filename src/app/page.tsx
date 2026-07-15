@@ -10,12 +10,12 @@ export const metadata: Metadata = {
 
 const foundations = [
   { label: "Personen und Klassen", href: "/personen" },
-  { label: "Sets und Komponenten", href: "/sets" },
+  { label: "Set-Zuordnung", href: "/sets" },
   { label: "Geräteliste", href: "/geraete" },
   { label: "Schadensfälle", href: "/schadensfaelle" },
   { label: "Aus- und Rückgabeliste", href: "/ausgaben" },
   { label: "Aufgaben", href: "/aufgaben" },
-  { label: "Legacy-Import", href: null },
+  { label: "Lagerliste", href: "/sets/w1" },
 ];
 
 type DashboardSlice = {

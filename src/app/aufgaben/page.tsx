@@ -76,6 +76,7 @@ function getStatusParam(
 
   if (
     status === "" ||
+    status === "all" ||
     status === "active" ||
     status === "offen" ||
     status === "in_bearbeitung" ||
@@ -346,7 +347,7 @@ export default async function TasksPage({
 
   if (status === "active") {
     taskQuery = taskQuery.in("status", ["offen", "in_bearbeitung"]);
-  } else if (status) {
+  } else if (status && status !== "all") {
     taskQuery = taskQuery.eq("status", status);
   }
 
@@ -355,10 +356,74 @@ export default async function TasksPage({
   }
 
   if (query) {
-    const escapedQuery = query.replaceAll("%", "\\%").replaceAll("_", "\\_");
-    taskQuery = taskQuery.or(
-      `title.ilike.%${escapedQuery}%,description.ilike.%${escapedQuery}%,related_object_type.ilike.%${escapedQuery}%`,
+    const setNumberMatch = query.match(/^(?:set\s*)?(\d+)$/i);
+    const setNumber = setNumberMatch
+      ? Number.parseInt(setNumberMatch[1], 10)
+      : null;
+    const componentQuery = query.replace(/^komponente\s+/i, "").trim();
+    const [matchingSetsResult, matchingComponentsResult] = await Promise.all([
+      setNumber !== null
+        ? supabase
+            .from("inventory_set")
+            .select("id")
+            .eq("legacy_set_id", setNumber)
+        : Promise.resolve({ data: [], error: null }),
+      componentQuery
+        ? supabase
+            .from("inventory_component")
+            .select("id")
+            .ilike("legacy_inventory_number", `%${componentQuery}%`)
+        : Promise.resolve({ data: [], error: null }),
+    ]);
+
+    if (matchingSetsResult.error) {
+      throw matchingSetsResult.error;
+    }
+
+    if (matchingComponentsResult.error) {
+      throw matchingComponentsResult.error;
+    }
+
+    const matchingSetIds = (matchingSetsResult.data ?? []).map((set) => set.id);
+    const matchingComponentIds = (matchingComponentsResult.data ?? []).map(
+      (component) => component.id,
     );
+    const matchingAssignmentsResult =
+      matchingSetIds.length > 0
+        ? await supabase
+            .from("set_component_assignment")
+            .select("component_id")
+            .in("set_id", matchingSetIds)
+            .is("valid_until", null)
+        : { data: [], error: null };
+
+    if (matchingAssignmentsResult.error) {
+      throw matchingAssignmentsResult.error;
+    }
+
+    const matchingRelatedObjectIds = Array.from(
+      new Set([
+        ...matchingSetIds,
+        ...matchingComponentIds,
+        ...(matchingAssignmentsResult.data ?? []).map(
+          (assignment) => assignment.component_id,
+        ),
+      ]),
+    );
+    const escapedQuery = query.replaceAll("%", "\\%").replaceAll("_", "\\_");
+    const searchClauses = [
+      `title.ilike.%${escapedQuery}%`,
+      `description.ilike.%${escapedQuery}%`,
+      `related_object_type.ilike.%${escapedQuery}%`,
+    ];
+
+    if (matchingRelatedObjectIds.length > 0) {
+      searchClauses.push(
+        `related_object_id.in.(${matchingRelatedObjectIds.join(",")})`,
+      );
+    }
+
+    taskQuery = taskQuery.or(searchClauses.join(","));
   }
 
   if (sort === "created_desc") {
@@ -729,20 +794,27 @@ export default async function TasksPage({
               Admin-only Aufgabenliste fuer operative Folgearbeiten.
             </p>
           </div>
+          <form action="/auth/sign-out" method="post">
+            <button className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-medium transition hover:bg-white">
+              Abmelden
+            </button>
+          </form>
         </header>
 
         <div className="overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm">
           <SectionTabs active="aufgaben" />
 
-          <TasksFilterForm
-            hasActiveFilters={hasActiveFilters}
-            priority={priority}
-            query={query}
-            sort={sort}
-            status={status}
-          />
-
-          <section className="border-b border-zinc-200 bg-zinc-50 px-4 py-4">
+          <section className="border-b border-zinc-300 bg-zinc-100 px-4 py-4 shadow-inner">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-semibold text-zinc-950">
+                  Neue Aufgabe anlegen
+                </h2>
+                <p className="mt-1 text-xs text-zinc-600">
+                  Kurze Folgearbeit ohne Objektbezug erfassen.
+                </p>
+              </div>
+            </div>
             <form action={createTask} className="grid gap-3 lg:grid-cols-[minmax(220px,1fr)_150px_160px_minmax(220px,1fr)_auto]">
               <label className="flex flex-col gap-1 text-sm font-medium">
                 Titel
@@ -797,6 +869,14 @@ export default async function TasksPage({
               </p>
             ) : null}
           </section>
+
+          <TasksFilterForm
+            hasActiveFilters={hasActiveFilters}
+            priority={priority}
+            query={query}
+            sort={sort}
+            status={status}
+          />
 
           <TasksTable
             returnTo={currentHref}

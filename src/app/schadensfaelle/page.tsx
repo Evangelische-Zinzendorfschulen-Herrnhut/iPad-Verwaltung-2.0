@@ -30,11 +30,11 @@ type DamageCaseRow = {
   billing_assessment: string;
   import_hint: string | null;
   person: {
+    id: string;
     first_name: string | null;
     last_name: string | null;
     email: string | null;
-    id?: string;
-    person_type?: string;
+    person_type: string;
   } | null;
   inventory_set: {
     id: string;
@@ -55,16 +55,36 @@ type PreviousPersonAssignmentRow = {
   set_id: string;
   person:
     | {
+        id: string;
         first_name: string | null;
         last_name: string | null;
         email: string | null;
+        person_type: string;
       }
     | {
+        id: string;
         first_name: string | null;
         last_name: string | null;
         email: string | null;
+        person_type: string;
       }[]
     | null;
+};
+
+type PersonClassAssignmentRow = {
+  person_id: string;
+  school_class: {
+    label: string;
+  } | null;
+};
+
+type RawPersonClassAssignmentRow = Omit<
+  PersonClassAssignmentRow,
+  "school_class"
+> & {
+  school_class:
+    | PersonClassAssignmentRow["school_class"]
+    | PersonClassAssignmentRow["school_class"][];
 };
 
 type RawDamageCaseRow = Omit<
@@ -159,7 +179,7 @@ function buildPageHref(
 ) {
   const nextParams = new URLSearchParams();
 
-  for (const key of ["q", "status", "type", "billing"]) {
+  for (const key of ["damage", "q", "status", "type", "billing"]) {
     const value = getSingleParam(params, key).trim();
 
     if (value) {
@@ -178,7 +198,7 @@ function buildPageHref(
 function buildCloseDetailHref(params: Record<string, string | string[] | undefined>) {
   const nextParams = new URLSearchParams();
 
-  for (const key of ["q", "status", "type", "billing", "page"]) {
+  for (const key of ["damage", "q", "status", "type", "billing", "page"]) {
     const value = getSingleParam(params, key).trim();
 
     if (value) {
@@ -195,7 +215,7 @@ function buildCloseStorageHref(
 ) {
   const nextParams = new URLSearchParams();
 
-  for (const key of ["q", "status", "type", "billing", "page"]) {
+  for (const key of ["damage", "q", "status", "type", "billing", "page"]) {
     const value = getSingleParam(params, key).trim();
 
     if (value) {
@@ -213,7 +233,7 @@ function buildEditHref(
 ) {
   const nextParams = new URLSearchParams();
 
-  for (const key of ["q", "status", "type", "billing", "page"]) {
+  for (const key of ["damage", "q", "status", "type", "billing", "page"]) {
     const value = getSingleParam(params, key).trim();
 
     if (value) {
@@ -290,7 +310,9 @@ async function updateDamageCase(formData: FormData) {
     "nicht_abrechenbar",
   ];
   const normalizedProblemType =
-    caseType === "schaden" || caseType === "verlust" ? "hardware" : problemType;
+    caseType === "technisches_problem"
+      ? problemType || "hardware"
+      : "";
 
   if (
     !id ||
@@ -541,6 +563,7 @@ export default async function SchadensfaellePage({
 }) {
   const params = await searchParams;
   const query = getSingleParam(params, "q").trim();
+  const damageNumberFilter = getSingleParam(params, "damage").trim();
   const statusFilter = getSingleParam(params, "status");
   const typeFilter = getSingleParam(params, "type");
   const billingFilter = getSingleParam(params, "billing");
@@ -564,7 +587,7 @@ export default async function SchadensfaellePage({
   let damageQuery = supabase
     .from("damage_case")
     .select(
-      "id,damage_number,legacy_damage_id,case_type,problem_type,affected_item,status,legacy_status,legacy_exchange_status,legacy_insurance_warranty,reported_at,occurred_at,short_description,billing_assessment,import_hint,person:person_id(first_name,last_name,email),inventory_set:set_id(id,legacy_set_id,storage_label),component:component_id(legacy_inventory_number,model),replacement_component:replacement_component_id(legacy_inventory_number)",
+      "id,damage_number,legacy_damage_id,case_type,problem_type,affected_item,status,legacy_status,legacy_exchange_status,legacy_insurance_warranty,reported_at,occurred_at,short_description,billing_assessment,import_hint,person:person_id(id,first_name,last_name,email,person_type),inventory_set:set_id(id,legacy_set_id,storage_label),component:component_id(legacy_inventory_number,model),replacement_component:replacement_component_id(legacy_inventory_number)",
     )
     .order("reported_at", { ascending: false })
     .order("damage_number", { ascending: false })
@@ -580,6 +603,16 @@ export default async function SchadensfaellePage({
 
   if (billingFilter) {
     damageQuery = damageQuery.eq("billing_assessment", billingFilter);
+  }
+
+  if (damageNumberFilter) {
+    const damageNumber = Number.parseInt(damageNumberFilter, 10);
+
+    if (Number.isInteger(damageNumber)) {
+      damageQuery = damageQuery.eq("damage_number", damageNumber);
+    } else {
+      damageQuery = damageQuery.eq("damage_number", -1);
+    }
   }
 
   const [
@@ -652,7 +685,7 @@ export default async function SchadensfaellePage({
     visibleSetIds.length > 0
       ? await supabase
           .from("set_person_assignment")
-          .select("set_id,person:person_id(first_name,last_name,email)")
+          .select("set_id,person:person_id(id,first_name,last_name,email,person_type)")
           .not("returned_at", "is", null)
           .in("set_id", visibleSetIds)
           .order("returned_at", { ascending: false })
@@ -664,7 +697,13 @@ export default async function SchadensfaellePage({
 
   const previousPersonBySetId = new Map<
     string,
-    { first_name: string | null; last_name: string | null; email: string | null }
+    {
+      id: string;
+      first_name: string | null;
+      last_name: string | null;
+      email: string | null;
+      person_type: string;
+    }
   >();
 
   for (const assignment of (previousAssignmentsResult.data ??
@@ -679,11 +718,55 @@ export default async function SchadensfaellePage({
       previousPersonBySetId.set(assignment.set_id, person);
     }
   }
+  const visiblePersonIds = Array.from(
+    new Set(
+      [
+        ...visibleCases.map((caseRow) =>
+          caseRow.person?.person_type === "schueler" ? caseRow.person.id : null,
+        ),
+        ...Array.from(previousPersonBySetId.values()).map((person) =>
+          person.person_type === "schueler" ? person.id : null,
+        ),
+      ].filter((id): id is string => Boolean(id)),
+    ),
+  );
+  const classAssignmentsResult =
+    visiblePersonIds.length > 0
+      ? await supabase
+          .from("person_class_assignment")
+          .select("person_id,school_class:school_class_id(label)")
+          .in("person_id", visiblePersonIds)
+          .is("valid_until", null)
+      : { data: [], error: null };
+
+  if (classAssignmentsResult.error) {
+    throw classAssignmentsResult.error;
+  }
+
+  const classByPersonId = new Map<string, string>();
+
+  for (const assignment of (classAssignmentsResult.data ??
+    []) as RawPersonClassAssignmentRow[]) {
+    const schoolClass = normalizeJoin(assignment.school_class);
+
+    if (schoolClass?.label) {
+      classByPersonId.set(assignment.person_id, schoolClass.label);
+    }
+  }
   const visibleRows = visibleCases.map((caseRow) => ({
     ...caseRow,
+    personClassLabel: caseRow.person?.id
+      ? (classByPersonId.get(caseRow.person.id) ?? null)
+      : null,
     previousPerson: caseRow.person
       ? null
       : (previousPersonBySetId.get(caseRow.inventory_set?.id ?? "") ?? null),
+    previousPersonClassLabel:
+      !caseRow.person && caseRow.inventory_set?.id
+        ? (classByPersonId.get(
+            previousPersonBySetId.get(caseRow.inventory_set.id)?.id ?? "",
+          ) ?? null)
+        : null,
   }));
   const setToEditStorage =
     visibleCases.find((caseRow) => caseRow.inventory_set?.id === storageSetId)
@@ -692,7 +775,7 @@ export default async function SchadensfaellePage({
   const displayedFrom = filteredCount === 0 ? 0 : rangeStart + 1;
   const displayedTo = Math.min(currentPage * PAGE_SIZE, filteredCount);
   const hasActiveFilters = Boolean(
-    query || statusFilter || typeFilter || billingFilter,
+    damageNumberFilter || query || statusFilter || typeFilter || billingFilter,
   );
   const detailCase = detailResult.data
     ? ({
@@ -792,8 +875,9 @@ export default async function SchadensfaellePage({
 
           <DamageCasesFilterForm
             billing={billingFilter}
+            damageNumber={damageNumberFilter}
             hasActiveFilters={hasActiveFilters}
-            key={`${query}:${statusFilter}:${typeFilter}:${billingFilter}`}
+            key={`${damageNumberFilter}:${query}:${statusFilter}:${typeFilter}:${billingFilter}`}
             query={query}
             status={statusFilter}
             type={typeFilter}
@@ -1100,7 +1184,8 @@ export default async function SchadensfaellePage({
                       defaultValue={
                         editCase.problem_type ??
                         (editCase.case_type === "schaden" ||
-                        editCase.case_type === "verlust"
+                        editCase.case_type === "verlust" ||
+                        editCase.case_type === "technisches_problem"
                           ? "hardware"
                           : "")
                       }

@@ -22,15 +22,21 @@ export type DamageCaseListRow = {
   legacy_damage_id: number | null;
   damage_number: number;
   person: {
+    id: string;
     first_name: string | null;
     last_name: string | null;
     email: string | null;
+    person_type: string;
   } | null;
+  personClassLabel: string | null;
   previousPerson: {
+    id: string;
     first_name: string | null;
     last_name: string | null;
     email: string | null;
+    person_type: string;
   } | null;
+  previousPersonClassLabel: string | null;
   reported_at: string;
   short_description: string;
   status: string;
@@ -51,13 +57,34 @@ type ContextMenuState = {
   y: number;
 } | null;
 
-function formatPerson(person: DamageCaseListRow["person"]) {
+function personTypeLabel(value: string) {
+  const labels: Record<string, string> = {
+    lehrer: "Lehrer",
+    mitarbeiter: "Mitarbeiter",
+    praktikant: "Praktikant",
+    referendar: "Referendar",
+    schueler: "Schüler",
+  };
+
+  return labels[value] ?? value;
+}
+
+function formatPerson(
+  person: DamageCaseListRow["person"],
+  schoolClassLabel: string | null,
+) {
   if (!person) {
     return "-";
   }
 
   const name = [person.last_name, person.first_name].filter(Boolean).join(", ");
-  return name || person.email || "-";
+  const label = name || person.email || "-";
+  const suffix =
+    person.person_type === "schueler"
+      ? schoolClassLabel
+      : personTypeLabel(person.person_type);
+
+  return suffix ? `${label} (${suffix})` : label;
 }
 
 function formatSet(set: DamageCaseListRow["inventory_set"]) {
@@ -177,10 +204,14 @@ export function DamageCasesTable({ canManage, cases }: DamageCasesTableProps) {
                 </td>
                 <td className="w-52 truncate px-4 py-3">
                   {caseRow.person ? (
-                    formatPerson(caseRow.person)
+                    formatPerson(caseRow.person, caseRow.personClassLabel)
                   ) : caseRow.previousPerson ? (
                     <span className="text-zinc-400">
-                      ehemals {formatPerson(caseRow.previousPerson)}
+                      ehemals{" "}
+                      {formatPerson(
+                        caseRow.previousPerson,
+                        caseRow.previousPersonClassLabel,
+                      )}
                     </span>
                   ) : (
                     "-"

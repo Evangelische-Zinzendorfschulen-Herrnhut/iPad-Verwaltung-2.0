@@ -18,6 +18,7 @@ type SetsFilterFormProps = {
   condition: string;
   hasActiveFilters: boolean;
   query: string;
+  setIdQuery: string;
   sort: string;
 };
 
@@ -28,12 +29,14 @@ export function SetsFilterForm({
   condition,
   hasActiveFilters,
   query,
+  setIdQuery,
   sort,
 }: SetsFilterFormProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [search, setSearch] = useState(query);
+  const [setIdSearch, setSetIdSearch] = useState(setIdQuery);
 
   const updateUrl = useCallback(
     (nextValues: {
@@ -41,10 +44,12 @@ export function SetsFilterForm({
       class?: string;
       condition?: string;
       q?: string;
+      setId?: string;
       sort?: string;
     }) => {
       const params = new URLSearchParams();
       const nextQuery = nextValues.q ?? search;
+      const nextSetId = nextValues.setId ?? setIdSearch;
       const nextAvailability = nextValues.availability ?? availability;
       const nextClass = nextValues.class ?? classFilter;
       const nextCondition = nextValues.condition ?? condition;
@@ -52,6 +57,10 @@ export function SetsFilterForm({
 
       if (nextQuery.trim()) {
         params.set("q", nextQuery.trim());
+      }
+
+      if (nextSetId.trim()) {
+        params.set("setId", nextSetId.trim());
       }
 
       if (nextAvailability) {
@@ -78,7 +87,16 @@ export function SetsFilterForm({
         router.push(target);
       });
     },
-    [availability, classFilter, condition, pathname, router, search, sort],
+    [
+      availability,
+      classFilter,
+      condition,
+      pathname,
+      router,
+      search,
+      setIdSearch,
+      sort,
+    ],
   );
 
   function handleSelectChange(event: ChangeEvent<HTMLSelectElement>) {
@@ -87,7 +105,7 @@ export function SetsFilterForm({
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    updateUrl({ q: search });
+    updateUrl({ q: search, setId: setIdSearch });
   }
 
   useEffect(() => {
@@ -100,9 +118,19 @@ export function SetsFilterForm({
     return () => window.clearTimeout(timeout);
   }, [query, search, updateUrl]);
 
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      if (setIdSearch !== setIdQuery) {
+        updateUrl({ setId: setIdSearch });
+      }
+    }, 350);
+
+    return () => window.clearTimeout(timeout);
+  }, [setIdQuery, setIdSearch, updateUrl]);
+
   return (
     <form
-      className="grid gap-3 border-b border-zinc-200 px-4 py-4 md:grid-cols-[minmax(220px,1fr)_160px_160px_160px_160px_auto]"
+      className="grid gap-3 border-b border-zinc-200 px-4 py-4 md:grid-cols-[minmax(220px,1fr)_120px_160px_160px_160px_160px_auto]"
       onSubmit={handleSubmit}
     >
       <label className="flex flex-col gap-1 text-sm font-medium">
@@ -111,9 +139,22 @@ export function SetsFilterForm({
           className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
           name="q"
           onChange={(event) => setSearch(event.target.value)}
-          placeholder="Set-ID, Inventarnummer oder Person"
+          placeholder="Inventarnummer oder Person"
           type="search"
           value={search}
+        />
+      </label>
+
+      <label className="flex flex-col gap-1 text-sm font-medium">
+        Set-ID
+        <input
+          className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
+          inputMode="numeric"
+          name="setId"
+          onChange={(event) => setSetIdSearch(event.target.value)}
+          placeholder="z. B. 221"
+          type="search"
+          value={setIdSearch}
         />
       </label>
 

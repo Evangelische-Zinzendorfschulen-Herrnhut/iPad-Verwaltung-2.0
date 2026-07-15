@@ -86,6 +86,9 @@ Komponententyp statt der allgemeinen Bezeichnung "Komponente".
 Bei einer letzten historischen Personenzuordnung wird ein vorhandenes
 Rueckgabedatum des Sets in der Personeninformation angezeigt.
 
+Der Statusfilter unterscheidet "Aktive" (offen und in Bearbeitung), "Alle"
+(ohne Statuseinschraenkung) sowie jeden einzelnen Aufgabenstatus.
+
 Assumption: Aufgaben werden im ersten Schnitt nicht einzelnen Rollen oder
 anderen Nutzern zugewiesen, weil nur `admin` die Aufgabenverwaltung nutzt.
 
@@ -118,6 +121,10 @@ Audit-pflichtig sind:
 - Admin kann Beschreibung, Prioritaet und Faelligkeit optional erfassen.
 - Neue Aufgaben erhalten den Status `offen`.
 - Admin kann Aufgaben nach Status filtern.
+- Admin kann Aufgaben ueber eine Setnummer finden. Dabei werden direkte
+  Set-Aufgaben und Aufgaben zu aktuell zugeordneten Komponenten gefunden.
+- Admin kann Aufgaben ueber die Inventarnummer der betroffenen Komponente
+  finden.
 - Admin kann ueberfaellige Aufgaben erkennen.
 - Admin kann eine Aufgabe als `erledigt` markieren.
 - Erledigte Aufgaben speichern Abschlusszeitpunkt und abschliessenden Admin.

@@ -47,6 +47,7 @@ type ContextMenuState = {
   components: SetTaskComponentOption[];
   damageHref: string | null;
   detailHref: string;
+  devicesHref: string;
   issueHref: string | null;
   issueLabel: string | null;
   problemHref: string | null;
@@ -102,6 +103,7 @@ export function SetsTable({ releaseAction, rows, taskAction }: SetsTableProps) {
       components: row.components,
       damageHref: row.damageHref,
       detailHref: row.detailHref,
+      devicesHref: row.devicesHref,
       issueHref: row.issueHref,
       issueLabel: row.issueLabel,
       problemHref: row.problemHref,
@@ -201,6 +203,7 @@ export function SetsTable({ releaseAction, rows, taskAction }: SetsTableProps) {
                       aria-label={`Geräte von Set ${row.legacySetId} anzeigen`}
                       className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full align-middle transition hover:scale-105"
                       href={row.devicesHref}
+                      target="_blank"
                       title="Geräte dieses Sets anzeigen"
                     >
                       <Image
@@ -236,6 +239,14 @@ export function SetsTable({ releaseAction, rows, taskAction }: SetsTableProps) {
           >
             Datensatz anzeigen
           </Link>
+          <Link
+            className="block w-full rounded px-3 py-2 text-left font-medium hover:bg-zinc-100"
+            href={contextMenu.devicesHref}
+            target="_blank"
+          >
+            Set in Geräteliste anzeigen
+          </Link>
+          <div className="my-1 border-t border-zinc-100" />
           {contextMenu.returnProtocolHref ? (
             <a
               className="block w-full rounded px-3 py-2 text-left font-medium hover:bg-zinc-100"
@@ -247,12 +258,14 @@ export function SetsTable({ releaseAction, rows, taskAction }: SetsTableProps) {
             </a>
           ) : null}
           {contextMenu.returnSetHref ? (
-            <Link
-              className="block w-full rounded px-3 py-2 text-left font-medium hover:bg-zinc-100"
-              href={contextMenu.returnSetHref}
-            >
-              Set zurücknehmen
-            </Link>
+            <>
+              <Link
+                className="block w-full rounded px-3 py-2 text-left font-medium hover:bg-zinc-100"
+                href={contextMenu.returnSetHref}
+              >
+                Set zurücknehmen
+              </Link>
+            </>
           ) : null}
           {contextMenu.issueHref ? (
             <Link
@@ -263,12 +276,15 @@ export function SetsTable({ releaseAction, rows, taskAction }: SetsTableProps) {
             </Link>
           ) : null}
           {contextMenu.damageHref ? (
-            <Link
-              className="block w-full rounded px-3 py-2 text-left font-medium hover:bg-zinc-100"
-              href={contextMenu.damageHref}
-            >
-              Schaden/Verlust melden
-            </Link>
+            <>
+              <div className="my-1 border-t border-zinc-100" />
+              <Link
+                className="block w-full rounded px-3 py-2 text-left font-medium hover:bg-zinc-100"
+                href={contextMenu.damageHref}
+              >
+                Schaden/Verlust melden
+              </Link>
+            </>
           ) : null}
           {contextMenu.problemHref ? (
             <Link
@@ -278,6 +294,14 @@ export function SetsTable({ releaseAction, rows, taskAction }: SetsTableProps) {
               Problem melden
             </Link>
           ) : null}
+          <div className="my-1 border-t border-zinc-100" />
+          <button
+            className="block w-full rounded px-3 py-2 text-left font-medium hover:bg-zinc-100"
+            onClick={openTaskDrawer}
+            type="button"
+          >
+            Aufgabe erstellen
+          </button>
           {contextMenu.storageHref ? (
             <Link
               className="block w-full rounded px-3 py-2 text-left font-medium hover:bg-zinc-100"
@@ -286,13 +310,6 @@ export function SetsTable({ releaseAction, rows, taskAction }: SetsTableProps) {
               Lagerort ändern
             </Link>
           ) : null}
-          <button
-            className="block w-full rounded px-3 py-2 text-left font-medium hover:bg-zinc-100"
-            onClick={openTaskDrawer}
-            type="button"
-          >
-            Aufgabe erstellen
-          </button>
           {contextMenu.releasable ? (
             <form action={releaseAction}>
               <input name="set_id" type="hidden" value={contextMenu.setId} />

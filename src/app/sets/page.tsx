@@ -134,13 +134,27 @@ function getPageParam(searchParams: Record<string, string | string[] | undefined
   return parsed;
 }
 
+const SET_LIST_FILTER_PARAMS = [
+  "q",
+  "setId",
+  "availability",
+  "condition",
+  "class",
+  "sort",
+] as const;
+
+const SET_LIST_FILTER_AND_PAGE_PARAMS = [
+  ...SET_LIST_FILTER_PARAMS,
+  "page",
+] as const;
+
 function buildPageHref(
   params: Record<string, string | string[] | undefined>,
   page: number,
 ) {
   const nextParams = new URLSearchParams();
 
-  for (const key of ["q", "availability", "condition", "class", "sort"]) {
+  for (const key of SET_LIST_FILTER_PARAMS) {
     const value = getSingleParam(params, key).trim();
 
     if (value) {
@@ -162,7 +176,7 @@ function buildDamageHref(
 ) {
   const nextParams = new URLSearchParams();
 
-  for (const key of ["q", "availability", "condition", "class", "sort", "page"]) {
+  for (const key of SET_LIST_FILTER_AND_PAGE_PARAMS) {
     const value = getSingleParam(params, key).trim();
 
     if (value) {
@@ -179,7 +193,7 @@ function buildCloseDamageHref(
 ) {
   const nextParams = new URLSearchParams();
 
-  for (const key of ["q", "availability", "condition", "class", "sort", "page"]) {
+  for (const key of SET_LIST_FILTER_AND_PAGE_PARAMS) {
     const value = getSingleParam(params, key).trim();
 
     if (value) {
@@ -197,7 +211,7 @@ function buildDetailHref(
 ) {
   const nextParams = new URLSearchParams();
 
-  for (const key of ["q", "availability", "condition", "class", "sort", "page"]) {
+  for (const key of SET_LIST_FILTER_AND_PAGE_PARAMS) {
     const value = getSingleParam(params, key).trim();
 
     if (value) {
@@ -214,7 +228,7 @@ function buildCloseDetailHref(
 ) {
   const nextParams = new URLSearchParams();
 
-  for (const key of ["q", "availability", "condition", "class", "sort", "page"]) {
+  for (const key of SET_LIST_FILTER_AND_PAGE_PARAMS) {
     const value = getSingleParam(params, key).trim();
 
     if (value) {
@@ -232,7 +246,7 @@ function buildIssueHref(
 ) {
   const nextParams = new URLSearchParams();
 
-  for (const key of ["q", "availability", "condition", "class", "sort", "page"]) {
+  for (const key of SET_LIST_FILTER_AND_PAGE_PARAMS) {
     const value = getSingleParam(params, key).trim();
 
     if (value) {
@@ -249,7 +263,7 @@ function buildCloseIssueHref(
 ) {
   const nextParams = new URLSearchParams();
 
-  for (const key of ["q", "availability", "condition", "class", "sort", "page"]) {
+  for (const key of SET_LIST_FILTER_AND_PAGE_PARAMS) {
     const value = getSingleParam(params, key).trim();
 
     if (value) {
@@ -267,7 +281,7 @@ function buildProblemHref(
 ) {
   const nextParams = new URLSearchParams();
 
-  for (const key of ["q", "availability", "condition", "class", "sort", "page"]) {
+  for (const key of SET_LIST_FILTER_AND_PAGE_PARAMS) {
     const value = getSingleParam(params, key).trim();
 
     if (value) {
@@ -284,7 +298,7 @@ function buildCloseProblemHref(
 ) {
   const nextParams = new URLSearchParams();
 
-  for (const key of ["q", "availability", "condition", "class", "sort", "page"]) {
+  for (const key of SET_LIST_FILTER_AND_PAGE_PARAMS) {
     const value = getSingleParam(params, key).trim();
 
     if (value) {
@@ -302,7 +316,7 @@ function buildReturnHref(
 ) {
   const nextParams = new URLSearchParams();
 
-  for (const key of ["q", "availability", "condition", "class", "sort", "page"]) {
+  for (const key of SET_LIST_FILTER_AND_PAGE_PARAMS) {
     const value = getSingleParam(params, key).trim();
 
     if (value) {
@@ -319,7 +333,7 @@ function buildCloseReturnHref(
 ) {
   const nextParams = new URLSearchParams();
 
-  for (const key of ["q", "availability", "condition", "class", "sort", "page"]) {
+  for (const key of SET_LIST_FILTER_AND_PAGE_PARAMS) {
     const value = getSingleParam(params, key).trim();
 
     if (value) {
@@ -337,7 +351,7 @@ function buildStorageHref(
 ) {
   const nextParams = new URLSearchParams();
 
-  for (const key of ["q", "availability", "condition", "class", "sort", "page"]) {
+  for (const key of SET_LIST_FILTER_AND_PAGE_PARAMS) {
     const value = getSingleParam(params, key).trim();
 
     if (value) {
@@ -354,7 +368,7 @@ function buildCloseStorageHref(
 ) {
   const nextParams = new URLSearchParams();
 
-  for (const key of ["q", "availability", "condition", "class", "sort", "page"]) {
+  for (const key of SET_LIST_FILTER_AND_PAGE_PARAMS) {
     const value = getSingleParam(params, key).trim();
 
     if (value) {
@@ -387,6 +401,18 @@ function normalizeCheckbox(value: FormDataEntryValue | null) {
   return value === "on";
 }
 
+function personTypeLabel(value: string) {
+  const labels: Record<string, string> = {
+    lehrer: "Lehrer",
+    mitarbeiter: "Mitarbeiter",
+    praktikant: "Praktikant",
+    referendar: "Referendar",
+    schueler: "Schüler",
+  };
+
+  return labels[value] ?? value;
+}
+
 function formatPerson(
   person: PersonAssignmentRow["person"],
   schoolClassLabel?: string,
@@ -397,10 +423,12 @@ function formatPerson(
 
   const name = [person.last_name, person.first_name].filter(Boolean).join(", ");
   const label = name || person.email || "-";
+  const suffix =
+    person.person_type === "schueler"
+      ? schoolClassLabel
+      : personTypeLabel(person.person_type);
 
-  return person.person_type === "schueler" && schoolClassLabel
-    ? `${label} (${schoolClassLabel})`
-    : label;
+  return suffix ? `${label} (${suffix})` : label;
 }
 
 function componentLabel(component: ComponentAssignmentRow["component"]) {
@@ -1115,6 +1143,7 @@ export default async function SetsPage({
 }) {
   const params = await searchParams;
   const query = getSingleParam(params, "q").trim();
+  const setIdQuery = getSingleParam(params, "setId").trim();
   const availabilityFilter = getSingleParam(params, "availability");
   const conditionFilter = getSingleParam(params, "condition");
   const classFilter = getSingleParam(params, "class");
@@ -1202,20 +1231,31 @@ export default async function SetsPage({
 
   const requiredSetIdsByFilter: string[][] = [];
 
-  if (query) {
-    const numericQuery = Number.parseInt(query, 10);
+  if (setIdQuery) {
+    const numericSetId = Number.parseInt(setIdQuery, 10);
     const matchingSetIds = new Set<string>();
 
-    if (Number.isInteger(numericQuery)) {
-      const { data: matchingSetsById } = await supabase
-        .from("inventory_set")
-        .select("id")
-        .eq("legacy_set_id", numericQuery);
+    if (Number.isInteger(numericSetId)) {
+      const { data: matchingSetsById, error: matchingSetsByIdError } =
+        await supabase
+          .from("inventory_set")
+          .select("id")
+          .eq("legacy_set_id", numericSetId);
+
+      if (matchingSetsByIdError) {
+        throw matchingSetsByIdError;
+      }
 
       for (const set of matchingSetsById ?? []) {
         matchingSetIds.add(set.id);
       }
     }
+
+    requiredSetIdsByFilter.push([...matchingSetIds]);
+  }
+
+  if (query) {
+    const matchingSetIds = new Set<string>();
 
     const { data: matchingComponents } = await supabase
       .from("inventory_component")
@@ -1647,7 +1687,7 @@ export default async function SetsPage({
   const displayedFrom = filteredCount === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
   const displayedTo = Math.min(currentPage * PAGE_SIZE, filteredCount);
   const hasActiveFilters = Boolean(
-    query || availabilityFilter || conditionFilter || classFilter,
+    query || setIdQuery || availabilityFilter || conditionFilter || classFilter,
   );
   const setRows: SetsTableRow[] = sets.map((set) => {
     const components = componentsBySetId.get(set.id);
@@ -1891,8 +1931,9 @@ export default async function SetsPage({
           classOptions={classOptions.map((schoolClass) => schoolClass.label)}
           condition={conditionFilter}
           hasActiveFilters={hasActiveFilters}
-          key={`${query}:${availabilityFilter}:${conditionFilter}:${classFilter}:${sort}`}
+          key={`${query}:${setIdQuery}:${availabilityFilter}:${conditionFilter}:${classFilter}:${sort}`}
           query={query}
+          setIdQuery={setIdQuery}
           sort={sort}
         />
 

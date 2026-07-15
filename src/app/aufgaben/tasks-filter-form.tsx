@@ -101,7 +101,7 @@ export function TasksFilterForm({
           className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
           name="q"
           onChange={(event) => setSearch(event.target.value)}
-          placeholder="Titel, Beschreibung oder Bezug"
+          placeholder="Titel, Set- oder Inventarnummer"
           type="search"
           value={search}
         />
@@ -116,7 +116,7 @@ export function TasksFilterForm({
           value={status}
         >
           <option value="active">Aktive</option>
-          <option value="">Alle</option>
+          <option value="all">Alle</option>
           <option value="offen">Offen</option>
           <option value="in_bearbeitung">In Bearbeitung</option>
           <option value="erledigt">Erledigt</option>

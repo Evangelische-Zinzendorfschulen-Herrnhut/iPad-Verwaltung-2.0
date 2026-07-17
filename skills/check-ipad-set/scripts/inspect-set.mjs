@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import fs from "node:fs";
 import process from "node:process";
+import zlib from "node:zlib";
 import { createClient } from "@supabase/supabase-js";
 
 function readEnv(path = ".env.local") {
@@ -25,6 +26,142 @@ function uniqueById(rows) {
     out.push(row);
   }
   return out;
+}
+
+function decodeXmlText(value) {
+  return String(value ?? "")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, "\"")
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, "&");
+}
+
+function readZipEntries(path) {
+  const buffer = fs.readFileSync(path);
+  const entries = new Map();
+  let offset = 0;
+
+  while (offset + 30 <= buffer.length && buffer.readUInt32LE(offset) === 0x04034b50) {
+    const compression = buffer.readUInt16LE(offset + 8);
+    const compressedSize = buffer.readUInt32LE(offset + 18);
+    const fileNameLength = buffer.readUInt16LE(offset + 26);
+    const extraLength = buffer.readUInt16LE(offset + 28);
+    const fileNameStart = offset + 30;
+    const fileNameEnd = fileNameStart + fileNameLength;
+    const dataStart = fileNameEnd + extraLength;
+    const dataEnd = dataStart + compressedSize;
+    const fileName = buffer.toString("utf8", fileNameStart, fileNameEnd);
+    const compressed = buffer.subarray(dataStart, dataEnd);
+    const data =
+      compression === 0
+        ? compressed
+        : compression === 8
+          ? zlib.inflateRawSync(compressed)
+          : null;
+
+    if (data) {
+      entries.set(fileName, data.toString("utf8"));
+    }
+
+    offset = dataEnd;
+  }
+
+  return entries;
+}
+
+function parseSharedStrings(xml) {
+  if (!xml) return [];
+
+  return [...xml.matchAll(/<si\b[^>]*>([\s\S]*?)<\/si>/g)].map((match) => {
+    const textParts = [...match[1].matchAll(/<t\b[^>]*>([\s\S]*?)<\/t>/g)];
+    return textParts.map((part) => decodeXmlText(part[1])).join("");
+  });
+}
+
+function parseCellValue(cellXml, sharedStrings) {
+  const type = cellXml.match(/\bt="([^"]+)"/)?.[1] ?? "";
+  const inlineText = cellXml.match(/<is\b[^>]*>[\s\S]*?<t\b[^>]*>([\s\S]*?)<\/t>[\s\S]*?<\/is>/);
+
+  if (inlineText) {
+    return decodeXmlText(inlineText[1]).trim();
+  }
+
+  const value = cellXml.match(/<v>([\s\S]*?)<\/v>/)?.[1];
+  if (value == null) return "";
+
+  if (type === "s") {
+    return String(sharedStrings[Number(value)] ?? "").trim();
+  }
+
+  return decodeXmlText(value).trim();
+}
+
+function parseWorksheetRows(xml, sharedStrings) {
+  if (!xml) return [];
+
+  return [...xml.matchAll(/<row\b[^>]*>([\s\S]*?)<\/row>/g)].map((rowMatch) => {
+    const row = [];
+    for (const cellMatch of rowMatch[1].matchAll(/<c\b([^>]*)>([\s\S]*?)<\/c>/g)) {
+      const attributes = cellMatch[1];
+      const cellXml = cellMatch[0];
+      const ref = attributes.match(/\br="([A-Z]+)(\d+)"/)?.[1] ?? "";
+      const index = ref
+        ? [...ref].reduce((value, char) => value * 26 + char.charCodeAt(0) - 64, 0) - 1
+        : row.length;
+      row[index] = parseCellValue(cellXml, sharedStrings);
+    }
+
+    return row;
+  });
+}
+
+function readLoosePowerSupplyRows(path = "input/Lose Netzteile.xlsx") {
+  if (!fs.existsSync(path)) return [];
+
+  const entries = readZipEntries(path);
+  const sharedStrings = parseSharedStrings(entries.get("xl/sharedStrings.xml"));
+  const worksheet =
+    entries.get("xl/worksheets/sheet1.xml") ??
+    [...entries.entries()].find(([name]) => name.startsWith("xl/worksheets/"))?.[1];
+  const rows = parseWorksheetRows(worksheet, sharedStrings);
+  const headers = (rows[0] ?? []).map((header) => String(header ?? "").trim());
+
+  return rows.slice(1).map((row) =>
+    Object.fromEntries(headers.map((header, index) => [header, row[index] ?? ""])),
+  );
+}
+
+function normalizeInventoryNeedle(inventoryNumber) {
+  return String(inventoryNumber ?? "").split(" / ")[0].trim();
+}
+
+function checkLoosePowerSupply(currentComponents) {
+  const ipadInventoryNumber = currentComponents.find((row) => row.role === "ipad")
+    ?.component?.legacy_inventory_number;
+  const needle = normalizeInventoryNeedle(ipadInventoryNumber);
+  const rows = readLoosePowerSupplyRows();
+  const match = rows.find((row) =>
+    normalizeInventoryNeedle(row.InvNr).toLowerCase() === needle.toLowerCase(),
+  );
+
+  return {
+    found: Boolean(match),
+    icon: match ? "🟢" : "🔴",
+    inventoryNumber: ipadInventoryNumber ?? null,
+    match: match
+      ? {
+          invNr: match.InvNr || null,
+          user: match.User || null,
+          klasse: match.Klasse || null,
+          anmerkung: match.Anmerkung || null,
+        }
+      : null,
+  };
+}
+
+function formatSetSuffix(setNumber) {
+  return String(setNumber).padStart(4, "0");
 }
 
 async function main() {
@@ -67,6 +204,30 @@ async function main() {
     .eq("legacy_set_number", setNumber)
     .order("category");
   if (legacyError) throw legacyError;
+
+  const requiredRoles = ["ipad", "pencil", "keyboard"];
+  const currentRoles = new Set(currentComponents.map((row) => row.role).filter(Boolean));
+  const missingRequiredRoles = requiredRoles.filter((role) => !currentRoles.has(role));
+  const setSuffix = formatSetSuffix(setNumber);
+  const { data: suffixComponents, error: suffixComponentsError } = missingRequiredRoles.length
+    ? await supabase
+        .from("inventory_component")
+        .select(componentSelect)
+        .ilike("legacy_inventory_number", `% / ${setSuffix}`)
+        .order("category")
+    : { data: [], error: null };
+  if (suffixComponentsError) throw suffixComponentsError;
+
+  const suffixIds = suffixComponents.map((component) => component.id);
+  const { data: suffixAssignments, error: suffixAssignmentsError } = suffixIds.length
+    ? await supabase
+        .from("set_component_assignment")
+        .select("component_id,role,valid_from,valid_until,set:set_id(legacy_set_id,availability,condition,storage_label)")
+        .in("component_id", suffixIds)
+        .is("valid_until", null)
+        .order("role")
+    : { data: [], error: null };
+  if (suffixAssignmentsError) throw suffixAssignmentsError;
 
   const legacyIds = legacyComponents.map((component) => component.id);
   const { data: legacyAssignments, error: legacyAssignmentsError } = legacyIds.length
@@ -140,8 +301,16 @@ async function main() {
     currentComponents,
     legacyComponents,
     currentAssignmentsForLegacyComponents: legacyAssignments,
+    missingRequiredRoles,
+    suffixComponentSearch: {
+      searched: missingRequiredRoles.length > 0,
+      suffix: setSuffix,
+      components: suffixComponents,
+      currentAssignmentsForSuffixComponents: suffixAssignments,
+    },
     supplemental,
     openPersonAssignments,
+    loosePowerSupplyCheck: checkLoosePowerSupply(currentComponents),
     damageCases: {
       directComponentOrReplacement: uniqueById(directDamage),
       setLevel: uniqueById(setDamage),

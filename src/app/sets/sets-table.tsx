@@ -21,7 +21,9 @@ export type SetsTableRow = {
   legacyStatus: string | null;
   pencil: string;
   person: string;
+  personHref: string | null;
   previousPerson: string | null;
+  previousPersonHref: string | null;
   problemHref: string | null;
   releaseReturnTo: string;
   releasable: boolean;
@@ -160,10 +162,46 @@ export function SetsTable({ releaseAction, rows, taskAction }: SetsTableProps) {
                 <td className="px-4 py-3 font-semibold">{row.legacySetId}</td>
                 <td className="px-4 py-3">
                   {row.person !== "-" ? (
-                    row.person
+                    <span className="inline-flex items-center gap-2 align-middle">
+                      {row.personHref ? (
+                        <Link
+                          aria-label={`${row.person} in der Personenliste anzeigen`}
+                          className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full align-middle transition hover:scale-105"
+                          href={row.personHref}
+                          title="Person in Personenliste anzeigen"
+                        >
+                          <Image
+                            alt=""
+                            aria-hidden="true"
+                            className="block h-5 w-5"
+                            height={20}
+                            src="/arrow_right_green.svg"
+                            width={20}
+                          />
+                        </Link>
+                      ) : null}
+                      <span>{row.person}</span>
+                    </span>
                   ) : row.previousPerson ? (
-                    <span className="text-zinc-400">
-                      ehemals {row.previousPerson}
+                    <span className="inline-flex items-center gap-2 align-middle text-zinc-400">
+                      {row.previousPersonHref ? (
+                        <Link
+                          aria-label={`${row.previousPerson} in der Personenliste anzeigen`}
+                          className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full align-middle opacity-70 transition hover:scale-105 hover:opacity-100"
+                          href={row.previousPersonHref}
+                          title="Person in Personenliste anzeigen"
+                        >
+                          <Image
+                            alt=""
+                            aria-hidden="true"
+                            className="block h-5 w-5"
+                            height={20}
+                            src="/arrow_right_green.svg"
+                            width={20}
+                          />
+                        </Link>
+                      ) : null}
+                      <span>ehemals {row.previousPerson}</span>
                     </span>
                   ) : (
                     "-"

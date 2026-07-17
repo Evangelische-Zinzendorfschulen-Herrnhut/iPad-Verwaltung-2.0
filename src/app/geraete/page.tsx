@@ -585,6 +585,9 @@ export default async function GeraetePage({
         .filter(Boolean)
         .join(" · "),
       serialNumber: component.serial_number,
+      setHref: assignment?.set
+        ? `/sets?setId=${encodeURIComponent(String(assignment.set.legacy_set_id))}`
+        : null,
       setLabel: formatSet(assignment),
       storageHref: canEditComponents
         ? buildGeraeteHref(params, {

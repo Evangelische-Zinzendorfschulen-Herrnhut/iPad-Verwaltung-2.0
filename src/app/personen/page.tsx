@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { getCurrentAppUser, hasAnyRole } from "@/lib/auth/current-user";
 import { createClient } from "@/lib/supabase/server";
 import { SectionTabs } from "../section-tabs";
+import { PersonenTable, type PersonenTableRow } from "./personen-table";
 
 export const metadata: Metadata = {
   title: "Personen | iPad-Verwaltung",
@@ -91,6 +92,30 @@ function getPageParam(searchParams: Record<string, string | string[] | undefined
   return parsed;
 }
 
+function escapeSearchTerm(value: string) {
+  return value.replaceAll("%", "\\%").replaceAll("_", "\\_");
+}
+
+function buildPersonSearchFilter(query: string) {
+  const terms = query
+    .split(/[\s,]+/)
+    .map((term) => term.trim())
+    .filter(Boolean);
+  const filters: string[] = [];
+
+  for (const term of terms) {
+    const escapedTerm = escapeSearchTerm(term);
+
+    filters.push(
+      `first_name.ilike.%${escapedTerm}%`,
+      `last_name.ilike.%${escapedTerm}%`,
+      `email.ilike.%${escapedTerm}%`,
+    );
+  }
+
+  return filters.join(",");
+}
+
 function buildPageHref(
   params: Record<string, string | string[] | undefined>,
   page: number,
@@ -111,6 +136,30 @@ function buildPageHref(
 
   const queryString = nextParams.toString();
   return queryString ? `/personen?${queryString}` : "/personen";
+}
+
+function buildCurrentListHref(
+  params: Record<string, string | string[] | undefined>,
+) {
+  const nextParams = new URLSearchParams();
+
+  for (const key of ["q", "type", "status", "class", "page"]) {
+    const value = getSingleParam(params, key).trim();
+
+    if (value) {
+      nextParams.set(key, value);
+    }
+  }
+
+  const queryString = nextParams.toString();
+  return queryString ? `/personen?${queryString}` : "/personen";
+}
+
+function buildDetailHref(personId: string, returnTo: string) {
+  const params = new URLSearchParams();
+  params.set("returnTo", returnTo);
+
+  return `/personen/${personId}?${params.toString()}`;
 }
 
 export default async function PersonenPage({
@@ -144,10 +193,7 @@ export default async function PersonenPage({
     });
 
   if (query) {
-    const escapedQuery = query.replaceAll("%", "\\%").replaceAll("_", "\\_");
-    peopleQuery = peopleQuery.or(
-      `first_name.ilike.%${escapedQuery}%,last_name.ilike.%${escapedQuery}%,email.ilike.%${escapedQuery}%`,
-    );
+    peopleQuery = peopleQuery.or(buildPersonSearchFilter(query));
   }
 
   if (typeFilter) {
@@ -298,6 +344,18 @@ export default async function PersonenPage({
   const hasActiveFilters = Boolean(
     query || typeFilter || statusFilter || classFilter,
   );
+  const currentListHref = buildCurrentListHref(params);
+  const personTableRows: PersonenTableRow[] = people.map((person) => ({
+    classLabel: currentClassByPersonId.get(person.id) ?? null,
+    detailHref: buildDetailHref(person.id, currentListHref),
+    email: person.email,
+    id: person.id,
+    jahrgang: person.jahrgang,
+    name: formatName(person),
+    personType: person.person_type,
+    status: person.status,
+  }));
+
   return (
     <main className="min-h-screen bg-zinc-50 text-zinc-950">
       <section className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-6 py-10">
@@ -428,38 +486,7 @@ export default async function PersonenPage({
           </form>
 
           {people.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[760px] border-collapse text-left text-sm">
-                <thead className="bg-zinc-100 text-zinc-600">
-                  <tr>
-                    <th className="px-4 py-3 font-medium">Name</th>
-                    <th className="px-4 py-3 font-medium">Klasse</th>
-                    <th className="px-4 py-3 font-medium">Typ</th>
-                    <th className="px-4 py-3 font-medium">E-Mail</th>
-                    <th className="px-4 py-3 font-medium">Status</th>
-                    <th className="px-4 py-3 font-medium">Jahrgang</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {people.map((person) => (
-                    <tr className="border-t border-zinc-100" key={person.id}>
-                      <td className="px-4 py-3 font-medium">
-                        {formatName(person)}
-                      </td>
-                      <td className="px-4 py-3">
-                        {currentClassByPersonId.get(person.id) ?? "-"}
-                      </td>
-                      <td className="px-4 py-3">{person.person_type}</td>
-                      <td className="px-4 py-3 text-zinc-600">
-                        {person.email ?? "-"}
-                      </td>
-                      <td className="px-4 py-3">{person.status}</td>
-                      <td className="px-4 py-3">{person.jahrgang ?? "-"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <PersonenTable rows={personTableRows} />
           ) : (
             <div className="px-4 py-8 text-sm text-zinc-600">
               Noch keine Personen vorhanden. Der naechste Schritt ist der

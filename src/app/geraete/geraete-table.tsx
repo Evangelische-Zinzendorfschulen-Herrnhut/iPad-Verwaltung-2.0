@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { MouseEvent, useEffect, useState } from "react";
@@ -17,6 +18,7 @@ export type GeraeteTableRow = {
   legacyStatus: string | null;
   manufacturerModel: string;
   serialNumber: string | null;
+  setHref: string | null;
   setLabel: string;
   storageHref: string | null;
   storageLabel: string;
@@ -130,7 +132,31 @@ export function GeraeteTable({
                   ) : null}
                 </td>
                 <td className="px-4 py-3">{row.conditionLabel}</td>
-                <td className="px-4 py-3">{row.setLabel}</td>
+                <td className="px-4 py-3">
+                  {row.setHref ? (
+                    <span className="inline-flex items-center gap-2 align-middle">
+                      <Link
+                        aria-label={`Set ${row.setLabel} in der Setliste anzeigen`}
+                        className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full align-middle transition hover:scale-105"
+                        href={row.setHref}
+                        target="_blank"
+                        title="Set in Setliste anzeigen"
+                      >
+                        <Image
+                          alt=""
+                          aria-hidden="true"
+                          className="block h-5 w-5"
+                          height={20}
+                          src="/arrow_right_orange.svg"
+                          width={20}
+                        />
+                      </Link>
+                      <span>{row.setLabel}</span>
+                    </span>
+                  ) : (
+                    row.setLabel
+                  )}
+                </td>
                 <td className="px-4 py-3">{row.assignmentLabel}</td>
                 <td className="px-4 py-3">{row.storageLabel}</td>
                 <td className="px-4 py-3 text-zinc-600">

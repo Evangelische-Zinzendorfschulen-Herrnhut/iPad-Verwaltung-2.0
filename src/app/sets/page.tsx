@@ -91,6 +91,16 @@ type SupplementalAssignmentRow = {
   set_id: string;
 };
 
+type ActiveTaskRow = {
+  id: string;
+  title: string;
+  status: "offen" | "in_bearbeitung";
+  priority: "normal" | "hoch";
+  due_date: string | null;
+  related_object_type: "set" | "komponente" | string | null;
+  related_object_id: string | null;
+};
+
 type SchoolClassOptionRow = {
   id: string;
   label: string;
@@ -431,6 +441,17 @@ function formatPerson(
   return suffix ? `${label} (${suffix})` : label;
 }
 
+function personListHref(person: PersonAssignmentRow["person"]) {
+  if (!person) {
+    return null;
+  }
+
+  const name = [person.last_name, person.first_name].filter(Boolean).join(", ");
+  const query = person.email || name;
+
+  return query ? `/personen?q=${encodeURIComponent(query)}` : null;
+}
+
 function componentLabel(component: ComponentAssignmentRow["component"]) {
   if (!component) {
     return "-";
@@ -500,6 +521,23 @@ function supplementalLabel(assignment: SupplementalAssignmentRow) {
   const label = assignment.label || labels[assignment.item_type] || assignment.item_type;
 
   return assignment.quantity > 1 ? `${label} (${assignment.quantity}x)` : label;
+}
+
+function taskStatusLabel(status: ActiveTaskRow["status"]) {
+  const labels: Record<ActiveTaskRow["status"], string> = {
+    in_bearbeitung: "in Bearbeitung",
+    offen: "offen",
+  };
+
+  return labels[status] ?? status;
+}
+
+function formatDate(value: string | null) {
+  if (!value) {
+    return null;
+  }
+
+  return new Intl.DateTimeFormat("de-DE").format(new Date(`${value}T00:00:00`));
 }
 
 function DetailField({
@@ -1167,6 +1205,7 @@ export default async function SetsPage({
 
   const supabase = await createClient();
   const canManageSets = hasAnyRole(appUser, ["admin", "ipad_verwaltung"]);
+  const canReadTasks = hasAnyRole(appUser, ["admin"]);
   const canEditSetStorage = canManageSets;
   const [{ data: classOptionData }, { data: personOptionData }] = await Promise.all([
     supabase
@@ -1684,6 +1723,64 @@ export default async function SetsPage({
     supplementalBySetId.get(assignment.set_id)?.push(assignment);
   }
 
+  const componentById = new Map<string, ComponentAssignmentRow["component"]>();
+  const setIdByComponentId = new Map<string, string>();
+
+  for (const assignment of componentAssignments) {
+    if (assignment.component?.id) {
+      componentById.set(assignment.component.id, assignment.component);
+      setIdByComponentId.set(assignment.component.id, assignment.set_id);
+    }
+  }
+
+  const taskRelatedIds = [
+    ...setIds,
+    ...Array.from(componentById.keys()),
+  ];
+  const activeTasks: ActiveTaskRow[] = [];
+
+  if (canReadTasks && taskRelatedIds.length > 0) {
+    for (const relatedIdBatch of chunkValues(taskRelatedIds)) {
+      const { data, error } = await supabase
+        .from("task")
+        .select(
+          "id,title,status,priority,due_date,related_object_type,related_object_id",
+        )
+        .in("status", ["offen", "in_bearbeitung"])
+        .in("related_object_id", relatedIdBatch)
+        .order("due_date", { ascending: true, nullsFirst: false })
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        throw error;
+      }
+
+      activeTasks.push(...((data ?? []) as ActiveTaskRow[]));
+    }
+  }
+
+  const activeTasksBySetId = new Map<string, ActiveTaskRow[]>();
+
+  for (const task of activeTasks) {
+    const relatedObjectId = task.related_object_id;
+    const taskSetId =
+      task.related_object_type === "set"
+        ? relatedObjectId
+        : task.related_object_type === "komponente" && relatedObjectId
+          ? setIdByComponentId.get(relatedObjectId)
+          : null;
+
+    if (!taskSetId) {
+      continue;
+    }
+
+    if (!activeTasksBySetId.has(taskSetId)) {
+      activeTasksBySetId.set(taskSetId, []);
+    }
+
+    activeTasksBySetId.get(taskSetId)?.push(task);
+  }
+
   const displayedFrom = filteredCount === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
   const displayedTo = Math.min(currentPage * PAGE_SIZE, filteredCount);
   const hasActiveFilters = Boolean(
@@ -1760,9 +1857,14 @@ export default async function SetsPage({
         person,
         person ? classByPersonId.get(person.id) : undefined,
       ),
+      personHref: personListHref(person),
       previousPerson:
         (availability === "frei" || availability === "blockiert") && previousPerson
           ? formatPerson(previousPerson)
+          : null,
+      previousPersonHref:
+        (availability === "frei" || availability === "blockiert") && previousPerson
+          ? personListHref(previousPerson)
           : null,
       problemHref:
         availability === "ausgegeben" || availability === "frei"
@@ -1832,6 +1934,9 @@ export default async function SetsPage({
     : undefined;
   const detailSupplemental = setToShowDetail
     ? (supplementalBySetId.get(setToShowDetail.id) ?? [])
+    : [];
+  const detailTasks = setToShowDetail
+    ? (activeTasksBySetId.get(setToShowDetail.id) ?? [])
     : [];
   const issueComponents = setToIssue
     ? componentsBySetId.get(setToIssue.id)
@@ -2067,6 +2172,72 @@ export default async function SetsPage({
                     />
                   </dl>
                 </section>
+
+                {canReadTasks ? (
+                  <section className="grid gap-3">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <h3 className="font-semibold">Anstehende Aufgaben</h3>
+                      <Link
+                        className="text-sm font-medium text-emerald-700 hover:text-emerald-900"
+                        href={`/aufgaben?q=${encodeURIComponent(String(setToShowDetail.legacy_set_id))}`}
+                      >
+                        Aufgabenliste
+                      </Link>
+                    </div>
+                    {detailTasks.length > 0 ? (
+                      <ul className="grid gap-2">
+                        {detailTasks.map((task) => {
+                          const relatedComponent =
+                            task.related_object_type === "komponente" &&
+                            task.related_object_id
+                              ? componentById.get(task.related_object_id)
+                              : null;
+                          const dueDate = formatDate(task.due_date);
+
+                          return (
+                            <li
+                              className="rounded-md border border-zinc-200 px-3 py-2"
+                              key={task.id}
+                            >
+                              <div className="flex flex-wrap items-start justify-between gap-2">
+                                <div>
+                                  <p className="font-medium text-zinc-950">
+                                    {task.title}
+                                  </p>
+                                  <p className="mt-1 text-xs text-zinc-500">
+                                    {relatedComponent
+                                      ? `${relatedComponent.category}: ${componentLabel(relatedComponent)}`
+                                      : `Set ${setToShowDetail.legacy_set_id}`}
+                                  </p>
+                                </div>
+                                <div className="flex flex-wrap justify-end gap-2 text-xs">
+                                  <span className="rounded-md bg-zinc-100 px-2 py-1 font-medium text-zinc-700">
+                                    {taskStatusLabel(task.status)}
+                                  </span>
+                                  {task.priority === "hoch" ? (
+                                    <span className="rounded-md bg-amber-100 px-2 py-1 font-medium text-amber-800">
+                                      hoch
+                                    </span>
+                                  ) : null}
+                                  {dueDate ? (
+                                    <span className="rounded-md bg-zinc-100 px-2 py-1 font-medium text-zinc-700">
+                                      fällig {dueDate}
+                                    </span>
+                                  ) : null}
+                                </div>
+                              </div>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    ) : (
+                      <p className="rounded-md border border-zinc-200 px-3 py-2 text-sm text-zinc-500">
+                        Keine aktiven Aufgaben zu diesem Set oder seinen aktuellen
+                        Komponenten.
+                      </p>
+                    )}
+                  </section>
+                ) : null}
               </div>
             </aside>
           </div>
@@ -2442,17 +2613,15 @@ export default async function SetsPage({
                         </span>
                       </label>
 
-                      {pencilAccessoryToReturn.required ? (
-                        <label className="flex items-start gap-3 rounded-md border border-zinc-200 px-3 py-3 text-sm font-medium">
-                          <input
-                            className="mt-1 h-4 w-4"
-                            defaultChecked
-                            name="return_pencil_cap_present"
-                            type="checkbox"
-                          />
-                          <span>{pencilAccessoryToReturn.label}</span>
-                        </label>
-                      ) : null}
+                      <label className="flex items-start gap-3 rounded-md border border-zinc-200 px-3 py-3 text-sm font-medium">
+                        <input
+                          className="mt-1 h-4 w-4"
+                          defaultChecked
+                          name="return_pencil_cap_present"
+                          type="checkbox"
+                        />
+                        <span>{pencilAccessoryToReturn.label}</span>
+                      </label>
 
                       <label className="flex items-start gap-3 rounded-md border border-zinc-200 px-3 py-3 text-sm font-medium">
                         <input

@@ -186,6 +186,7 @@ export function PersonSelectionList({ people }: PersonSelectionListProps) {
                   <th className="w-10 px-3 py-2 font-medium">
                     <span className="sr-only">Auswahl</span>
                   </th>
+                  <th className="w-12 px-3 py-2 font-medium">Nr.</th>
                   <th className="px-3 py-2 font-medium">Person</th>
                   <th className="px-3 py-2 font-medium">Klasse</th>
                   <th className="px-3 py-2 font-medium">Typ</th>
@@ -193,7 +194,7 @@ export function PersonSelectionList({ people }: PersonSelectionListProps) {
                 </tr>
               </thead>
               <tbody>
-                {filteredPeople.map((person) => {
+                {filteredPeople.map((person, index) => {
                   const selected = person.id === selectedPersonId;
                   const inputId = `issue-person-${person.id}`;
 
@@ -218,6 +219,9 @@ export function PersonSelectionList({ people }: PersonSelectionListProps) {
                           type="radio"
                           value={person.id}
                         />
+                      </td>
+                      <td className="px-3 py-2 align-middle tabular-nums text-zinc-500">
+                        {index + 1}
                       </td>
                       <td className="px-3 py-2 align-middle font-medium text-zinc-950">
                         <label className="cursor-pointer" htmlFor={inputId}>

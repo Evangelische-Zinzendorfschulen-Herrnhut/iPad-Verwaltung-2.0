@@ -376,7 +376,7 @@ export async function loadWagenOverview(
         availability,
         classLabel: schoolClass?.label ?? "",
         condition,
-        detailHref: `/sets?detail=${set.id}`,
+        detailHref: `/sets?setId=${set.legacy_set_id}`,
         id: set.id,
         ipad: componentLabel(ipadComponent),
         ipadMdmHref: ipadComponent?.serial_number

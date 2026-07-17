@@ -23,10 +23,35 @@ type ContextMenuState = {
   y: number;
 } | null;
 
+function rowHighlightClass(row: WagenOverviewRow, duplicatePlaces: Set<number>) {
+  if (row.storagePlace && duplicatePlaces.has(row.storagePlace)) {
+    return "border-amber-200 bg-amber-100 hover:bg-amber-200/70";
+  }
+
+  if (row.storagePlace && row.storagePlace % 5 === 0) {
+    return "border-t-2 border-t-zinc-300 bg-zinc-50 hover:bg-zinc-100";
+  }
+
+  return "border-zinc-100 hover:bg-zinc-50";
+}
+
 export function WagenTable({ canManageSets, rows }: WagenTableProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [contextMenu, setContextMenu] = useState<ContextMenuState>(null);
+  const storagePlaceCounts = rows.reduce((counts, row) => {
+    if (!row.storagePlace) {
+      return counts;
+    }
+
+    counts.set(row.storagePlace, (counts.get(row.storagePlace) ?? 0) + 1);
+    return counts;
+  }, new Map<number, number>());
+  const duplicatePlaces = new Set(
+    [...storagePlaceCounts.entries()]
+      .filter(([, count]) => count > 1)
+      .map(([place]) => place),
+  );
 
   useEffect(() => {
     function closeMenu() {
@@ -93,61 +118,95 @@ export function WagenTable({ canManageSets, rows }: WagenTableProps) {
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) => (
-              <tr
-                className="border-t border-zinc-100 hover:bg-zinc-50"
-                key={row.id}
-                onContextMenu={(event) => openContextMenu(event, row)}
-              >
-                <td className="px-4 py-3 font-semibold">
-                  {row.storagePlace ?? "-"}
-                </td>
-                <td className="px-4 py-3 font-semibold">{row.legacySetId}</td>
-                <td className="px-4 py-3">
-                  {row.person ? (
-                    row.person
-                  ) : row.previousPerson ? (
-                    <span className="text-zinc-400">
-                      ehemals {row.previousPerson}
-                    </span>
-                  ) : (
-                    "-"
-                  )}
-                </td>
-                <td className="px-4 py-3">{row.classLabel || "-"}</td>
-                <td className="inventory-number whitespace-nowrap px-4 py-3 align-middle">
-                  <span className="inline-flex items-center gap-2 align-middle">
-                    <span>{row.ipad || "-"}</span>
-                    {row.ipadMdmHref ? (
+            {rows.map((row) => {
+              const isDuplicatePlace = Boolean(
+                row.storagePlace && duplicatePlaces.has(row.storagePlace),
+              );
+
+              return (
+                <tr
+                  className={`border-t ${rowHighlightClass(row, duplicatePlaces)}`}
+                  key={row.id}
+                  onContextMenu={(event) => openContextMenu(event, row)}
+                >
+                  <td className="px-4 py-3 font-semibold">
+                    {row.storagePlace ?? "-"}
+                    {isDuplicatePlace ? (
+                      <span className="ml-2 rounded-full bg-amber-600 px-2 py-0.5 text-xs font-semibold text-white">
+                        doppelt
+                      </span>
+                    ) : null}
+                  </td>
+                  <td className="px-4 py-3 font-semibold">
+                    <span className="inline-flex items-center gap-2 align-middle">
                       <a
-                        aria-label={`iPad ${row.ipad} im MDM öffnen`}
+                        aria-label={`Set ${row.legacySetId} in Setliste öffnen`}
                         className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full align-middle transition hover:scale-105"
-                        href={row.ipadMdmHref}
+                        href={row.detailHref}
                         rel="noreferrer"
                         target="_blank"
-                        title="Im MDM öffnen"
+                        title="Set in Setliste öffnen"
                       >
                         <Image
                           alt=""
                           aria-hidden="true"
                           className="block h-5 w-5"
                           height={20}
-                          src="/arrow_right.svg"
+                          src="/arrow_right_green.svg"
                           width={20}
                         />
                       </a>
-                    ) : null}
-                  </span>
-                </td>
-                <td className="inventory-number px-4 py-3">{row.pencil || "-"}</td>
-                <td className="inventory-number px-4 py-3">
-                  {row.keyboard || "-"}
-                </td>
-                <td className="px-4 py-3">{row.availability}</td>
-                <td className="px-4 py-3">{row.condition}</td>
-                <td className="px-4 py-3">{row.storageLabel || "-"}</td>
-              </tr>
-            ))}
+                      <span>{row.legacySetId}</span>
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    {row.person ? (
+                      row.person
+                    ) : row.previousPerson ? (
+                      <span className="text-zinc-400">
+                        ehemals {row.previousPerson}
+                      </span>
+                    ) : (
+                      "-"
+                    )}
+                  </td>
+                  <td className="px-4 py-3">{row.classLabel || "-"}</td>
+                  <td className="inventory-number whitespace-nowrap px-4 py-3 align-middle">
+                    <span className="inline-flex items-center gap-2 align-middle">
+                      <span>{row.ipad || "-"}</span>
+                      {row.ipadMdmHref ? (
+                        <a
+                          aria-label={`iPad ${row.ipad} im MDM öffnen`}
+                          className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full align-middle transition hover:scale-105"
+                          href={row.ipadMdmHref}
+                          rel="noreferrer"
+                          target="_blank"
+                          title="Im MDM öffnen"
+                        >
+                          <Image
+                            alt=""
+                            aria-hidden="true"
+                            className="block h-5 w-5"
+                            height={20}
+                            src="/arrow_right.svg"
+                            width={20}
+                          />
+                        </a>
+                      ) : null}
+                    </span>
+                  </td>
+                  <td className="inventory-number px-4 py-3">
+                    {row.pencil || "-"}
+                  </td>
+                  <td className="inventory-number px-4 py-3">
+                    {row.keyboard || "-"}
+                  </td>
+                  <td className="px-4 py-3">{row.availability}</td>
+                  <td className="px-4 py-3">{row.condition}</td>
+                  <td className="px-4 py-3">{row.storageLabel || "-"}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -163,6 +222,14 @@ export function WagenTable({ canManageSets, rows }: WagenTableProps) {
             href={contextMenu.detailHref}
           >
             Datensatz anzeigen
+          </Link>
+          <Link
+            className="block w-full rounded px-3 py-2 text-left font-medium hover:bg-zinc-100"
+            href={contextMenu.detailHref}
+            rel="noreferrer"
+            target="_blank"
+          >
+            Set in Setliste öffnen
           </Link>
           {canManageSets && contextMenu.issueHref ? (
             <Link

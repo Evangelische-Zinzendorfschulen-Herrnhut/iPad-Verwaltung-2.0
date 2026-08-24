@@ -8,6 +8,7 @@ import { MouseEvent, useEffect, useState } from "react";
 import type { WagenOverviewRow } from "../wagen-overview";
 
 type WagenTableProps = {
+  canCreateTasks: boolean;
   canManageSets: boolean;
   rows: WagenOverviewRow[];
 };
@@ -19,6 +20,7 @@ type ContextMenuState = {
   returnHref: string | null;
   setId: string;
   setLabel: string;
+  taskHref: string | null;
   x: number;
   y: number;
 } | null;
@@ -35,7 +37,11 @@ function rowHighlightClass(row: WagenOverviewRow, duplicatePlaces: Set<number>) 
   return "border-zinc-100 hover:bg-zinc-50";
 }
 
-export function WagenTable({ canManageSets, rows }: WagenTableProps) {
+export function WagenTable({
+  canCreateTasks,
+  canManageSets,
+  rows,
+}: WagenTableProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [contextMenu, setContextMenu] = useState<ContextMenuState>(null);
@@ -85,6 +91,7 @@ export function WagenTable({ canManageSets, rows }: WagenTableProps) {
       returnHref: row.returnHref,
       setId: row.id,
       setLabel: `Set ${row.legacySetId}`,
+      taskHref: canCreateTasks ? buildLocalTaskHref(row.id) : null,
       x: event.clientX,
       y: event.clientY,
     });
@@ -95,6 +102,16 @@ export function WagenTable({ canManageSets, rows }: WagenTableProps) {
     nextParams.set("issue", setId);
     nextParams.delete("prepared");
     nextParams.delete("error");
+
+    return `${pathname}?${nextParams.toString()}`;
+  }
+
+  function buildLocalTaskHref(setId: string) {
+    const nextParams = new URLSearchParams(searchParams.toString());
+    nextParams.set("task", setId);
+    nextParams.delete("prepared");
+    nextParams.delete("error");
+    nextParams.delete("task_created");
 
     return `${pathname}?${nextParams.toString()}`;
   }
@@ -249,6 +266,14 @@ export function WagenTable({ canManageSets, rows }: WagenTableProps) {
               href={contextMenu.returnHref}
             >
               Set zurücknehmen
+            </Link>
+          ) : null}
+          {contextMenu.taskHref ? (
+            <Link
+              className="block w-full rounded px-3 py-2 text-left font-medium hover:bg-zinc-100"
+              href={contextMenu.taskHref}
+            >
+              Aufgabe erstellen
             </Link>
           ) : null}
           <p className="border-t border-zinc-100 px-3 py-2 text-xs text-zinc-500">

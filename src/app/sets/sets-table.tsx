@@ -16,6 +16,7 @@ export type SetsTableRow = {
   ipadMdmHref: string | null;
   issueHref: string | null;
   issueLabel: string | null;
+  issueProtocolHref: string | null;
   keyboard: string;
   legacySetId: number;
   legacyStatus: string | null;
@@ -52,6 +53,7 @@ type ContextMenuState = {
   devicesHref: string;
   issueHref: string | null;
   issueLabel: string | null;
+  issueProtocolHref: string | null;
   problemHref: string | null;
   releaseReturnTo: string;
   releasable: boolean;
@@ -108,6 +110,7 @@ export function SetsTable({ releaseAction, rows, taskAction }: SetsTableProps) {
       devicesHref: row.devicesHref,
       issueHref: row.issueHref,
       issueLabel: row.issueLabel,
+      issueProtocolHref: row.issueProtocolHref,
       problemHref: row.problemHref,
       releaseReturnTo: row.releaseReturnTo,
       releasable: row.releasable,
@@ -293,6 +296,16 @@ export function SetsTable({ releaseAction, rows, taskAction }: SetsTableProps) {
               target="_blank"
             >
               Rückgabeprotokoll als PDF
+            </a>
+          ) : null}
+          {contextMenu.issueProtocolHref ? (
+            <a
+              className="block w-full rounded px-3 py-2 text-left font-medium hover:bg-zinc-100"
+              href={contextMenu.issueProtocolHref}
+              rel="noreferrer"
+              target="_blank"
+            >
+              Ausgabeprotokoll als PDF
             </a>
           ) : null}
           {contextMenu.returnSetHref ? (

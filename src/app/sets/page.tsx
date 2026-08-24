@@ -1849,6 +1849,8 @@ export default async function SetsPage({
           ? buildIssueHref(params, set.id)
           : null,
       issueLabel: isPreparedIssue ? "Set ausgeben" : "Set vorbereiten",
+      issueProtocolHref:
+        currentAssignment?.issued_at || previousPerson ? `/sets/${set.id}/issue-protocol` : null,
       keyboard: componentLabel(keyboard),
       legacySetId: set.legacy_set_id,
       legacyStatus: set.legacy_status,

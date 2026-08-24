@@ -85,6 +85,12 @@ Auch das Feld "Betroffenes Objekt" verwendet bei Komponenten den konkreten
 Komponententyp statt der allgemeinen Bezeichnung "Komponente".
 Bei einer letzten historischen Personenzuordnung wird ein vorhandenes
 Rueckgabedatum des Sets in der Personeninformation angezeigt.
+Aus der Schadensfallliste kann ein Admin direkt eine Aufgabe zum gewaehlten
+Schadensfall erstellen. Der Fachbezug wird als `schadensfall` gespeichert.
+In der Aufgabenliste wird dieser Bezug mit Schadensnummer und Link zur
+gefilterten Schadensfallliste angezeigt. Wenn der Schadensfall mit Set,
+Komponente oder Person verknuepft ist, zeigt die Aufgabe zusaetzlich die
+verfuegbaren Kontextlinks zu diesen Objekten.
 
 Der Statusfilter unterscheidet "Aktive" (offen und in Bearbeitung), "Alle"
 (ohne Statuseinschraenkung) sowie jeden einzelnen Aufgabenstatus.
@@ -120,11 +126,17 @@ Audit-pflichtig sind:
 - Titel ist Pflichtfeld.
 - Admin kann Beschreibung, Prioritaet und Faelligkeit optional erfassen.
 - Neue Aufgaben erhalten den Status `offen`.
+- Admin kann aus der Lagerliste heraus eine neue Aufgabe mit vorausgefuelltem
+  Set-Bezug erstellen.
 - Admin kann Aufgaben nach Status filtern.
 - Admin kann Aufgaben ueber eine Setnummer finden. Dabei werden direkte
   Set-Aufgaben und Aufgaben zu aktuell zugeordneten Komponenten gefunden.
 - Admin kann Aufgaben ueber die Inventarnummer der betroffenen Komponente
   finden.
+- Admin kann aus der Schadensfallliste heraus eine Aufgabe mit
+  vorausgefuelltem Schadensfall-Bezug erstellen.
+- Aufgaben mit Schadensfall-Bezug zeigen die fachliche Schadensnummer und
+  verlinken zur Schadensfallliste.
 - Admin kann ueberfaellige Aufgaben erkennen.
 - Admin kann eine Aufgabe als `erledigt` markieren.
 - Erledigte Aufgaben speichern Abschlusszeitpunkt und abschliessenden Admin.

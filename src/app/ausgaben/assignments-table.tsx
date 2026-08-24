@@ -12,6 +12,7 @@ export type AssignmentTableRow = {
   classLabel: string;
   editHref: string;
   id: string;
+  issueProtocolHref: string | null;
   issuedAt: string;
   issueHref: string | null;
   person: string;
@@ -38,6 +39,7 @@ type AssignmentsTableProps = {
 type ContextMenuState = {
   editHref: string;
   issueHref: string | null;
+  issueProtocolHref: string | null;
   label: string;
   releaseReturnTo: string;
   releasable: boolean;
@@ -84,6 +86,7 @@ export function AssignmentsTable({
     setContextMenu({
       editHref: row.editHref,
       issueHref: row.issueHref,
+      issueProtocolHref: row.issueProtocolHref,
       label: `${row.setLabel} · ${row.person}`,
       releaseReturnTo: row.releaseReturnTo,
       releasable: row.releasable,
@@ -193,6 +196,16 @@ export function AssignmentsTable({
                         Protokoll
                       </a>
                     ) : null}
+                    {row.issueProtocolHref ? (
+                      <a
+                        className="rounded-md border border-zinc-300 px-3 py-2 text-xs font-semibold transition hover:bg-zinc-50"
+                        href={row.issueProtocolHref}
+                        rel="noreferrer"
+                        target="_blank"
+                      >
+                        Ausgabeprotokoll
+                      </a>
+                    ) : null}
                     {row.releasable ? (
                       <form action={releaseAction}>
                         <input name="set_id" type="hidden" value={row.setId} />
@@ -208,6 +221,7 @@ export function AssignmentsTable({
                     ) : null}
                     {!row.returnHref &&
                     !row.issueHref &&
+                    !row.issueProtocolHref &&
                     !row.returnProtocolHref &&
                     !row.releasable ? (
                       <span className="text-zinc-400">-</span>
@@ -257,6 +271,16 @@ export function AssignmentsTable({
               target="_blank"
             >
               Rückgabeprotokoll als PDF
+            </a>
+          ) : null}
+          {contextMenu.issueProtocolHref ? (
+            <a
+              className="block w-full rounded px-3 py-2 text-left font-medium hover:bg-zinc-100"
+              href={contextMenu.issueProtocolHref}
+              rel="noreferrer"
+              target="_blank"
+            >
+              Ausgabeprotokoll als PDF
             </a>
           ) : null}
           {contextMenu.storageHref ? (

@@ -917,6 +917,8 @@ export default async function AusgabenPage({
         : "-",
       editHref: buildEditHref(params, assignment.id),
       id: assignment.id,
+      issueProtocolHref:
+        assignment.issued_at && setId ? `/sets/${setId}/issue-protocol` : null,
       issuedAt: formatDate(assignment.issued_at),
       issueHref: isPrepared && setId ? issueReturnTo : null,
       person: formatPerson(assignment.person),

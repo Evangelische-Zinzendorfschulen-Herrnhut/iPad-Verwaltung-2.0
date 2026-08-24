@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 
-import { getCurrentAppUser } from "@/lib/auth/current-user";
+import { requireAppUser, type CurrentAppUser } from "@/lib/auth/current-user";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
@@ -226,11 +226,7 @@ function PieChartCard({ chart }: { chart: DashboardChart }) {
   );
 }
 
-async function getDashboardCharts(appUser: Awaited<ReturnType<typeof getCurrentAppUser>>) {
-  if (!appUser) {
-    return [];
-  }
-
+async function getDashboardCharts(appUser: CurrentAppUser) {
   const canSeeDashboard = appUser.roles.some((role) =>
     ["admin", "ipad_verwaltung", "buchhaltung", "readonly"].includes(role),
   );
@@ -372,7 +368,12 @@ async function getDashboardCharts(appUser: Awaited<ReturnType<typeof getCurrentA
 }
 
 export default async function Home() {
-  const appUser = await getCurrentAppUser();
+  const appUser = await requireAppUser([
+    "admin",
+    "ipad_verwaltung",
+    "buchhaltung",
+    "readonly",
+  ]);
   const dashboardCharts = await getDashboardCharts(appUser);
 
   return (
@@ -382,20 +383,11 @@ export default async function Home() {
           <p className="text-sm font-medium uppercase tracking-wide text-zinc-500">
             iPad-Verwaltung 2.0
           </p>
-          {appUser ? (
-            <form action="/auth/sign-out" method="post">
-              <button className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-medium transition hover:bg-white">
-                Abmelden
-              </button>
-            </form>
-          ) : (
-            <Link
-              className="rounded-md bg-zinc-950 px-3 py-2 text-sm font-medium text-white transition hover:bg-zinc-800"
-              href="/login"
-            >
-              Anmelden
-            </Link>
-          )}
+          <form action="/auth/sign-out" method="post">
+            <button className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-medium transition hover:bg-white">
+              Abmelden
+            </button>
+          </form>
         </header>
 
         <div className="flex flex-1 flex-col justify-center">
@@ -411,27 +403,16 @@ export default async function Home() {
         </div>
 
         <div className="mt-8 rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
-          {appUser ? (
-            <div>
-              <p className="text-sm font-medium text-zinc-500">
-                Angemeldet als
-              </p>
-              <p className="mt-1 text-lg font-semibold">{appUser.email}</p>
-              <p className="mt-2 text-sm text-zinc-600">
-                Rollen:{" "}
-                {appUser.roles.length > 0 ? appUser.roles.join(", ") : "keine"}
-              </p>
-            </div>
-          ) : (
-            <div>
-              <p className="text-sm font-medium text-zinc-500">
-                Nicht angemeldet
-              </p>
-              <p className="mt-1 text-sm text-zinc-600">
-                Melde dich an, um die Rollen- und Datenbankanbindung zu pruefen.
-              </p>
-            </div>
-          )}
+          <div>
+            <p className="text-sm font-medium text-zinc-500">
+              Angemeldet als
+            </p>
+            <p className="mt-1 text-lg font-semibold">{appUser.email}</p>
+            <p className="mt-2 text-sm text-zinc-600">
+              Rollen:{" "}
+              {appUser.roles.length > 0 ? appUser.roles.join(", ") : "keine"}
+            </p>
+          </div>
         </div>
 
         {dashboardCharts.length > 0 ? (

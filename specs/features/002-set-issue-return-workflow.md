@@ -159,6 +159,7 @@ Die iPad-Verwaltung braucht eine chronologische Arbeitsliste der Set-Ausgaben un
 - `ipad_verwaltung` kann keine Benutzer oder Rollen verwalten.
 - Die Aus- und Rueckgabeliste zeigt aktive und abgeschlossene Ausleihen mit Setnummer, Person, Klasse, Ausgabe- und Rueckgabedatum.
 - Die Aus- und Rueckgabeliste kann nach Person oder Setnummer durchsucht und nach Status gefiltert werden.
+- Von tatsaechlich ausgegebenen Eintraegen kann das Ausgabeprotokoll geoeffnet werden.
 - Von abgeschlossenen Eintraegen kann das Rueckgabeprotokoll geoeffnet werden.
 - Von vollstaendig zurueckgegebenen, blockierten und `ok` geprueften Sets kann die Aktion "Zuruecksetzen und freigeben" aus der Setliste und aus der Aus- und Rueckgabeliste ausgefuehrt werden.
 - Die Freigabe setzt serverseitig voraus, dass keine aktive Ausleihe fuer das Set existiert, das Set `blockiert` ist und der Set-Zustand `ok` ist.
@@ -176,7 +177,6 @@ Die iPad-Verwaltung braucht eine chronologische Arbeitsliste der Set-Ausgaben un
 
 - Gibt es feste Set-Nummern auf Aufklebern?
 - Welche E-Mail-Adresse oder Verteilerliste soll fuer die Buchhaltung verwendet werden?
-- Soll bei Ausgabe oder Rueckgabe ein PDF-Protokoll erzeugt werden?
 - Brauchen wir Unterschriften bei Ausgabe oder Rueckgabe?
 - Sollen Adapter, HDMI-Kabel und Magic-Maeuse mit Bestandszahlen verwaltet werden, obwohl sie keine Inventarnummer haben?
 - Welche weiteren Komponenten- oder Zusatzartikelkategorien sollen direkt zum Start angelegt werden?

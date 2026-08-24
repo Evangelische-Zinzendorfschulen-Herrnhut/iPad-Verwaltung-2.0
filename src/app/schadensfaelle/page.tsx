@@ -423,6 +423,64 @@ async function updateSetStorage(formData: FormData) {
   redirect(returnTo);
 }
 
+async function createTaskForDamageCase(formData: FormData) {
+  "use server";
+
+  const appUser = await getCurrentAppUser();
+
+  if (!appUser) {
+    redirect("/login");
+  }
+
+  if (!hasAnyRole(appUser, ["admin"])) {
+    redirect("/");
+  }
+
+  const damageCaseId = requiredText(formData.get("damage_case_id"));
+  const returnTo = requiredText(formData.get("return_to")) || "/schadensfaelle";
+  const title = requiredText(formData.get("title"));
+  const description = optionalText(formData.get("description"));
+  const priority = requiredText(formData.get("priority")) === "hoch"
+    ? "hoch"
+    : "normal";
+  const dueDate = optionalText(formData.get("due_date"));
+
+  if (!damageCaseId || !title) {
+    redirect(returnTo);
+  }
+
+  const supabase = await createClient();
+  const { data: damageCase, error: damageCaseError } = await supabase
+    .from("damage_case")
+    .select("id")
+    .eq("id", damageCaseId)
+    .maybeSingle();
+
+  if (damageCaseError) {
+    throw damageCaseError;
+  }
+
+  if (!damageCase) {
+    redirect(returnTo);
+  }
+
+  const { error } = await supabase.from("task").insert({
+    created_by_user_id: appUser.id,
+    description,
+    due_date: dueDate,
+    priority,
+    related_object_id: damageCaseId,
+    related_object_type: "schadensfall",
+    title,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  redirect(appendFlagToHref(returnTo, "task_created", "1"));
+}
+
 function normalizeJoin<T>(value: T | T[] | null) {
   return Array.isArray(value) ? (value[0] ?? null) : value;
 }
@@ -887,6 +945,7 @@ export default async function SchadensfaellePage({
             <DamageCasesTable
               canManage={canManageDamageCases}
               cases={visibleRows}
+              taskAction={createTaskForDamageCase}
             />
           ) : (
             <div className="px-4 py-8 text-sm text-zinc-600">

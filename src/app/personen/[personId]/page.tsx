@@ -140,6 +140,30 @@ function formatName(person: PersonRow) {
   return name || person.email || "Ohne Namen";
 }
 
+function personFilterQuery(person: PersonRow) {
+  return person.email || person.last_name || person.first_name || "";
+}
+
+function filteredListHref(pathname: "/schadensfaelle" | "/sets", person: PersonRow) {
+  const query = personFilterQuery(person).trim();
+
+  if (!query) {
+    return pathname;
+  }
+
+  const params = new URLSearchParams({ q: query });
+  return `${pathname}?${params.toString()}`;
+}
+
+function setDetailHref(set: { id: string; legacy_set_id: number }) {
+  const params = new URLSearchParams({
+    detail: set.id,
+    setId: String(set.legacy_set_id),
+  });
+
+  return `/sets?${params.toString()}`;
+}
+
 function personTypeLabel(value: string) {
   const labels: Record<string, string> = {
     lehrer: "Lehrer",
@@ -316,6 +340,8 @@ export default async function PersonDetailPage({
     (assignment) => assignment.valid_until === null,
   );
   const returnTo = getSingleParam(queryParams, "returnTo") || "/personen";
+  const filteredSetsHref = filteredListHref("/sets", person);
+  const filteredDamageCasesHref = filteredListHref("/schadensfaelle", person);
 
   return (
     <main className="min-h-screen bg-zinc-50 text-zinc-950">
@@ -413,8 +439,14 @@ export default async function PersonDetailPage({
         </section>
 
         <section className="rounded-lg border border-zinc-200 bg-white shadow-sm">
-          <div className="border-b border-zinc-200 px-4 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-200 px-4 py-3">
             <h2 className="font-semibold">Set-Zuordnungen</h2>
+            <Link
+              className="text-sm font-semibold text-emerald-700 hover:underline"
+              href={filteredSetsHref}
+            >
+              In der Setliste anzeigen
+            </Link>
           </div>
           {setAssignments.length > 0 ? (
             <div className="overflow-x-auto">
@@ -437,7 +469,7 @@ export default async function PersonDetailPage({
                         {assignment.inventory_set ? (
                           <Link
                             className="hover:underline"
-                            href={`/sets?detail=${assignment.inventory_set.id}`}
+                            href={setDetailHref(assignment.inventory_set)}
                           >
                             Set {assignment.inventory_set.legacy_set_id}
                           </Link>
@@ -474,8 +506,14 @@ export default async function PersonDetailPage({
         </section>
 
         <section className="rounded-lg border border-zinc-200 bg-white shadow-sm">
-          <div className="border-b border-zinc-200 px-4 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-200 px-4 py-3">
             <h2 className="font-semibold">Schadensfälle</h2>
+            <Link
+              className="text-sm font-semibold text-emerald-700 hover:underline"
+              href={filteredDamageCasesHref}
+            >
+              In der Schadensliste anzeigen
+            </Link>
           </div>
           {damageCases.length > 0 ? (
             <div className="overflow-x-auto">
@@ -515,7 +553,7 @@ export default async function PersonDetailPage({
                         {damageCase.inventory_set ? (
                           <Link
                             className="hover:underline"
-                            href={`/sets?detail=${damageCase.inventory_set.id}`}
+                            href={setDetailHref(damageCase.inventory_set)}
                           >
                             Set {damageCase.inventory_set.legacy_set_id}
                           </Link>

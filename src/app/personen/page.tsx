@@ -25,6 +25,11 @@ type PersonRow = {
 type PersonClassAssignmentRow = {
   school_class: {
     label: string;
+    school_year: {
+      status: string;
+    } | {
+      status: string;
+    }[] | null;
   } | null;
 };
 
@@ -92,6 +97,34 @@ function getPageParam(searchParams: Record<string, string | string[] | undefined
   return parsed;
 }
 
+function normalizeOptionalText(value: FormDataEntryValue | null) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  return trimmed || null;
+}
+
+function normalizeRequiredText(value: FormDataEntryValue | null) {
+  return normalizeOptionalText(value) ?? "";
+}
+
+function normalizeOptionalNumber(value: FormDataEntryValue | null) {
+  const text = normalizeOptionalText(value);
+
+  if (!text) {
+    return null;
+  }
+
+  const parsed = Number.parseInt(text, 10);
+  return Number.isInteger(parsed) ? parsed : null;
+}
+
+function appendFlagToHref(href: string, key: string, value: string) {
+  return `${href}${href.includes("?") ? "&" : "?"}${key}=${value}`;
+}
+
 function escapeSearchTerm(value: string) {
   return value.replaceAll("%", "\\%").replaceAll("_", "\\_");
 }
@@ -155,11 +188,80 @@ function buildCurrentListHref(
   return queryString ? `/personen?${queryString}` : "/personen";
 }
 
+function buildNewPersonHref(params: Record<string, string | string[] | undefined>) {
+  const nextParams = new URLSearchParams();
+
+  for (const key of ["q", "type", "status", "class", "page"]) {
+    const value = getSingleParam(params, key).trim();
+
+    if (value) {
+      nextParams.set(key, value);
+    }
+  }
+
+  nextParams.set("new", "1");
+
+  return `/personen?${nextParams.toString()}`;
+}
+
 function buildDetailHref(personId: string, returnTo: string) {
   const params = new URLSearchParams();
   params.set("returnTo", returnTo);
 
   return `/personen/${personId}?${params.toString()}`;
+}
+
+function buildEditHref(personId: string, returnTo: string) {
+  const params = new URLSearchParams();
+  params.set("edit", "1");
+  params.set("returnTo", returnTo);
+
+  return `/personen/${personId}?${params.toString()}`;
+}
+
+async function createPerson(formData: FormData) {
+  "use server";
+
+  const appUser = await getCurrentAppUser();
+
+  if (!appUser) {
+    redirect("/login");
+  }
+
+  if (!hasAnyRole(appUser, ["admin"])) {
+    redirect("/");
+  }
+
+  const returnTo = normalizeRequiredText(formData.get("return_to")) || "/personen";
+  const firstName = normalizeOptionalText(formData.get("first_name"));
+  const lastName = normalizeOptionalText(formData.get("last_name"));
+  const personType = normalizeRequiredText(formData.get("person_type"));
+  const status = normalizeRequiredText(formData.get("status"));
+
+  if (!personType || !status || (!firstName && !lastName)) {
+    redirect(appendFlagToHref(returnTo, "error", "missing_required"));
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("person")
+    .insert({
+      email: normalizeOptionalText(formData.get("email")),
+      first_name: firstName,
+      jahrgang: normalizeOptionalNumber(formData.get("jahrgang")),
+      last_name: lastName,
+      notes: normalizeOptionalText(formData.get("notes")),
+      person_type: personType,
+      status,
+    })
+    .select("id")
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  redirect(`/personen/${data.id}?created=1&returnTo=${encodeURIComponent("/personen")}`);
 }
 
 export default async function PersonenPage({
@@ -172,6 +274,8 @@ export default async function PersonenPage({
   const typeFilter = getSingleParam(params, "type");
   const statusFilter = getSingleParam(params, "status");
   const classFilter = getSingleParam(params, "class");
+  const isCreatingPerson = getSingleParam(params, "new") === "1";
+  const error = getSingleParam(params, "error");
   const page = getPageParam(params);
   const rangeStart = (page - 1) * PAGE_SIZE;
   const rangeEnd = rangeStart + PAGE_SIZE - 1;
@@ -206,18 +310,43 @@ export default async function PersonenPage({
 
   const { data: classAssignmentData } = await supabase
     .from("person_class_assignment")
-    .select("person_id,school_class:school_class_id(label)")
+    .select("person_id,school_class:school_class_id(label,school_year:school_year_id(status))")
     .is("valid_until", null)
     .limit(1000);
-  const visibleClassAssignments = (classAssignmentData ?? []) as {
+  const rawVisibleClassAssignments = (classAssignmentData ?? []) as unknown as {
     person_id: string;
     school_class:
       | PersonClassAssignmentRow["school_class"]
       | PersonClassAssignmentRow["school_class"][];
   }[];
+  const visibleClassAssignments = rawVisibleClassAssignments.map((assignment) => {
+    const schoolClass = Array.isArray(assignment.school_class)
+      ? (assignment.school_class[0] ?? null)
+      : assignment.school_class;
+    const schoolYear = Array.isArray(schoolClass?.school_year)
+      ? (schoolClass.school_year[0] ?? null)
+      : (schoolClass?.school_year ?? null);
+
+    return {
+      person_id: assignment.person_id,
+      school_class: schoolClass
+        ? {
+            ...schoolClass,
+            school_year: schoolYear,
+          }
+        : null,
+    };
+  });
+  const activeYearClassAssignments = visibleClassAssignments.filter((assignment) => {
+    const schoolClass = Array.isArray(assignment.school_class)
+      ? (assignment.school_class[0] ?? null)
+      : assignment.school_class;
+
+    return schoolClass?.school_year?.status === "aktiv";
+  });
   const classPersonIds = new Set(
     classFilter
-      ? visibleClassAssignments
+      ? activeYearClassAssignments
           .filter((assignment) => {
             const schoolClass = Array.isArray(assignment.school_class)
               ? (assignment.school_class[0] ?? null)
@@ -277,15 +406,16 @@ export default async function PersonenPage({
       .limit(5),
     supabase
       .from("school_class")
-      .select("id,label,grade_level,jahrgang,track,is_upper_school,school_year:school_year_id(label,status)")
+      .select("id,label,grade_level,jahrgang,track,is_upper_school,school_year:school_year_id!inner(label,status)")
+      .eq("school_year.status", "aktiv")
       .order("grade_level", { ascending: true, nullsFirst: false })
       .order("label", { ascending: true })
-      .limit(40),
+      .limit(100),
   ]);
 
   const people = (peopleResult.data ?? []) as PersonRow[];
   const currentClassByPersonId = new Map(
-    visibleClassAssignments.map((assignment) => {
+    activeYearClassAssignments.map((assignment) => {
       const schoolClass = Array.isArray(assignment.school_class)
         ? (assignment.school_class[0] ?? null)
         : assignment.school_class;
@@ -311,18 +441,20 @@ export default async function PersonenPage({
     (activeStudentsResult.data ?? []).map((person) => person.id as string),
   );
   const schoolYears = (yearsResult.data ?? []) as SchoolYearRow[];
-  const schoolClasses = ((classesResult.data ?? []) as RawSchoolClassRow[]).map(
-    (schoolClass) => ({
+  const schoolClasses = ((classesResult.data ?? []) as RawSchoolClassRow[])
+    .map((schoolClass) => ({
       ...schoolClass,
       school_year: Array.isArray(schoolClass.school_year)
         ? (schoolClass.school_year[0] ?? null)
         : schoolClass.school_year,
-    }),
-  );
-  const classOptions = schoolClasses.map((schoolClass) => schoolClass.label);
+    }))
+    .filter((schoolClass) => schoolClass.school_year?.status === "aktiv");
+  const classOptions = [
+    ...new Set(schoolClasses.map((schoolClass) => schoolClass.label)),
+  ];
   const activeStudentCountByClass = new Map<string, number>();
 
-  for (const assignment of visibleClassAssignments) {
+  for (const assignment of activeYearClassAssignments) {
     if (!activeStudentIds.has(assignment.person_id)) {
       continue;
     }
@@ -345,14 +477,18 @@ export default async function PersonenPage({
     query || typeFilter || statusFilter || classFilter,
   );
   const currentListHref = buildCurrentListHref(params);
-  const personTableRows: PersonenTableRow[] = people.map((person) => ({
+  const canEditPeople = hasAnyRole(appUser, ["admin"]);
+  const newPersonHref = buildNewPersonHref(params);
+  const personTableRows: PersonenTableRow[] = people.map((person, index) => ({
     classLabel: currentClassByPersonId.get(person.id) ?? null,
     detailHref: buildDetailHref(person.id, currentListHref),
+    editHref: buildEditHref(person.id, currentListHref),
     email: person.email,
     id: person.id,
     jahrgang: person.jahrgang,
     name: formatName(person),
     personType: person.person_type,
+    position: displayedFrom + index,
     status: person.status,
   }));
 
@@ -399,14 +535,93 @@ export default async function PersonenPage({
         </div>
 
         <section className="rounded-lg border border-zinc-200 bg-white shadow-sm">
-          <div className="border-b border-zinc-200 px-4 py-3">
-            <h2 className="font-semibold">Personen</h2>
-            <p className="mt-1 text-sm text-zinc-500">
-              {hasActiveFilters
-                ? `${displayedFrom}-${displayedTo} von ${filteredPeopleCount} Treffern angezeigt.`
-                : `${displayedFrom}-${displayedTo} von ${peopleCount} Personen angezeigt, alphabetisch sortiert.`}
-            </p>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-200 px-4 py-3">
+            <div>
+              <h2 className="font-semibold">Personen</h2>
+              <p className="mt-1 text-sm text-zinc-500">
+                {hasActiveFilters
+                  ? `${displayedFrom}-${displayedTo} von ${filteredPeopleCount} Treffern angezeigt.`
+                  : `${displayedFrom}-${displayedTo} von ${peopleCount} Personen angezeigt, alphabetisch sortiert.`}
+              </p>
+            </div>
+            {canEditPeople ? (
+              isCreatingPerson ? (
+                <Link
+                  className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-semibold transition hover:bg-zinc-50"
+                  href={currentListHref}
+                >
+                  Abbrechen
+                </Link>
+              ) : (
+                <Link
+                  className="rounded-md bg-zinc-950 px-3 py-2 text-sm font-semibold text-white transition hover:bg-zinc-800"
+                  href={newPersonHref}
+                >
+                  Neue Person
+                </Link>
+              )
+            ) : null}
           </div>
+
+          {error === "missing_required" ? (
+            <div className="border-b border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+              Bitte mindestens Vorname oder Nachname sowie Typ und Status ausfuellen.
+            </div>
+          ) : null}
+
+          {isCreatingPerson && canEditPeople ? (
+            <form action={createPerson} className="grid gap-4 border-b border-zinc-200 px-4 py-4">
+              <input name="return_to" type="hidden" value={newPersonHref} />
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <label className="flex flex-col gap-1 text-sm font-medium">
+                  Nachname
+                  <input className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2" name="last_name" />
+                </label>
+                <label className="flex flex-col gap-1 text-sm font-medium">
+                  Vorname
+                  <input className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2" name="first_name" />
+                </label>
+                <label className="flex flex-col gap-1 text-sm font-medium">
+                  E-Mail
+                  <input className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2" name="email" type="email" />
+                </label>
+                <label className="flex flex-col gap-1 text-sm font-medium">
+                  Typ
+                  <select className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2" defaultValue="schueler" name="person_type">
+                    <option value="schueler">Schueler</option>
+                    <option value="lehrer">Lehrer</option>
+                    <option value="mitarbeiter">Mitarbeiter</option>
+                    <option value="referendar">Referendar</option>
+                    <option value="praktikant">Praktikant</option>
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1 text-sm font-medium">
+                  Status
+                  <select className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2" defaultValue="aktiv" name="status">
+                    <option value="aktiv">Aktiv</option>
+                    <option value="ausgeschieden">Ausgeschieden</option>
+                    <option value="verstorben">Verstorben</option>
+                    <option value="dublette">Dublette</option>
+                    <option value="test">Test</option>
+                    <option value="unklar">Unklar</option>
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1 text-sm font-medium">
+                  Jahrgang
+                  <input className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2" max="2100" min="2000" name="jahrgang" type="number" />
+                </label>
+              </div>
+              <label className="flex flex-col gap-1 text-sm font-medium">
+                Anmerkung
+                <textarea className="min-h-24 rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2" name="notes" />
+              </label>
+              <div>
+                <button className="rounded-md bg-zinc-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-zinc-800">
+                  Person anlegen
+                </button>
+              </div>
+            </form>
+          ) : null}
 
           <form className="grid gap-3 border-b border-zinc-200 px-4 py-4 md:grid-cols-[minmax(180px,1fr)_160px_160px_180px_auto]">
             <input name="page" type="hidden" value="1" />
@@ -486,7 +701,7 @@ export default async function PersonenPage({
           </form>
 
           {people.length > 0 ? (
-            <PersonenTable rows={personTableRows} />
+            <PersonenTable canEdit={canEditPeople} rows={personTableRows} />
           ) : (
             <div className="px-4 py-8 text-sm text-zinc-600">
               Noch keine Personen vorhanden. Der naechste Schritt ist der

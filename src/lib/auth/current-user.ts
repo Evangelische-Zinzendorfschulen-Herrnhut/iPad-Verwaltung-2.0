@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
 
 export type CurrentAppUser = {
   id: string;
@@ -15,6 +16,20 @@ export function hasAnyRole(
   roles: string[],
 ): boolean {
   return Boolean(appUser?.roles.some((role) => roles.includes(role)));
+}
+
+export async function requireAppUser(roles?: string[]) {
+  const appUser = await getCurrentAppUser();
+
+  if (!appUser) {
+    redirect("/login");
+  }
+
+  if (roles && !hasAnyRole(appUser, roles)) {
+    redirect("/");
+  }
+
+  return appUser;
 }
 
 export async function getCurrentAppUser(): Promise<CurrentAppUser | null> {

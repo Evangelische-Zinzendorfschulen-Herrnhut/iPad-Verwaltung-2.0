@@ -239,6 +239,60 @@ async function prepareSetFromStorageList(formData: FormData) {
   redirect(`${returnTo}${returnTo.includes("?") ? "&" : "?"}prepared=1`);
 }
 
+async function createTaskFromStorageList(formData: FormData) {
+  "use server";
+
+  const appUser = await getCurrentAppUser();
+
+  if (!appUser) {
+    redirect("/login");
+  }
+
+  if (!hasAnyRole(appUser, ["admin"])) {
+    redirect("/");
+  }
+
+  const setId = normalizeRequiredText(formData.get("set_id"));
+  const returnTo = normalizeRequiredText(formData.get("return_to")) || "/sets/w1";
+  const title = normalizeRequiredText(formData.get("title"));
+  const description = normalizeOptionalText(formData.get("description"));
+  const priority = normalizeRequiredText(formData.get("priority"));
+  const dueDate = normalizeOptionalText(formData.get("due_date"));
+
+  if (!setId || !title) {
+    redirect(`${returnTo}${returnTo.includes("?") ? "&" : "?"}error=task_missing_title`);
+  }
+
+  const supabase = await createClient();
+  const { data: set, error: setError } = await supabase
+    .from("inventory_set")
+    .select("id")
+    .eq("id", setId)
+    .maybeSingle();
+
+  if (setError) throw setError;
+
+  if (!set) {
+    redirect(`${returnTo}${returnTo.includes("?") ? "&" : "?"}error=task_invalid_set`);
+  }
+
+  const { error } = await supabase.from("task").insert({
+    created_by_user_id: appUser.id,
+    description,
+    due_date: dueDate,
+    priority: priority === "hoch" ? "hoch" : "normal",
+    related_object_id: setId,
+    related_object_type: "set",
+    title,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  redirect(`${returnTo}${returnTo.includes("?") ? "&" : "?"}task_created=1`);
+}
+
 export default async function W1SetsPage({
   searchParams,
 }: {
@@ -256,9 +310,11 @@ export default async function W1SetsPage({
   }
 
   const canManageSets = hasAnyRole(appUser, ["admin", "ipad_verwaltung"]);
+  const canCreateTasks = hasAnyRole(appUser, ["admin"]);
   const selectedStorage = getStorageFilter(params);
   const query = getSingleParam(params, "q").trim();
   const issueSetId = getSingleParam(params, "issue");
+  const taskSetId = getSingleParam(params, "task");
   const selectedStorageLabel =
     storageFilters.find((filter) => filter.value === selectedStorage)?.label
     ?? "Wagen W1";
@@ -329,6 +385,7 @@ export default async function W1SetsPage({
     }),
   );
   const setToIssue = rows.find((row) => row.id === issueSetId) ?? null;
+  const setForTask = rows.find((row) => row.id === taskSetId) ?? null;
   const closeIssueParams = new URLSearchParams();
 
   if (selectedStorage !== "W1") {
@@ -343,6 +400,19 @@ export default async function W1SetsPage({
   const issueCloseHref = closeIssueQuery
     ? `/sets/w1?${closeIssueQuery}`
     : "/sets/w1";
+  const taskCloseHref = issueCloseHref;
+  const infoMessage =
+    getSingleParam(params, "task_created") === "1"
+      ? "Aufgabe wurde angelegt."
+      : getSingleParam(params, "prepared") === "1"
+        ? "Set-Vorbereitung wurde gespeichert."
+        : null;
+  const errorMessage =
+    getSingleParam(params, "error") === "task_missing_title"
+      ? "Bitte einen Aufgabentitel eintragen."
+      : getSingleParam(params, "error") === "task_invalid_set"
+        ? "Das Set wurde nicht gefunden."
+        : null;
 
   return (
     <main className="min-h-screen bg-zinc-50 text-zinc-950">
@@ -366,6 +436,18 @@ export default async function W1SetsPage({
         </header>
 
         <SectionTabs active="wagen-w1" />
+
+        {infoMessage ? (
+          <div className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-900">
+            {infoMessage}
+          </div>
+        ) : null}
+
+        {errorMessage ? (
+          <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-900">
+            {errorMessage}
+          </div>
+        ) : null}
 
         <div className="grid gap-3 sm:grid-cols-3">
           <div className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
@@ -409,7 +491,11 @@ export default async function W1SetsPage({
           </div>
 
           {rows.length > 0 ? (
-            <WagenTable canManageSets={canManageSets} rows={rows} />
+            <WagenTable
+              canCreateTasks={canCreateTasks}
+              canManageSets={canManageSets}
+              rows={rows}
+            />
           ) : (
             <div className="px-4 py-8 text-sm text-zinc-600">
               {emptyStateLabel}
@@ -503,6 +589,114 @@ export default async function W1SetsPage({
                   </Link>
                   <button className="rounded-md bg-zinc-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-zinc-800">
                     Vorbereitung speichern
+                  </button>
+                </div>
+              </form>
+            </aside>
+          </div>
+        ) : null}
+
+        {setForTask && canCreateTasks ? (
+          <div className="fixed inset-0 z-40 bg-zinc-950/25">
+            <aside className="ml-auto flex h-full w-full max-w-xl flex-col overflow-y-auto border-l border-zinc-200 bg-white shadow-2xl">
+              <div className="sticky top-0 z-10 flex flex-wrap items-start justify-between gap-4 border-b border-zinc-200 bg-white px-6 py-5">
+                <div>
+                  <p className="text-sm font-medium text-zinc-500">
+                    Lagerliste
+                  </p>
+                  <h2 className="mt-1 text-2xl font-semibold tracking-tight">
+                    Aufgabe erstellen
+                  </h2>
+                  <p className="mt-2 text-sm text-zinc-600">
+                    Set {setForTask.legacySetId}
+                  </p>
+                </div>
+                <Link
+                  className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-semibold transition hover:bg-zinc-50"
+                  href={taskCloseHref}
+                >
+                  Schließen
+                </Link>
+              </div>
+
+              <form
+                action={createTaskFromStorageList}
+                className="grid gap-6 px-6 py-6"
+              >
+                <input name="set_id" type="hidden" value={setForTask.id} />
+                <input name="return_to" type="hidden" value={taskCloseHref} />
+
+                <section className="grid gap-3 rounded-lg border border-zinc-200 p-4">
+                  <h3 className="font-semibold">Set</h3>
+                  <dl className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <dt className="text-xs font-medium text-zinc-500">Set</dt>
+                      <dd className="mt-1 text-sm">Set {setForTask.legacySetId}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs font-medium text-zinc-500">Lagerort</dt>
+                      <dd className="mt-1 text-sm">{setForTask.storageLabel || "-"}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs font-medium text-zinc-500">Verfügbarkeit</dt>
+                      <dd className="mt-1 text-sm">{setForTask.availability}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs font-medium text-zinc-500">Zustand</dt>
+                      <dd className="mt-1 text-sm">{setForTask.condition}</dd>
+                    </div>
+                  </dl>
+                </section>
+
+                <section className="grid gap-4 rounded-lg border border-zinc-200 p-4">
+                  <h3 className="font-semibold">Aufgabe</h3>
+                  <label className="flex flex-col gap-1 text-sm font-medium">
+                    Titel
+                    <input
+                      className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
+                      name="title"
+                      placeholder={`Set ${setForTask.legacySetId} prüfen`}
+                      required
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1 text-sm font-medium">
+                    Priorität
+                    <select
+                      className="rounded-md border border-zinc-300 bg-white px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
+                      defaultValue="normal"
+                      name="priority"
+                    >
+                      <option value="normal">Normal</option>
+                      <option value="hoch">Hoch</option>
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-1 text-sm font-medium">
+                    Fällig am
+                    <input
+                      className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
+                      name="due_date"
+                      type="date"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1 text-sm font-medium">
+                    Beschreibung
+                    <textarea
+                      className="min-h-28 rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
+                      name="description"
+                      placeholder="Optional"
+                    />
+                  </label>
+                </section>
+
+                <div className="flex flex-wrap justify-end gap-2 border-t border-zinc-200 pt-4">
+                  <Link
+                    className="rounded-md border border-zinc-300 px-4 py-2 text-sm font-semibold transition hover:bg-zinc-50"
+                    href={taskCloseHref}
+                  >
+                    Abbrechen
+                  </Link>
+                  <button className="rounded-md bg-zinc-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-zinc-800">
+                    Aufgabe speichern
                   </button>
                 </div>
               </form>

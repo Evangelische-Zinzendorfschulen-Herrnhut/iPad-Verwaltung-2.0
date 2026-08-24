@@ -461,10 +461,17 @@ export default async function TasksPage({
         task.related_object_type === "komponente" && task.related_object_id,
     )
     .map((task) => task.related_object_id as string);
+  const relatedDamageCaseIds = rawTasks
+    .filter(
+      (task) =>
+        task.related_object_type === "schadensfall" && task.related_object_id,
+    )
+    .map((task) => task.related_object_id as string);
   const [
     { data: directlyRelatedSets, error: directlyRelatedSetsError },
     { data: relatedComponents, error: relatedComponentsError },
     { data: relatedComponentAssignments, error: relatedAssignmentsError },
+    { data: relatedDamageCases, error: relatedDamageCasesError },
   ] =
     await Promise.all([
       relatedSetIds.length > 0
@@ -488,6 +495,14 @@ export default async function TasksPage({
             .in("component_id", relatedComponentIds)
             .is("valid_until", null)
         : Promise.resolve({ data: [], error: null }),
+      relatedDamageCaseIds.length > 0
+        ? supabase
+            .from("damage_case")
+            .select(
+              "id,damage_number,short_description,set_id,component_id,person_id",
+            )
+            .in("id", relatedDamageCaseIds)
+        : Promise.resolve({ data: [], error: null }),
     ]);
 
   if (directlyRelatedSetsError) {
@@ -502,10 +517,27 @@ export default async function TasksPage({
     throw relatedAssignmentsError;
   }
 
+  if (relatedDamageCasesError) {
+    throw relatedDamageCasesError;
+  }
+
+  const damageRelatedSetIds = (relatedDamageCases ?? [])
+    .map((damageCase) => damageCase.set_id)
+    .filter((setId): setId is string => Boolean(setId));
+  const damageRelatedComponentIds = (relatedDamageCases ?? [])
+    .map((damageCase) => damageCase.component_id)
+    .filter((componentId): componentId is string => Boolean(componentId));
+  const damageRelatedPersonIds = (relatedDamageCases ?? [])
+    .map((damageCase) => damageCase.person_id)
+    .filter((personId): personId is string => Boolean(personId));
+
   const assignedSetIds = (relatedComponentAssignments ?? []).map(
     (assignment) => assignment.set_id,
   );
-  const missingAssignedSetIds = assignedSetIds.filter(
+  const missingAssignedSetIds = Array.from(new Set([
+    ...assignedSetIds,
+    ...damageRelatedSetIds,
+  ])).filter(
     (setId) => !relatedSetIds.includes(setId),
   );
   const { data: assignedSets, error: assignedSetsError } =
@@ -520,6 +552,21 @@ export default async function TasksPage({
 
   if (assignedSetsError) {
     throw assignedSetsError;
+  }
+
+  const missingDamageComponentIds = damageRelatedComponentIds.filter(
+    (componentId) => !relatedComponentIds.includes(componentId),
+  );
+  const { data: damageRelatedComponents, error: damageRelatedComponentsError } =
+    missingDamageComponentIds.length > 0
+      ? await supabase
+          .from("inventory_component")
+          .select("id,legacy_inventory_number,category")
+          .in("id", missingDamageComponentIds)
+      : { data: [], error: null };
+
+  if (damageRelatedComponentsError) {
+    throw damageRelatedComponentsError;
   }
 
   const allRelatedSets = [...(directlyRelatedSets ?? []), ...(assignedSets ?? [])];
@@ -560,6 +607,7 @@ export default async function TasksPage({
   const relatedPersonIds = Array.from(new Set(allRelatedSets
     .map((set) => set.assigned_person_id)
     .concat(Array.from(previousPersonIdBySetId.values()))
+    .concat(damageRelatedPersonIds)
     .filter((personId): personId is string => Boolean(personId))));
   const [
     { data: relatedPeople, error: relatedPeopleError },
@@ -592,7 +640,12 @@ export default async function TasksPage({
     allRelatedSets.map((set) => [set.id, set]),
   );
   const relatedComponentById = new Map(
-    (relatedComponents ?? []).map((component) => [component.id, component]),
+    [...(relatedComponents ?? []), ...(damageRelatedComponents ?? [])].map(
+      (component) => [component.id, component],
+    ),
+  );
+  const relatedDamageCaseById = new Map(
+    (relatedDamageCases ?? []).map((damageCase) => [damageCase.id, damageCase]),
   );
   const assignedSetIdByComponentId = new Map(
     (relatedComponentAssignments ?? []).map((assignment) => [
@@ -617,16 +670,26 @@ export default async function TasksPage({
       task.related_object_type === "komponente" && task.related_object_id
         ? assignedSetIdByComponentId.get(task.related_object_id)
         : null;
+    const relatedDamageCase =
+      task.related_object_type === "schadensfall" && task.related_object_id
+        ? relatedDamageCaseById.get(task.related_object_id)
+        : null;
+    const damageSetId = relatedDamageCase?.set_id ?? null;
+    const damageComponentId = relatedDamageCase?.component_id ?? null;
     const relatedSet = task.related_object_id
       ? relatedSetById.get(
           task.related_object_type === "set"
             ? task.related_object_id
-            : (assignedSetId ?? ""),
+            : (assignedSetId ?? damageSetId ?? ""),
         )
       : null;
     const setNumber = relatedSet?.legacy_set_id ?? null;
     const relatedComponent = task.related_object_id
-      ? relatedComponentById.get(task.related_object_id)
+      ? relatedComponentById.get(
+          task.related_object_type === "schadensfall"
+            ? (damageComponentId ?? "")
+            : task.related_object_id,
+        )
       : null;
     const inventoryNumber = relatedComponent?.legacy_inventory_number ?? null;
     const currentPersonId = relatedSet?.assigned_person_id ?? null;
@@ -636,7 +699,8 @@ export default async function TasksPage({
     const previousReturnDate = relatedSet
       ? previousReturnDateBySetId.get(relatedSet.id)
       : null;
-    const personId = currentPersonId ?? previousPersonId;
+    const personId =
+      currentPersonId ?? relatedDamageCase?.person_id ?? previousPersonId;
     const person = personId
       ? relatedPersonById.get(personId)
       : null;
@@ -717,6 +781,15 @@ export default async function TasksPage({
       });
     }
 
+    if (relatedDamageCase) {
+      relatedLinks.push({
+        description: `Schadensfall ${relatedDamageCase.damage_number}`,
+        href: `/schadensfaelle?damage=${encodeURIComponent(String(relatedDamageCase.damage_number))}`,
+        label: "Schadensfälle",
+        meta: relatedDamageCase.short_description,
+      });
+    }
+
     if (setNumber !== null) {
       relatedLinks.push(
         {
@@ -755,13 +828,17 @@ export default async function TasksPage({
           ? `/sets?q=${encodeURIComponent(String(setNumber))}`
           : task.related_object_type === "komponente" && inventoryNumber
             ? `/geraete?q=${encodeURIComponent(inventoryNumber)}`
-            : null,
+            : task.related_object_type === "schadensfall" && relatedDamageCase
+              ? `/schadensfaelle?damage=${encodeURIComponent(String(relatedDamageCase.damage_number))}`
+              : null,
       related_object_label:
         task.related_object_type === "set" && setNumber !== null && setNumber !== undefined
           ? `Set ${setNumber}`
           : task.related_object_type === "komponente" && inventoryNumber
             ? `${categoryLabels[relatedComponent?.category ?? ""] ?? relatedComponent?.category ?? "Komponente"} ${inventoryNumber}`
-            : null,
+            : task.related_object_type === "schadensfall" && relatedDamageCase
+              ? `Schadensfall ${relatedDamageCase.damage_number}`
+              : null,
       related_links: relatedLinks,
     };
   });

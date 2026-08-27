@@ -16,6 +16,7 @@ type ComponentRow = {
   category: string;
   condition: string;
   id: string;
+  invoice_position: InvoicePositionRow | InvoicePositionRow[] | null;
   invoice_position_number: number | null;
   legacy_inventory_number: string;
   legacy_set_number: number | null;
@@ -23,8 +24,20 @@ type ComponentRow = {
   manufacturer: string | null;
   model: string | null;
   notes: string | null;
+  purchase_date: string | null;
   serial_number: string | null;
   storage_label: string | null;
+};
+
+type InvoicePositionRow = {
+  invoice: InvoiceRow | InvoiceRow[] | null;
+  legacy_invoice_position_number: number | null;
+};
+
+type InvoiceRow = {
+  invoice_date: string | null;
+  legacy_invoice_number: number | null;
+  supplier: string | null;
 };
 
 type ComponentAssignmentRow = {
@@ -148,6 +161,22 @@ function normalizeOptionalNumber(value: FormDataEntryValue | null) {
   return Number.isInteger(parsed) ? parsed : null;
 }
 
+function normalizeOptionalDate(value: FormDataEntryValue | null) {
+  if (typeof value !== "string" || !value.trim()) {
+    return null;
+  }
+
+  return /^\d{4}-\d{2}-\d{2}$/.test(value.trim()) ? value.trim() : null;
+}
+
+function normalizeJoined<T>(value: T | T[] | null | undefined) {
+  if (Array.isArray(value)) {
+    return value[0] ?? null;
+  }
+
+  return value ?? null;
+}
+
 function categoryLabel(value: string) {
   const labels: Record<string, string> = {
     adapter: "Adapter",
@@ -171,6 +200,14 @@ function conditionLabel(value: string) {
   };
 
   return labels[value] ?? value;
+}
+
+function formatDate(value: string | null) {
+  if (!value) {
+    return "-";
+  }
+
+  return new Intl.DateTimeFormat("de-DE").format(new Date(`${value}T00:00:00`));
 }
 
 function formatSet(assignment: ComponentAssignmentRow | undefined) {
@@ -228,6 +265,7 @@ function matchesQuery(
     component.legacy_status,
     component.storage_label,
     component.notes,
+    component.purchase_date,
     assignment?.role,
     assignment?.set?.legacy_set_id,
     assignment?.set?.availability,
@@ -276,7 +314,7 @@ async function fetchAllComponents(supabase: Awaited<ReturnType<typeof createClie
     const { data, error } = await supabase
       .from("inventory_component")
       .select(
-        "id,legacy_inventory_number,legacy_set_number,category,manufacturer,model,condition,legacy_status,serial_number,invoice_position_number,notes,storage_label",
+        "id,legacy_inventory_number,legacy_set_number,category,manufacturer,model,condition,legacy_status,serial_number,invoice_position_number,invoice_position:invoice_position_id(legacy_invoice_position_number,invoice:invoice_id(invoice_date,legacy_invoice_number,supplier)),notes,purchase_date,storage_label",
       )
       .order("legacy_inventory_number", { ascending: true })
       .range(from, from + QUERY_BATCH_SIZE - 1);
@@ -359,6 +397,7 @@ async function updateComponent(formData: FormData) {
       manufacturer: normalizeOptionalText(formData.get("manufacturer")),
       model: normalizeOptionalText(formData.get("model")),
       notes: normalizeOptionalText(formData.get("notes")),
+      purchase_date: normalizeOptionalDate(formData.get("purchase_date")),
       serial_number: normalizeOptionalText(formData.get("serial_number")),
       storage_label: normalizeOptionalText(formData.get("storage_label")),
     })
@@ -584,6 +623,7 @@ export default async function GeraetePage({
       manufacturerModel: [component.manufacturer, component.model]
         .filter(Boolean)
         .join(" · "),
+      purchaseDateLabel: formatDate(component.purchase_date),
       serialNumber: component.serial_number,
       setHref: assignment?.set
         ? `/sets?setId=${encodeURIComponent(String(assignment.set.legacy_set_id))}`
@@ -616,6 +656,8 @@ export default async function GeraetePage({
   const editAssignment = editComponent
     ? assignmentByComponentId.get(editComponent.id)
     : undefined;
+  const editInvoicePosition = normalizeJoined(editComponent?.invoice_position);
+  const editInvoice = normalizeJoined(editInvoicePosition?.invoice);
   const closeEditHref = buildGeraeteHref(params, {
     edit: null,
     page: currentPage,
@@ -870,15 +912,6 @@ export default async function GeraetePage({
                     />
                   </label>
 
-                  <label className="flex flex-col gap-1 text-sm font-medium">
-                    Rechnungsposition
-                    <input
-                      className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
-                      defaultValue={editComponent.invoice_position_number ?? ""}
-                      inputMode="numeric"
-                      name="invoice_position_number"
-                    />
-                  </label>
                 </div>
 
                 <label className="flex flex-col gap-1 text-sm font-medium">
@@ -889,6 +922,55 @@ export default async function GeraetePage({
                     name="notes"
                   />
                 </label>
+              </section>
+
+              <section className="grid gap-4 rounded-lg border border-zinc-200 p-4">
+                <div>
+                  <h3 className="font-semibold">Rechnungsdaten</h3>
+                  <p className="mt-1 text-sm text-zinc-500">
+                    Einkaufsdaten der verknüpften Rechnungsposition.
+                  </p>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label className="flex flex-col gap-1 text-sm font-medium">
+                    Anschaffungsdatum
+                    <input
+                      className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
+                      defaultValue={editComponent.purchase_date ?? ""}
+                      name="purchase_date"
+                      type="date"
+                    />
+                  </label>
+
+                  <label className="flex flex-col gap-1 text-sm font-medium">
+                    Rechnungsposition
+                    <input
+                      className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
+                      defaultValue={editComponent.invoice_position_number ?? ""}
+                      inputMode="numeric"
+                      name="invoice_position_number"
+                    />
+                  </label>
+
+                  <div>
+                    <p className="text-sm font-medium text-zinc-500">
+                      Lieferant
+                    </p>
+                    <p className="mt-1 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm">
+                      {editInvoice?.supplier ?? "-"}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-sm font-medium text-zinc-500">
+                      Rechnungsnummer
+                    </p>
+                    <p className="mt-1 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm">
+                      {editInvoice?.legacy_invoice_number ?? "-"}
+                    </p>
+                  </div>
+                </div>
               </section>
 
               <section className="grid gap-4 rounded-lg border border-zinc-200 p-4">

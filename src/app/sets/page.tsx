@@ -1981,6 +1981,9 @@ export default async function SetsPage({
       value: "ohne Inventarnummer",
     })),
   ].filter(Boolean);
+  const classFilterOptions = Array.from(
+    new Set(classOptions.map((schoolClass) => schoolClass.label)),
+  );
 
   return (
     <main className="min-h-screen bg-zinc-50 text-zinc-950">
@@ -2035,7 +2038,7 @@ export default async function SetsPage({
         <SetsFilterForm
           availability={availabilityFilter}
           classFilter={classFilter}
-          classOptions={classOptions.map((schoolClass) => schoolClass.label)}
+          classOptions={classFilterOptions}
           condition={conditionFilter}
           hasActiveFilters={hasActiveFilters}
           key={`${query}:${setIdQuery}:${availabilityFilter}:${conditionFilter}:${classFilter}:${sort}`}

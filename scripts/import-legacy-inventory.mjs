@@ -284,14 +284,17 @@ async function importPurchaseInvoices(supabase, invoices) {
         },
         { onConflict: "legacy_invoice_number" },
       )
-      .select("id,legacy_invoice_number")
+      .select("id,invoice_date,legacy_invoice_number")
       .single();
 
     if (error) {
       throw error;
     }
 
-    invoiceByLegacyNumber.set(data.legacy_invoice_number, data.id);
+    invoiceByLegacyNumber.set(data.legacy_invoice_number, {
+      id: data.id,
+      invoiceDate: data.invoice_date,
+    });
   }
 
   return invoiceByLegacyNumber;
@@ -316,7 +319,7 @@ async function importPurchaseInvoicePositions(
       .from("purchase_invoice_position")
       .upsert(
         {
-          invoice_id: invoiceByLegacyNumber.get(legacyInvoiceNumber) ?? null,
+          invoice_id: invoiceByLegacyNumber.get(legacyInvoiceNumber)?.id ?? null,
           legacy_invoice_position_number: legacyPositionNumber,
           legacy_quantity: normalizeText(position.Anzahl),
           legacy_unit_price: normalizeText(position.Einzelpreis),
@@ -333,7 +336,12 @@ async function importPurchaseInvoicePositions(
       throw error;
     }
 
-    positionByLegacyNumber.set(data.legacy_invoice_position_number, data.id);
+    const invoiceData = invoiceByLegacyNumber.get(legacyInvoiceNumber);
+
+    positionByLegacyNumber.set(data.legacy_invoice_position_number, {
+      id: data.id,
+      purchaseDate: invoiceData?.invoiceDate ?? null,
+    });
   }
 
   return positionByLegacyNumber;
@@ -345,6 +353,7 @@ async function importComponents(supabase, devices, invoicePositionByLegacyNumber
   for (const device of devices) {
     const category = normalizeCategory(device.Kategorie);
     const invoicePositionNumber = normalizeInteger(device.RechnungsPositionsNr);
+    const invoicePosition = invoicePositionByLegacyNumber.get(invoicePositionNumber);
     const { data, error } = await supabase
       .from("inventory_component")
       .upsert(
@@ -356,10 +365,10 @@ async function importComponents(supabase, devices, invoicePositionByLegacyNumber
           condition: normalizeCondition(device.Status, category),
           legacy_status: normalizeText(device.Status),
           serial_number: normalizeText(device.Seriennummer),
-          invoice_position_id:
-            invoicePositionByLegacyNumber.get(invoicePositionNumber) ?? null,
+          invoice_position_id: invoicePosition?.id ?? null,
           invoice_position_number: invoicePositionNumber,
           notes: normalizeText(device.Anmerkungen),
+          purchase_date: invoicePosition?.purchaseDate ?? null,
           storage_label: normalizeText(device.Lager),
         },
         { onConflict: "legacy_inventory_number" },

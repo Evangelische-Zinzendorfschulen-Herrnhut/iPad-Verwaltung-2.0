@@ -17,6 +17,7 @@ export type GeraeteTableRow = {
   legacySetNumber: number | null;
   legacyStatus: string | null;
   manufacturerModel: string;
+  purchaseDateLabel: string;
   serialNumber: string | null;
   setHref: string | null;
   setLabel: string;
@@ -106,10 +107,8 @@ export function GeraeteTable({
               <th className="px-4 py-3 font-medium">Set</th>
               <th className="px-4 py-3 font-medium">Zuordnung</th>
               <th className="px-4 py-3 font-medium">Lagerort</th>
+              <th className="px-4 py-3 font-medium">Anschaffung</th>
               <th className="px-4 py-3 font-medium">Legacy</th>
-              {canEditComponents ? (
-                <th className="px-4 py-3 font-medium">Aktion</th>
-              ) : null}
             </tr>
           </thead>
           <tbody>
@@ -159,6 +158,9 @@ export function GeraeteTable({
                 </td>
                 <td className="px-4 py-3">{row.assignmentLabel}</td>
                 <td className="px-4 py-3">{row.storageLabel}</td>
+                <td className="whitespace-nowrap px-4 py-3">
+                  {row.purchaseDateLabel}
+                </td>
                 <td className="px-4 py-3 text-zinc-600">
                   {row.legacyStatus ?? "-"}
                   {row.legacySetNumber ? (
@@ -172,26 +174,6 @@ export function GeraeteTable({
                     </span>
                   ) : null}
                 </td>
-                {canEditComponents ? (
-                  <td className="flex flex-wrap gap-2 px-4 py-3">
-                    {row.storageHref ? (
-                      <Link
-                        className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-semibold transition hover:bg-zinc-50"
-                        href={row.storageHref}
-                      >
-                        Lagerort
-                      </Link>
-                    ) : null}
-                    {row.editHref ? (
-                      <Link
-                        className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-semibold transition hover:bg-zinc-50"
-                        href={row.editHref}
-                      >
-                        Bearbeiten
-                      </Link>
-                    ) : null}
-                  </td>
-                ) : null}
               </tr>
             ))}
           </tbody>

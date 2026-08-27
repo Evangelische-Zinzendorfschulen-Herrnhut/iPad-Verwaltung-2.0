@@ -6,7 +6,7 @@ draft
 
 ## Problem
 
-Die Schule braucht eine verlaessliche Uebersicht ueber alle Komponenten eines iPad-Sets: iPad, Pencil und Tastatur. Dazu gehoeren Seriennummern oder Inventarnummern, Status, Standort, Set-Zuordnung und Historie.
+Die Schule braucht eine verlaessliche Uebersicht ueber alle Komponenten eines iPad-Sets: iPad, Pencil und Tastatur. Dazu gehoeren Seriennummern oder Inventarnummern, Anschaffungsdatum, Status, Standort, Set-Zuordnung und Historie.
 
 ## Zielgruppe
 
@@ -63,6 +63,7 @@ Die Schule braucht eine verlaessliche Uebersicht ueber alle Komponenten eines iP
 
 - Eine Komponente kann ueber Inventarnummer oder Seriennummer gefunden werden.
 - Der aktuelle Status ist eindeutig sichtbar.
+- Das Anschaffungsdatum ist als optionales Geräteattribut in der Geräteliste sichtbar und fuer berechtigte Nutzer pflegbar.
 - Statusaenderungen werden mit Nutzer und Zeitpunkt protokolliert.
 - Nicht berechtigte Rollen koennen Komponentendaten nicht bearbeiten.
 - Freie und blockierte Sets koennen aufgetrennt werden.

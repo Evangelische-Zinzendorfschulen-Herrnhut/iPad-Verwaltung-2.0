@@ -11,6 +11,9 @@ Use this skill to answer operational questions about a school iPad set. Always p
 
 ## Core Rules
 
+- Supabase is the authoritative source for current WebApp data. Perform all operational database corrections and assignment changes exclusively in Supabase, then verify them by re-reading Supabase.
+- Use `db/iPad-Verwaltung.db` only as a read-only historical reference. Open SQLite with `sqlite3 -readonly` or Python URI `mode=ro`; never modify its data or schema, including for user-requested corrections. A correction request targets Supabase, not the legacy file.
+- SQLite changes are not synchronized to the WebApp. If Supabase cannot be read or updated, report the limitation; never substitute a SQLite write or report a legacy-only result as the current WebApp state.
 - Treat `inventory_set.legacy_set_id` as the user-facing set number.
 - Treat `set_component_assignment` rows with `valid_until is null` as the current component membership.
 - Do not infer current membership from `inventory_component.legacy_set_number` or inventory numbers like `E001085 / 0235`; use them only as legacy clues.

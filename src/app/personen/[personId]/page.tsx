@@ -1,4 +1,10 @@
+import { conditionLabel } from "@/lib/condition";
 import Link from "next/link";
+
+import {
+  ObjectLinkIcon,
+  objectLinkIconClassName,
+} from "../../object-link-icon";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 
@@ -467,12 +473,22 @@ export default async function PersonDetailPage({
                     <tr className="border-t border-zinc-100" key={assignment.id}>
                       <td className="px-4 py-3 font-semibold">
                         {assignment.inventory_set ? (
-                          <Link
-                            className="hover:underline"
-                            href={setDetailHref(assignment.inventory_set)}
-                          >
-                            Set {assignment.inventory_set.legacy_set_id}
-                          </Link>
+                          <span className="inline-flex items-center gap-2 align-middle">
+                            <Link
+                              aria-label={`Set ${assignment.inventory_set.legacy_set_id} in der Setliste anzeigen`}
+                              className={objectLinkIconClassName("set")}
+                              href={setDetailHref(assignment.inventory_set)}
+                              title="Set in Setliste anzeigen"
+                            >
+                              <ObjectLinkIcon kind="set" />
+                            </Link>
+                            <Link
+                              className="hover:underline"
+                              href={setDetailHref(assignment.inventory_set)}
+                            >
+                              Set {assignment.inventory_set.legacy_set_id}
+                            </Link>
+                          </span>
                         ) : (
                           "-"
                         )}
@@ -485,7 +501,7 @@ export default async function PersonDetailPage({
                         {assignment.inventory_set?.availability ?? "-"}
                       </td>
                       <td className="px-4 py-3">
-                        {assignment.inventory_set?.condition ?? "-"}
+                        {conditionLabel(assignment.inventory_set?.condition)}
                       </td>
                       <td className="px-4 py-3">
                         {assignment.inventory_set?.storage_label ?? "-"}
@@ -535,12 +551,22 @@ export default async function PersonDetailPage({
                   {damageCases.map((damageCase) => (
                     <tr className="border-t border-zinc-100" key={damageCase.id}>
                       <td className="px-4 py-3 font-semibold">
-                        <Link
-                          className="hover:underline"
-                          href={`/schadensfaelle?detail=${damageCase.id}`}
-                        >
-                          {damageCase.damage_number}
-                        </Link>
+                        <span className="inline-flex items-center gap-2 align-middle">
+                          <Link
+                            aria-label={`Schadensfall ${damageCase.damage_number} anzeigen`}
+                            className={objectLinkIconClassName("damage")}
+                            href={`/schadensfaelle?detail=${damageCase.id}`}
+                            title="Schadensfall anzeigen"
+                          >
+                            <ObjectLinkIcon kind="damage" />
+                          </Link>
+                          <Link
+                            className="hover:underline"
+                            href={`/schadensfaelle?detail=${damageCase.id}`}
+                          >
+                            {damageCase.damage_number}
+                          </Link>
+                        </span>
                       </td>
                       <td className="px-4 py-3">{damageCase.reported_at}</td>
                       <td className="px-4 py-3">
@@ -551,12 +577,22 @@ export default async function PersonDetailPage({
                       </td>
                       <td className="px-4 py-3">
                         {damageCase.inventory_set ? (
-                          <Link
-                            className="hover:underline"
-                            href={setDetailHref(damageCase.inventory_set)}
-                          >
-                            Set {damageCase.inventory_set.legacy_set_id}
-                          </Link>
+                          <span className="inline-flex items-center gap-2 align-middle">
+                            <Link
+                              aria-label={`Set ${damageCase.inventory_set.legacy_set_id} in der Setliste anzeigen`}
+                              className={objectLinkIconClassName("set")}
+                              href={setDetailHref(damageCase.inventory_set)}
+                              title="Set in Setliste anzeigen"
+                            >
+                              <ObjectLinkIcon kind="set" />
+                            </Link>
+                            <Link
+                              className="hover:underline"
+                              href={setDetailHref(damageCase.inventory_set)}
+                            >
+                              Set {damageCase.inventory_set.legacy_set_id}
+                            </Link>
+                          </span>
                         ) : (
                           "-"
                         )}

@@ -29,3 +29,11 @@ body {
   font-family: Consolas, Menlo, Monaco, "Courier New", monospace !important;
   font-variant-numeric: tabular-nums;
 }
+
+:where(table tbody > tr:nth-child(even)) {
+  background-color: #f4f4f5;
+}
+
+:where(table tbody > tr:hover) {
+  background-color: #d1fae5;
+}

@@ -1,3 +1,4 @@
+import { conditionLabel } from "@/lib/condition";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
@@ -734,13 +735,6 @@ export default async function TasksPage({
       zurücksetzen: "Zurücksetzen",
       zugeordnet: "Zugeordnet",
     };
-    const conditionLabels: Record<string, string> = {
-      "beschädigt_nutzbar": "Beschädigt, nutzbar",
-      defekt: "Defekt",
-      ok: "Ok",
-      unklar: "Unklar",
-      unvollständig: "Unvollständig",
-    };
     const categoryLabels: Record<string, string> = {
       adapter: "Adapter",
       ipad: "iPad",
@@ -798,7 +792,7 @@ export default async function TasksPage({
           label: "Setliste",
           meta: [
             `Verfügbarkeit: ${availabilityLabels[relatedSet?.availability ?? ""] ?? relatedSet?.availability ?? "-"}`,
-            `Zustand: ${conditionLabels[relatedSet?.condition ?? ""] ?? relatedSet?.condition ?? "-"}`,
+            `Zustand: ${conditionLabel(relatedSet?.condition)}`,
             `Lagerort: ${relatedSet?.storage_label || "-"}`,
           ].join(" · "),
         },

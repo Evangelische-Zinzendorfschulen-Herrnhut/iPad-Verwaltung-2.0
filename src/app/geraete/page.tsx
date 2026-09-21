@@ -1,3 +1,4 @@
+import { conditionLabel } from "@/lib/condition";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
@@ -7,6 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import { SectionTabs } from "../section-tabs";
 import { GeraeteFilterForm } from "./geraete-filter-form";
 import { GeraeteTable, type GeraeteTableRow } from "./geraete-table";
+import { PageSizeSelect } from "./page-size-select";
 
 export const metadata: Metadata = {
   title: "Geräte | iPad-Verwaltung",
@@ -55,9 +57,39 @@ type RawComponentAssignmentRow = Omit<ComponentAssignmentRow, "set"> & {
   set: ComponentAssignmentRow["set"] | ComponentAssignmentRow["set"][];
 };
 
+type InventoryComponentListRow = {
+  assignment_component_id: string | null;
+  assignment_role: string | null;
+  category: string;
+  condition: string;
+  id: string;
+  invoice_date: string | null;
+  invoice_legacy_number: number | null;
+  invoice_legacy_position_number: number | null;
+  invoice_position_number: number | null;
+  invoice_supplier: string | null;
+  legacy_inventory_number: string;
+  legacy_set_number: number | null;
+  legacy_status: string | null;
+  manufacturer: string | null;
+  model: string | null;
+  notes: string | null;
+  purchase_date: string | null;
+  serial_number: string | null;
+  set_availability: string | null;
+  set_condition: string | null;
+  set_legacy_set_id: number | null;
+  set_storage_label: string | null;
+  storage_label: string | null;
+  assigned_count: number;
+  component_count: number;
+  total_count: number;
+};
+
 type DeviceSort = "inventory" | "category" | "set" | "condition";
 
-const PAGE_SIZE = 75;
+const DEFAULT_PAGE_SIZE = 10;
+const PAGE_SIZE_OPTIONS = [10, 25, 50] as const;
 const QUERY_BATCH_SIZE = 1000;
 
 function getSingleParam(
@@ -81,6 +113,16 @@ function getPageParam(searchParams: Record<string, string | string[] | undefined
   }
 
   return parsed;
+}
+
+function getPageSizeParam(
+  searchParams: Record<string, string | string[] | undefined>,
+) {
+  const parsed = Number.parseInt(getSingleParam(searchParams, "pageSize"), 10);
+
+  return PAGE_SIZE_OPTIONS.includes(parsed as (typeof PAGE_SIZE_OPTIONS)[number])
+    ? parsed
+    : DEFAULT_PAGE_SIZE;
 }
 
 function getSortParam(
@@ -108,7 +150,15 @@ function buildGeraeteHref(
 ) {
   const nextParams = new URLSearchParams();
 
-  for (const key of ["q", "set", "category", "condition", "assignment", "sort"]) {
+  for (const key of [
+    "q",
+    "set",
+    "category",
+    "condition",
+    "assignment",
+    "sort",
+    "pageSize",
+  ]) {
     const value = getSingleParam(params, key).trim();
 
     if (value) {
@@ -190,17 +240,6 @@ function categoryLabel(value: string) {
   return labels[value] ?? value;
 }
 
-function conditionLabel(value: string) {
-  const labels: Record<string, string> = {
-    "beschädigt_nutzbar": "Beschädigt, nutzbar",
-    defekt: "Defekt",
-    "gesperrt_kein_mdm": "Gesperrt, kein MDM",
-    ok: "Ok",
-    unklar: "Unklar",
-  };
-
-  return labels[value] ?? value;
-}
 
 function formatDate(value: string | null) {
   if (!value) {
@@ -244,6 +283,16 @@ function assignmentLabel(assignment: ComponentAssignmentRow | undefined) {
   return assignment.set.availability === "frei"
     ? "In freiem Set"
     : "In zugeordnetem/ausgegebenem Set";
+}
+
+function chunkValues<T>(values: T[], size = QUERY_BATCH_SIZE) {
+  const chunks: T[][] = [];
+
+  for (let index = 0; index < values.length; index += size) {
+    chunks.push(values.slice(index, index + size));
+  }
+
+  return chunks;
 }
 
 function matchesQuery(
@@ -355,6 +404,193 @@ async function fetchAllCurrentAssignments(
       return assignments;
     }
   }
+}
+
+function canUsePagedComponentQuery({
+  assignmentFilter,
+  query,
+  sort,
+}: {
+  assignmentFilter: string;
+  query: string;
+  sort: DeviceSort;
+}) {
+  return !assignmentFilter && sort !== "set" && !query;
+}
+
+function inventorySetPartSearchPatterns(setFilter: string) {
+  const parsed = Number.parseInt(setFilter, 10);
+
+  if (!Number.isInteger(parsed)) {
+    return [`%/ ${setFilter}`, `%/${setFilter}`];
+  }
+
+  return Array.from(new Set([
+    `%/ ${parsed}`,
+    `%/${parsed}`,
+    `%/ ${String(parsed).padStart(4, "0")}`,
+    `%/${String(parsed).padStart(4, "0")}`,
+  ]));
+}
+
+async function fetchComponentIdsForSetFilter(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  setFilter: string,
+) {
+  if (!setFilter) {
+    return null;
+  }
+
+  const matchingComponentIds = new Set<string>();
+  const numericSetFilter = Number.parseInt(setFilter, 10);
+  const [legacySetComponentsResult, assignedSetComponentsResult, inventoryPartResults] =
+    await Promise.all([
+      Number.isInteger(numericSetFilter)
+        ? supabase
+            .from("inventory_component")
+            .select("id")
+            .eq("legacy_set_number", numericSetFilter)
+        : Promise.resolve({ data: [], error: null }),
+      Number.isInteger(numericSetFilter)
+        ? supabase
+            .from("set_component_assignment")
+            .select("component_id,set:set_id!inner(legacy_set_id)")
+            .is("valid_until", null)
+            .eq("set.legacy_set_id", numericSetFilter)
+        : Promise.resolve({ data: [], error: null }),
+      Promise.all(
+        inventorySetPartSearchPatterns(setFilter).map((pattern) =>
+          supabase
+            .from("inventory_component")
+            .select("id")
+            .ilike("legacy_inventory_number", pattern),
+        ),
+      ),
+    ]);
+
+  if (legacySetComponentsResult.error) {
+    throw legacySetComponentsResult.error;
+  }
+
+  if (assignedSetComponentsResult.error) {
+    throw assignedSetComponentsResult.error;
+  }
+
+  for (const result of inventoryPartResults) {
+    if (result.error) {
+      throw result.error;
+    }
+
+    for (const component of result.data ?? []) {
+      matchingComponentIds.add(component.id);
+    }
+  }
+
+  for (const component of legacySetComponentsResult.data ?? []) {
+    matchingComponentIds.add(component.id);
+  }
+
+  for (const assignment of assignedSetComponentsResult.data ?? []) {
+    if (assignment.component_id) {
+      matchingComponentIds.add(assignment.component_id);
+    }
+  }
+
+  return [...matchingComponentIds];
+}
+
+async function fetchAssignmentsForComponents(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  componentIds: string[],
+) {
+  const assignments: RawComponentAssignmentRow[] = [];
+
+  for (const componentIdBatch of chunkValues(componentIds)) {
+    const { data, error } = await supabase
+      .from("set_component_assignment")
+      .select(
+        "component_id,role,set:set_id(legacy_set_id,availability,condition,storage_label)",
+      )
+      .is("valid_until", null)
+      .in("component_id", componentIdBatch);
+
+    if (error) {
+      throw error;
+    }
+
+    assignments.push(...((data ?? []) as RawComponentAssignmentRow[]));
+  }
+
+  return assignments;
+}
+
+function componentFromListRow(row: InventoryComponentListRow): ComponentRow {
+  return {
+    category: row.category,
+    condition: row.condition,
+    id: row.id,
+    invoice_position:
+      row.invoice_legacy_position_number ||
+      row.invoice_date ||
+      row.invoice_legacy_number ||
+      row.invoice_supplier
+        ? {
+            invoice: {
+              invoice_date: row.invoice_date,
+              legacy_invoice_number: row.invoice_legacy_number,
+              supplier: row.invoice_supplier,
+            },
+            legacy_invoice_position_number: row.invoice_legacy_position_number,
+          }
+        : null,
+    invoice_position_number: row.invoice_position_number,
+    legacy_inventory_number: row.legacy_inventory_number,
+    legacy_set_number: row.legacy_set_number,
+    legacy_status: row.legacy_status,
+    manufacturer: row.manufacturer,
+    model: row.model,
+    notes: row.notes,
+    purchase_date: row.purchase_date,
+    serial_number: row.serial_number,
+    storage_label: row.storage_label,
+  };
+}
+
+function assignmentFromListRow(
+  row: InventoryComponentListRow,
+): RawComponentAssignmentRow | null {
+  if (!row.assignment_component_id || !row.assignment_role) {
+    return null;
+  }
+
+  return {
+    component_id: row.assignment_component_id,
+    role: row.assignment_role,
+    set:
+      row.set_legacy_set_id ||
+      row.set_availability ||
+      row.set_condition ||
+      row.set_storage_label
+        ? {
+            availability: row.set_availability ?? "",
+            condition: row.set_condition ?? "",
+            legacy_set_id: row.set_legacy_set_id ?? 0,
+            storage_label: row.set_storage_label,
+          }
+        : null,
+  };
+}
+
+function shouldUseComponentListRpc({
+  assignmentFilter,
+  query,
+  sort,
+}: {
+  assignmentFilter: string;
+  query: string;
+  sort: DeviceSort;
+}) {
+  return Boolean(assignmentFilter || query || sort === "set");
 }
 
 async function updateComponent(formData: FormData) {
@@ -500,6 +736,7 @@ export default async function GeraetePage({
   const assignmentFilter = getSingleParam(params, "assignment");
   const sort = getSortParam(params);
   const page = getPageParam(params);
+  const pageSize = getPageSizeParam(params);
   const editComponentId = getSingleParam(params, "edit");
   const storageComponentId = getSingleParam(params, "storage");
   const appUser = await getCurrentAppUser();
@@ -514,22 +751,90 @@ export default async function GeraetePage({
 
   const canEditComponents = hasAnyRole(appUser, ["admin"]);
   const supabase = await createClient();
-  const [
-    components,
-    rawAssignments,
-    componentCountResult,
-    setAssignedCountResult,
-  ] = await Promise.all([
-    fetchAllComponents(supabase),
-    fetchAllCurrentAssignments(supabase),
-    supabase
-      .from("inventory_component")
-      .select("id", { count: "exact", head: true }),
-    supabase
-      .from("set_component_assignment")
-      .select("id", { count: "exact", head: true })
-      .is("valid_until", null),
-  ]);
+  const rangeStart = (page - 1) * pageSize;
+  const rangeEnd = rangeStart + pageSize - 1;
+  const useRpcComponentList = shouldUseComponentListRpc({
+    assignmentFilter,
+    query,
+    sort,
+  });
+  const filteredComponentIds =
+    !useRpcComponentList && setFilter
+      ? await fetchComponentIdsForSetFilter(supabase, setFilter)
+      : null;
+  const baseComponentSelect =
+    "id,legacy_inventory_number,legacy_set_number,category,manufacturer,model,condition,legacy_status,serial_number,invoice_position_number,invoice_position:invoice_position_id(legacy_invoice_position_number,invoice:invoice_id(invoice_date,legacy_invoice_number,supplier)),notes,purchase_date,storage_label";
+  let directComponentQuery = supabase
+    .from("inventory_component")
+    .select(baseComponentSelect, { count: "exact" });
+
+  if (filteredComponentIds) {
+    directComponentQuery = filteredComponentIds.length
+      ? directComponentQuery.in("id", filteredComponentIds)
+      : directComponentQuery.eq("id", "00000000-0000-0000-0000-000000000000");
+  }
+
+  if (categoryFilter) {
+    directComponentQuery = directComponentQuery.eq("category", categoryFilter);
+  }
+
+  if (conditionFilter) {
+    directComponentQuery = directComponentQuery.eq("condition", conditionFilter);
+  }
+
+  directComponentQuery = directComponentQuery
+    .order("legacy_inventory_number", { ascending: true })
+    .range(rangeStart, rangeEnd);
+
+  const [componentListResult, directComponentResult, totalCountResult, assignedCountResult] =
+    await Promise.all([
+      useRpcComponentList
+        ? supabase.rpc("inventory_component_list", {
+            p_assignment_filter: assignmentFilter || null,
+            p_category: categoryFilter || null,
+            p_condition: conditionFilter || null,
+            p_limit: pageSize,
+            p_offset: rangeStart,
+            p_query: query || null,
+            p_set_filter: setFilter || null,
+            p_sort: sort,
+          })
+        : Promise.resolve({ data: [], error: null }),
+      useRpcComponentList
+        ? Promise.resolve({ count: null, data: [], error: null })
+        : directComponentQuery,
+      supabase
+        .from("inventory_component")
+        .select("id", { count: "exact", head: true }),
+      supabase
+        .from("set_component_assignment")
+        .select("id", { count: "exact", head: true })
+        .is("valid_until", null),
+    ]);
+
+  if (componentListResult.error) {
+    throw componentListResult.error;
+  }
+
+  if (directComponentResult.error) {
+    throw directComponentResult.error;
+  }
+
+  const componentListRows =
+    (componentListResult.data ?? []) as InventoryComponentListRow[];
+  const components = useRpcComponentList
+    ? componentListRows.map(componentFromListRow)
+    : ((directComponentResult.data ?? []) as ComponentRow[]);
+  const rawAssignments = useRpcComponentList
+    ? componentListRows
+        .map(assignmentFromListRow)
+        .filter((assignment): assignment is RawComponentAssignmentRow =>
+          Boolean(assignment),
+        )
+    : await fetchAssignmentsForComponents(
+        supabase,
+        components.map((component) => component.id),
+      );
   const assignments = rawAssignments.map(
     (assignment) => ({
       ...assignment,
@@ -544,61 +849,22 @@ export default async function GeraetePage({
     assignmentByComponentId.set(assignment.component_id, assignment);
   }
 
-  const unassignedCount =
-    (componentCountResult.count ?? components.length) -
-    (setAssignedCountResult.count ?? assignments.length);
+  const componentCount = totalCountResult.count ?? componentListRows[0]?.component_count ?? 0;
+  const setAssignedCount =
+    assignedCountResult.count ?? componentListRows[0]?.assigned_count ?? 0;
+  const unassignedCount = componentCount - setAssignedCount;
 
-  const filteredComponents = components
-    .filter((component) => {
-      const assignment = assignmentByComponentId.get(component.id);
-
-      if (categoryFilter && component.category !== categoryFilter) {
-        return false;
-      }
-
-      if (conditionFilter && component.condition !== conditionFilter) {
-        return false;
-      }
-
-      if (assignmentFilter) {
-        if (assignmentFilter === "set" && !assignment?.set) {
-          return false;
-        }
-
-        if (
-          assignmentFilter !== "set" &&
-          assignmentKind(assignment) !== assignmentFilter
-        ) {
-          return false;
-        }
-      }
-
-      return (
-        matchesSetFilter(component, assignment, setFilter) &&
-        matchesQuery(component, assignment, query)
-      );
-    })
-    .sort((first, second) => {
-      const firstAssignment = assignmentByComponentId.get(first.id);
-      const secondAssignment = assignmentByComponentId.get(second.id);
-      const firstSortValue = sortValue(first, firstAssignment)[sort];
-      const secondSortValue = sortValue(second, secondAssignment)[sort];
-
-      return firstSortValue.localeCompare(secondSortValue, "de-DE", {
-        numeric: true,
-      });
-    });
-  const filteredCount = filteredComponents.length;
-  const totalPages = Math.max(1, Math.ceil(filteredCount / PAGE_SIZE));
+  const filteredCount = useRpcComponentList
+    ? (componentListRows[0]?.total_count ?? 0)
+    : (directComponentResult.count ?? components.length);
+  const totalPages = Math.max(1, Math.ceil(filteredCount / pageSize));
 
   if (page > totalPages) {
     redirect(buildPageHref(params, totalPages));
   }
 
   const currentPage = Math.min(page, totalPages);
-  const rangeStart = (currentPage - 1) * PAGE_SIZE;
-  const rangeEnd = rangeStart + PAGE_SIZE;
-  const visibleComponents = filteredComponents.slice(rangeStart, rangeEnd);
+  const visibleComponents = components;
   const visibleRows: GeraeteTableRow[] = visibleComponents.map((component) => {
     const assignment = assignmentByComponentId.get(component.id);
 
@@ -639,8 +905,9 @@ export default async function GeraetePage({
         component.storage_label || assignment?.set?.storage_label || "-",
     };
   });
-  const displayedFrom = filteredCount === 0 ? 0 : rangeStart + 1;
-  const displayedTo = Math.min(rangeEnd, filteredCount);
+  const displayedFrom =
+    filteredCount === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const displayedTo = Math.min(currentPage * pageSize, filteredCount);
   const hasActiveFilters = Boolean(
     query || setFilter || categoryFilter || conditionFilter || assignmentFilter,
   );
@@ -692,13 +959,13 @@ export default async function GeraetePage({
           <div className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
             <p className="text-sm text-zinc-500">Komponenten</p>
             <p className="mt-2 text-2xl font-semibold">
-              {componentCountResult.count ?? 0}
+              {componentCount}
             </p>
           </div>
           <div className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
             <p className="text-sm text-zinc-500">In Sets</p>
             <p className="mt-2 text-2xl font-semibold">
-              {setAssignedCountResult.count ?? 0}
+              {setAssignedCount}
             </p>
           </div>
           <div className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
@@ -715,7 +982,7 @@ export default async function GeraetePage({
             <p className="mt-1 text-sm text-zinc-500">
               {hasActiveFilters
                 ? `${displayedFrom}-${displayedTo} von ${filteredCount} Treffern angezeigt.`
-                : `${displayedFrom}-${displayedTo} von ${componentCountResult.count ?? 0} Komponenten angezeigt.`}
+                : `${displayedFrom}-${displayedTo} von ${componentCount} Komponenten angezeigt.`}
             </p>
           </div>
 
@@ -724,7 +991,7 @@ export default async function GeraetePage({
             category={categoryFilter}
             condition={conditionFilter}
             hasActiveFilters={hasActiveFilters}
-            key={`${query}:${setFilter}:${categoryFilter}:${conditionFilter}:${assignmentFilter}:${sort}`}
+            key={`${query}:${setFilter}:${categoryFilter}:${conditionFilter}:${assignmentFilter}:${sort}:${pageSize}`}
             query={query}
             setFilter={setFilter}
             sort={sort}
@@ -742,11 +1009,39 @@ export default async function GeraetePage({
             </div>
           )}
 
-          {filteredCount > PAGE_SIZE ? (
+          {filteredCount > pageSize ? (
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-zinc-200 px-4 py-3 text-sm">
-              <p className="text-zinc-600">
-                Seite {currentPage} von {totalPages}
-              </p>
+              <div className="flex flex-wrap items-center gap-4">
+                <p className="text-zinc-600">
+                  Seite {currentPage} von {totalPages}
+                </p>
+                <form action="/geraete" className="flex items-center gap-2">
+                  {query ? <input name="q" type="hidden" value={query} /> : null}
+                  {setFilter ? (
+                    <input name="set" type="hidden" value={setFilter} />
+                  ) : null}
+                  {categoryFilter ? (
+                    <input name="category" type="hidden" value={categoryFilter} />
+                  ) : null}
+                  {conditionFilter ? (
+                    <input name="condition" type="hidden" value={conditionFilter} />
+                  ) : null}
+                  {assignmentFilter ? (
+                    <input
+                      name="assignment"
+                      type="hidden"
+                      value={assignmentFilter}
+                    />
+                  ) : null}
+                  {sort !== "inventory" ? (
+                    <input name="sort" type="hidden" value={sort} />
+                  ) : null}
+                  <label className="flex items-center gap-2 font-medium text-zinc-700">
+                    Einträge
+                    <PageSizeSelect pageSize={pageSize} />
+                  </label>
+                </form>
+              </div>
               <div className="flex gap-2">
                 {currentPage > 1 ? (
                   <Link
@@ -863,7 +1158,7 @@ export default async function GeraetePage({
                       name="condition"
                       required
                     >
-                      <option value="ok">Ok</option>
+                      <option value="ok">OK</option>
                       <option value="beschädigt_nutzbar">
                         Beschädigt, nutzbar
                       </option>

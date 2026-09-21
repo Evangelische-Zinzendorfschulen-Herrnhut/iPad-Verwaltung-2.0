@@ -1,3 +1,5 @@
+import { DamageContextItem } from "./damage-context-item";
+import { conditionLabel } from "@/lib/condition";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
@@ -12,6 +14,9 @@ import {
   type PersonSelectionOption,
 } from "./person-selection-list";
 import { SetsFilterForm } from "./sets-filter-form";
+import { SetConditionBadge } from "./set-condition-badge";
+import { SetAvailabilityBadge } from "./set-availability-badge";
+import { DamageStatusBadge } from "./damage-status-badge";
 import { SetsTable, type SetsTableRow } from "./sets-table";
 
 export const metadata: Metadata = {
@@ -543,9 +548,15 @@ function formatDate(value: string | null) {
 function DetailField({
   label,
   value,
+  emphasis = false,
+  condition = false,
+  availability = false,
 }: {
   label: string;
   value: number | string | null | undefined;
+  emphasis?: boolean;
+  condition?: boolean;
+  availability?: boolean;
 }) {
   const usesInventoryFont = [
     "Adapter",
@@ -560,11 +571,15 @@ function DetailField({
         {label}
       </dt>
       <dd
-        className={`mt-1 break-words text-sm font-medium text-zinc-900 ${
+        className={`mt-1 break-words ${emphasis ? "text-3xl font-bold tracking-tight" : "text-sm font-medium"} text-zinc-900 ${
           usesInventoryFont ? "inventory-number" : ""
         }`}
       >
-        {value === null || value === undefined || value === "" ? "-" : value}
+        {availability ? (
+          <SetAvailabilityBadge value={value == null ? null : String(value)} />
+        ) : condition ? (
+          <SetConditionBadge value={value} />
+        ) : value === null || value === undefined || value === "" ? "-" : value}
       </dd>
     </div>
   );
@@ -1889,6 +1904,14 @@ export default async function SetsPage({
     };
   });
   const setToShowDetail = sets.find((set) => set.id === detailSetId) ?? null;
+  const detailDamageResult = setToShowDetail
+    ? await supabase
+        .from("damage_case")
+        .select("id,damage_number,affected_item,short_description,reported_at,status,component:component_id(category,legacy_inventory_number),replacement_component:replacement_component_id(legacy_inventory_number)")
+        .eq("set_id", setToShowDetail.id)
+        .order("reported_at", { ascending: false, nullsFirst: false })
+        .order("damage_number", { ascending: false })
+    : { data: [], error: null };
   const setToIssue = sets.find((set) => set.id === issueSetId) ?? null;
   const setToReturn = sets.find((set) => set.id === returnSetId) ?? null;
   const setToEditStorage = sets.find((set) => set.id === storageSetId) ?? null;
@@ -1987,7 +2010,7 @@ export default async function SetsPage({
 
   return (
     <main className="min-h-screen bg-zinc-50 text-zinc-950">
-      <section className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-6 py-10">
+      <section className="mx-auto flex w-full max-w-[calc(100vw-2rem)] flex-col gap-8 px-4 py-10 sm:px-6">
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <Link className="text-sm font-medium text-zinc-500" href="/">
@@ -2120,19 +2143,19 @@ export default async function SetsPage({
               <div className="grid gap-6 px-6 py-6">
                 <section className="grid gap-3">
                   <h3 className="font-semibold">Set</h3>
-                  <dl className="grid gap-3 sm:grid-cols-2">
-                    <DetailField label="Setnummer" value={setToShowDetail.legacy_set_id} />
-                    <DetailField label="Verfügbarkeit" value={detailAvailability} />
-                    <DetailField label="Zustand" value={setToShowDetail.condition} />
-                    <DetailField label="Lagerort" value={setToShowDetail.storage_label} />
+                  <dl className="grid gap-3 sm:grid-cols-3">
+                    <DetailField label="Setnummer" value={setToShowDetail.legacy_set_id} emphasis />
+                    <DetailField label="Verfügbarkeit" value={detailAvailability} availability />
+                    <DetailField label="Zustand" value={setToShowDetail.condition} condition />
                     <DetailField label="Legacy-Status" value={setToShowDetail.legacy_status} />
                     <DetailField label="Marker" value={setToShowDetail.marker} />
+                    <DetailField label="Lagerort" value={setToShowDetail.storage_label} />
                   </dl>
                 </section>
 
                 <section className="grid gap-3">
                   <h3 className="font-semibold">Person</h3>
-                  <dl className="grid gap-3 sm:grid-cols-2">
+                  <dl className="grid gap-3 sm:grid-cols-3">
                     <DetailField
                       label="Aktuelle Person"
                       value={formatPerson(personToShowDetail, classToShowDetail)}
@@ -2150,7 +2173,7 @@ export default async function SetsPage({
 
                 <section className="grid gap-3">
                   <h3 className="font-semibold">Komponenten</h3>
-                  <dl className="grid gap-3 sm:grid-cols-2">
+                  <dl className="grid gap-3 sm:grid-cols-3">
                     <DetailField
                       label="iPad"
                       value={componentLabel(detailComponents?.get("ipad")?.component ?? null)}
@@ -2176,6 +2199,44 @@ export default async function SetsPage({
                       }
                     />
                   </dl>
+                </section>
+
+                <section className="grid gap-3">
+                  <h3 className="font-semibold">Schäden zu diesem Set</h3>
+                  {detailDamageResult.error ? (
+                    <p role="alert" className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+                      Die Schadensfälle konnten nicht geladen werden. Bitte erneut laden.
+                    </p>
+                  ) : detailDamageResult.data?.length ? (
+                    <ul className="grid gap-2">
+                      {detailDamageResult.data.map((damage) => (
+                        <DamageContextItem key={damage.id} id={damage.id} setId={setToShowDetail.id} status={damage.status} canEdit={canManageSets}>
+                          <Link
+                            className="flex flex-wrap items-start justify-between gap-3 rounded-md border border-zinc-200 px-3 py-3 transition hover:bg-zinc-50 focus-visible:outline-2 focus-visible:outline-emerald-600"
+                            href={`/schadensfaelle?detail=${damage.id}`}
+                          >
+                            <div className="min-w-0 flex-1">
+                              <p className="break-words text-sm font-semibold text-zinc-950">
+                                Schaden {damage.damage_number}
+                              </p>
+                              <p className="mt-1 text-sm text-zinc-700">
+                                Betroffen: {({ ipad: "iPad", pencil: "Pencil", keyboard: "Tastatur", adapter: "Adapter", hdmi_cable: "HDMI-Kabel", power_adapter: "Netzteil", charging_cable: "Kabel", magic_mouse: "Magic-Maus", mouse: "Magic-Maus", pencil_cap: "Pencil-Kappe", set: "Ganzes Set", component: "Komponente", other: "Sonstiges" } as Record<string, string>)[damage.affected_item === "component" ? normalizeJoined(damage.component)?.category ?? "component" : damage.affected_item] ?? damage.affected_item}
+                              </p>
+                              <dl className="mt-2 grid gap-2 text-xs sm:grid-cols-2">
+                                <div><dt className="text-zinc-500">InvNr Komponente</dt><dd className="inventory-number mt-1 break-words">{normalizeJoined(damage.component)?.legacy_inventory_number || "-"}</dd></div>
+                                <div><dt className="text-zinc-500">InvNr Austauschkomponente</dt><dd className="inventory-number mt-1 break-words">{normalizeJoined(damage.replacement_component)?.legacy_inventory_number || "-"}</dd></div>
+                              </dl>
+                              <p className="mt-2 break-words text-sm text-zinc-600">{damage.short_description || "Ohne Kurzbeschreibung"}</p>
+                              <p className="mt-1 text-xs text-zinc-500">Gemeldet: {formatDate(damage.reported_at) || "-"}</p>
+                            </div>
+                            <DamageStatusBadge value={damage.status} />
+                          </Link>
+                        </DamageContextItem>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="rounded-md border border-zinc-200 px-3 py-2 text-sm text-zinc-500">Keine Schadensfälle zu diesem Set vorhanden.</p>
+                  )}
                 </section>
 
                 {canReadTasks ? (
@@ -2284,7 +2345,7 @@ export default async function SetsPage({
                     <DetailField label="iPad" value={componentLabel(issueComponents?.get("ipad")?.component ?? null)} />
                     <DetailField label="Pencil" value={componentLabel(issueComponents?.get("pencil")?.component ?? null)} />
                     <DetailField label="Tastatur" value={componentLabel(issueComponents?.get("keyboard")?.component ?? null)} />
-                    <DetailField label="Zustand" value={setToIssue.condition} />
+                    <DetailField label="Zustand" value={conditionLabel(setToIssue.condition)} />
                     <DetailField label="Lagerort" value={setToIssue.storage_label} />
                   </dl>
                 </section>

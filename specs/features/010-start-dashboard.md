@@ -52,8 +52,29 @@ geändert werden, ist kein zusätzlicher Audit-Log erforderlich.
 - Mindestens Sets, aktive Personen und Schadensfälle werden ausgewertet.
 - Leere Datenbestände werden verständlich dargestellt.
 - Nicht angemeldete Nutzer sehen keine aggregierten Fachdaten.
+- Alle sieben Arbeitsbereich-Links zeigen ein passendes, einheitlich großes
+  Font-Awesome-Icon vor der weiterhin sichtbaren Beschriftung. Die Icons sind
+  dekorativ und werden für Screenreader ausgeblendet.
+- Die Bedeutung bestehender Objekt-Icons bleibt konsistent: Sets verwenden
+  `faList`, Geräte `faLayerGroup`, Personen `faUser` und Schadensfälle
+  `faClipboard`. Die Startseite nutzt dieselbe zentrale Icon-Zuordnung wie
+  die Objekt-Links; `faTabletScreenButton` bleibt dem MDM-Link vorbehalten.
 
 ## Offene Fragen
 
 - Welche Auswertungen sollen langfristig für Buchhaltung priorisiert werden?
 - Soll das Dashboard später nach Rolle unterschiedlich gewichtet werden?
+
+## Browser-Tab-Icons
+
+- Ziel/Nutzerrollen: Alle Nutzer erkennen den aktuellen Arbeitsbereich auch am
+  Browser-Tab-Icon; es entspricht dem jeweiligen Menü-Icon.
+- Assumption: Mit HTML-Icon ist das Favicon im Browser-Tab gemeint. Startseite
+  und Seiten ohne eigenen Menüpunkt verwenden das Set-Symbol.
+- Datenmodell/Rechte: Ausschließlich öffentliche, statische Icon-Definitionen;
+  keine Fachdatenspeicherung oder Schreibrechte, kein zusätzlicher Auditbedarf.
+- Akzeptanz: Personen, Sets, Aus-/Rückgaben, Geräte, Schadensfälle, Aufgaben und
+  Lagerliste nutzen die zentrale Menü-Icon-Zuordnung auch im HTML-Head.
+  Detailseiten erben das Bereichs-Icon; die Lagerliste überschreibt das Set-Icon.
+  Die Symbole bleiben auf hellen und dunklen Browserleisten erkennbar.
+- Offene Fragen: Keine für diese Anpassung.

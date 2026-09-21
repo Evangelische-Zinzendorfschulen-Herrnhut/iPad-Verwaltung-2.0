@@ -1,0 +1,11 @@
+{
+  "timestamp_utc": "2026-09-11T09:01:47.478735+00:00",
+  "database": "db/iPad-Verwaltung.db",
+  "table": "Sets",
+  "SetID": 124,
+  "field": "Tastatur",
+  "before": "E001112 / 0262",
+  "after": "E000974 / 0124",
+  "authorization": "Explizite Nutzeranweisung in Codex",
+  "status": "committed"
+}

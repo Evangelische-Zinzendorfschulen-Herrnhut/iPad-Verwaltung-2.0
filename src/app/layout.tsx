@@ -3,6 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "iPad-Verwaltung",
+  icons: { icon: [{ url: "/bereich-icon/set", type: "image/svg+xml" }] },
   description: "Verwaltung von iPad-Sets an der Schule",
 };
 

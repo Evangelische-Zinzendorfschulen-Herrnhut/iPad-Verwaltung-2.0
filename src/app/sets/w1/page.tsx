@@ -1,3 +1,4 @@
+import { conditionLabel } from "@/lib/condition";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
@@ -29,6 +30,7 @@ const storageFilters = [
   { label: "Regal1", value: "Regal1" },
   { label: "Alle Lagerorte", value: "all" },
 ];
+const ipadStorageFilters = [32, 64, 128, 256];
 
 type PersonOptionRow = {
   email: string | null;
@@ -76,6 +78,14 @@ function getStorageFilter(
   return storageFilters.some((filter) => filter.value === storage)
     ? storage
     : "W1";
+}
+
+function getIpadStorageFilter(
+  searchParams: Record<string, string | string[] | undefined>,
+) {
+  const ipadStorage = getSingleParam(searchParams, "ipadStorage");
+
+  return ipadStorageFilters.includes(Number(ipadStorage)) ? ipadStorage : "";
 }
 
 function normalizeJoined<T>(value: T | T[] | null | undefined) {
@@ -293,6 +303,136 @@ async function createTaskFromStorageList(formData: FormData) {
   redirect(`${returnTo}${returnTo.includes("?") ? "&" : "?"}task_created=1`);
 }
 
+async function updateSetStorageFromStorageList(formData: FormData) {
+  "use server";
+
+  const appUser = await getCurrentAppUser();
+
+  if (!appUser) {
+    redirect("/login");
+  }
+
+  if (!hasAnyRole(appUser, ["admin", "ipad_verwaltung"])) {
+    redirect("/");
+  }
+
+  const setId = normalizeRequiredText(formData.get("set_id"));
+  const returnTo = normalizeRequiredText(formData.get("return_to")) || "/sets/w1";
+  const storageLabel = normalizeOptionalText(formData.get("storage_label"));
+
+  if (!setId) {
+    redirect(returnTo);
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("inventory_set")
+    .update({ storage_label: storageLabel })
+    .eq("id", setId);
+
+  if (error) {
+    throw error;
+  }
+
+  redirect(`${returnTo}${returnTo.includes("?") ? "&" : "?"}storage_updated=1`);
+}
+
+async function completeSetIssueFromStorageList(formData: FormData) {
+  "use server";
+
+  const appUser = await getCurrentAppUser();
+
+  if (!appUser) {
+    redirect("/login");
+  }
+
+  if (!hasAnyRole(appUser, ["admin", "ipad_verwaltung"])) {
+    redirect("/");
+  }
+
+  const setId = normalizeRequiredText(formData.get("set_id"));
+  const returnTo = normalizeRequiredText(formData.get("return_to")) || "/sets/w1";
+  const issuedAt =
+    normalizeRequiredText(formData.get("issued_at")) ||
+    new Date().toISOString().slice(0, 10);
+  const issueNote = normalizeOptionalText(formData.get("issue_note"));
+
+  if (!setId) {
+    redirect(returnTo);
+  }
+
+  const supabase = await createClient();
+  const [
+    { data: set, error: setError },
+    { data: assignment, error: assignmentError },
+  ] = await Promise.all([
+    supabase
+      .from("inventory_set")
+      .select("id,availability,condition,assigned_person_id")
+      .eq("id", setId)
+      .maybeSingle(),
+    supabase
+      .from("set_person_assignment")
+      .select("id,issue_note,person:person_id(id,legacy_user_id,status)")
+      .eq("set_id", setId)
+      .is("returned_at", null)
+      .is("issued_at", null)
+      .maybeSingle(),
+  ]);
+
+  if (setError) throw setError;
+  if (assignmentError) throw assignmentError;
+
+  const assignmentPerson = normalizeJoined(assignment?.person);
+
+  if (
+    !set ||
+    !assignment ||
+    !assignmentPerson ||
+    assignmentPerson.status !== "aktiv" ||
+    set.availability !== "zugeordnet" ||
+    !["ok", "beschädigt_nutzbar"].includes(set.condition)
+  ) {
+    redirect(`${returnTo}${returnTo.includes("?") ? "&" : "?"}error=issue_invalid`);
+  }
+
+  const combinedNote = [
+    assignment.issue_note,
+    issueNote,
+    `Tatsächliche Ausgabe am ${issuedAt} über Lagerliste.`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const { error: assignmentUpdateError } = await supabase
+    .from("set_person_assignment")
+    .update({
+      issued_at: issuedAt,
+      issue_note: combinedNote || null,
+      legacy_status: "manual_issue",
+      legacy_user_id: assignmentPerson.legacy_user_id ?? 0,
+    })
+    .eq("id", assignment.id)
+    .is("returned_at", null)
+    .is("issued_at", null);
+
+  if (assignmentUpdateError) throw assignmentUpdateError;
+
+  const { error: setUpdateError } = await supabase
+    .from("inventory_set")
+    .update({
+      availability: "ausgegeben",
+      legacy_user_id: assignmentPerson.legacy_user_id,
+      notes: combinedNote || null,
+      storage_label: null,
+    })
+    .eq("id", setId);
+
+  if (setUpdateError) throw setUpdateError;
+
+  redirect(`${returnTo}${returnTo.includes("?") ? "&" : "?"}issued=1`);
+}
+
 export default async function W1SetsPage({
   searchParams,
 }: {
@@ -312,8 +452,13 @@ export default async function W1SetsPage({
   const canManageSets = hasAnyRole(appUser, ["admin", "ipad_verwaltung"]);
   const canCreateTasks = hasAnyRole(appUser, ["admin"]);
   const selectedStorage = getStorageFilter(params);
+  const selectedIpadStorage = getIpadStorageFilter(params);
+  const selectedIpadStorageNumber = selectedIpadStorage
+    ? Number(selectedIpadStorage)
+    : null;
   const query = getSingleParam(params, "q").trim();
   const issueSetId = getSingleParam(params, "issue");
+  const setStorageId = getSingleParam(params, "setStorage");
   const taskSetId = getSingleParam(params, "task");
   const selectedStorageLabel =
     storageFilters.find((filter) => filter.value === selectedStorage)?.label
@@ -321,6 +466,7 @@ export default async function W1SetsPage({
   const rows = await loadWagenOverview(
     selectedStorage === "all" ? null : selectedStorage,
     query,
+    selectedIpadStorageNumber,
   );
   const occupiedPlaces = rows.filter((row) => row.storagePlace).length;
   const assignedSets = rows.filter((row) => row.person).length;
@@ -385,7 +531,10 @@ export default async function W1SetsPage({
     }),
   );
   const setToIssue = rows.find((row) => row.id === issueSetId) ?? null;
+  const setToEditStorage = rows.find((row) => row.id === setStorageId) ?? null;
   const setForTask = rows.find((row) => row.id === taskSetId) ?? null;
+  const isPreparedIssue = setToIssue?.issueLabel === "Set ausgeben";
+  const issueDateDefault = new Date().toISOString().slice(0, 10);
   const closeIssueParams = new URLSearchParams();
 
   if (selectedStorage !== "W1") {
@@ -396,27 +545,40 @@ export default async function W1SetsPage({
     closeIssueParams.set("q", query);
   }
 
+  if (selectedIpadStorage) {
+    closeIssueParams.set("ipadStorage", selectedIpadStorage);
+  }
+
   const closeIssueQuery = closeIssueParams.toString();
   const issueCloseHref = closeIssueQuery
     ? `/sets/w1?${closeIssueQuery}`
     : "/sets/w1";
   const taskCloseHref = issueCloseHref;
+  const storageCloseHref = issueCloseHref;
   const infoMessage =
     getSingleParam(params, "task_created") === "1"
       ? "Aufgabe wurde angelegt."
       : getSingleParam(params, "prepared") === "1"
         ? "Set-Vorbereitung wurde gespeichert."
-        : null;
+        : getSingleParam(params, "issued") === "1"
+          ? "Set wurde ausgegeben."
+          : getSingleParam(params, "storage_updated") === "1"
+            ? "Lagerort wurde gespeichert."
+            : null;
   const errorMessage =
     getSingleParam(params, "error") === "task_missing_title"
       ? "Bitte einen Aufgabentitel eintragen."
       : getSingleParam(params, "error") === "task_invalid_set"
         ? "Das Set wurde nicht gefunden."
-        : null;
+        : getSingleParam(params, "error") === "issue_invalid"
+          ? "Die Ausgabe konnte nicht abgeschlossen werden."
+          : getSingleParam(params, "error") === "issue_blocked"
+            ? "Dieses Set kann aktuell nicht ausgegeben werden."
+            : null;
 
   return (
     <main className="min-h-screen bg-zinc-50 text-zinc-950">
-      <section className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-6 py-10">
+      <section className="mx-auto flex w-full max-w-[calc(100vw-2rem)] flex-col gap-8 px-4 py-10 sm:px-6">
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <Link className="text-sm font-medium text-zinc-500" href="/sets">
@@ -476,8 +638,10 @@ export default async function W1SetsPage({
             </div>
             <div className="flex flex-wrap items-end gap-3">
               <StorageFilterForm
-                key={`${selectedStorage}:${query}`}
+                ipadStorageFilters={ipadStorageFilters}
+                key={`${selectedStorage}:${selectedIpadStorage}:${query}`}
                 query={query}
+                selectedIpadStorage={selectedIpadStorage}
                 selectedStorage={selectedStorage}
                 storageFilters={storageFilters}
               />
@@ -527,7 +691,11 @@ export default async function W1SetsPage({
               </div>
 
               <form
-                action={prepareSetFromStorageList}
+                action={
+                  isPreparedIssue
+                    ? completeSetIssueFromStorageList
+                    : prepareSetFromStorageList
+                }
                 className="grid gap-6 px-6 py-6"
               >
                 <input name="set_id" type="hidden" value={setToIssue.id} />
@@ -550,32 +718,63 @@ export default async function W1SetsPage({
                     </div>
                     <div>
                       <dt className="text-xs font-medium text-zinc-500">Zustand</dt>
-                      <dd className="mt-1 text-sm">{setToIssue.condition}</dd>
+                      <dd className="mt-1 text-sm">{conditionLabel(setToIssue.condition)}</dd>
                     </div>
                   </dl>
                 </section>
 
                 <section className="grid gap-4 rounded-lg border border-zinc-200 p-4">
-                  <h3 className="font-semibold">Vorbereitung</h3>
-                  <div className="grid gap-1 text-sm font-medium">
-                    <span>Person</span>
-                    <PersonSelectionList people={personSelectionOptions} />
-                  </div>
-                  <label className="flex flex-col gap-1 text-sm font-medium">
-                    Lagerort
-                    <input
-                      className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
-                      defaultValue={setToIssue.storageLabel ?? ""}
-                      name="storage_label"
-                      placeholder="z. B. W1 - 02, Schrank1"
-                    />
-                  </label>
+                  <h3 className="font-semibold">
+                    {isPreparedIssue ? "Ausgabe" : "Vorbereitung"}
+                  </h3>
+                  {isPreparedIssue ? (
+                    <>
+                      <div>
+                        <dt className="text-xs font-medium text-zinc-500">
+                          Vorbereitet für
+                        </dt>
+                        <dd className="mt-1 text-sm">
+                          {setToIssue.person || "-"}
+                        </dd>
+                      </div>
+                      <label className="flex flex-col gap-1 text-sm font-medium md:max-w-52">
+                        Ausgabedatum
+                        <input
+                          className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
+                          defaultValue={issueDateDefault}
+                          name="issued_at"
+                          required
+                          type="date"
+                        />
+                      </label>
+                    </>
+                  ) : (
+                    <>
+                      <div className="grid gap-1 text-sm font-medium">
+                        <span>Person</span>
+                        <PersonSelectionList people={personSelectionOptions} />
+                      </div>
+                      <label className="flex flex-col gap-1 text-sm font-medium">
+                        Lagerort
+                        <input
+                          className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
+                          defaultValue={setToIssue.storageLabel ?? ""}
+                          name="storage_label"
+                          placeholder="z. B. W1 - 02, Schrank1"
+                        />
+                      </label>
+                    </>
+                  )}
                   <label className="flex flex-col gap-1 text-sm font-medium">
                     Interne Ausgabenotiz
                     <textarea
                       className="min-h-24 rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
                       name="issue_note"
-                      placeholder="Optional, z. B. Zubehör, Besonderheiten oder Vorbereitungshinweis"
+                      placeholder={
+                        isPreparedIssue
+                          ? "Optional, z. B. tatsächlicher Ausgabeort oder Besonderheiten"
+                          : "Optional, z. B. Zubehör, Besonderheiten oder Vorbereitungshinweis"
+                      }
                     />
                   </label>
                 </section>
@@ -588,7 +787,7 @@ export default async function W1SetsPage({
                     Abbrechen
                   </Link>
                   <button className="rounded-md bg-zinc-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-zinc-800">
-                    Vorbereitung speichern
+                    {isPreparedIssue ? "Set ausgeben" : "Vorbereitung speichern"}
                   </button>
                 </div>
               </form>
@@ -643,7 +842,7 @@ export default async function W1SetsPage({
                     </div>
                     <div>
                       <dt className="text-xs font-medium text-zinc-500">Zustand</dt>
-                      <dd className="mt-1 text-sm">{setForTask.condition}</dd>
+                      <dd className="mt-1 text-sm">{conditionLabel(setForTask.condition)}</dd>
                     </div>
                   </dl>
                 </section>
@@ -697,6 +896,62 @@ export default async function W1SetsPage({
                   </Link>
                   <button className="rounded-md bg-zinc-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-zinc-800">
                     Aufgabe speichern
+                  </button>
+                </div>
+              </form>
+            </aside>
+          </div>
+        ) : null}
+
+        {setToEditStorage && canManageSets ? (
+          <div className="fixed inset-0 z-40 bg-zinc-950/25">
+            <aside className="ml-auto flex h-full w-full max-w-lg flex-col border-l border-zinc-200 bg-white shadow-2xl">
+              <div className="flex flex-wrap items-start justify-between gap-4 border-b border-zinc-200 px-6 py-5">
+                <div>
+                  <p className="text-sm font-medium text-zinc-500">
+                    Lagerliste
+                  </p>
+                  <h2 className="mt-1 text-2xl font-semibold tracking-tight">
+                    Lagerort ändern
+                  </h2>
+                  <p className="mt-2 text-sm text-zinc-600">
+                    Set {setToEditStorage.legacySetId}
+                  </p>
+                </div>
+                <Link
+                  className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-semibold transition hover:bg-zinc-50"
+                  href={storageCloseHref}
+                >
+                  Schließen
+                </Link>
+              </div>
+
+              <form
+                action={updateSetStorageFromStorageList}
+                className="grid gap-5 px-6 py-6"
+              >
+                <input name="set_id" type="hidden" value={setToEditStorage.id} />
+                <input name="return_to" type="hidden" value={storageCloseHref} />
+
+                <label className="flex flex-col gap-1 text-sm font-medium">
+                  Lagerort
+                  <input
+                    className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
+                    defaultValue={setToEditStorage.storageLabel ?? ""}
+                    name="storage_label"
+                    placeholder="z. B. W1 - 04, Schrank1 oder Regal1"
+                  />
+                </label>
+
+                <div className="flex flex-wrap justify-end gap-2 border-t border-zinc-200 pt-4">
+                  <Link
+                    className="rounded-md border border-zinc-300 px-4 py-2 text-sm font-semibold transition hover:bg-zinc-50"
+                    href={storageCloseHref}
+                  >
+                    Abbrechen
+                  </Link>
+                  <button className="rounded-md bg-zinc-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-zinc-800">
+                    Speichern
                   </button>
                 </div>
               </form>

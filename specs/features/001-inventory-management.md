@@ -48,8 +48,48 @@ Die Schule braucht eine verlaessliche Uebersicht ueber alle Komponenten eines iP
 4. Nutzer kann zusaetzlich frei nach Person, Setnummer oder Inventarnummern der Set-Komponenten suchen.
 5. System sortiert erkannte Wagenplaetze 1 bis 30 aufsteigend und zeigt Sets ohne erkannten Platz danach.
 6. System zeigt pro Set Platz, Setnummer, aktuelle Person, Klasse, iPad, Pencil, Tastatur, Verfuegbarkeit, Zustand und Lagerort.
-7. Nutzer kann aus der Lagerliste per Kontextmenue Set-Ausgabe- und Ruecknahme-Workflows starten, sofern die Rolle dazu berechtigt ist.
-8. Nutzer kann die gefilterte Lagerliste als XLSX herunterladen.
+7. Nutzer kann die Lagerliste zusaetzlich nach iPad-Speichergroesse 32 GB, 64 GB, 128 GB oder 256 GB filtern.
+8. Nutzer kann aus der Lagerliste per Kontextmenue Set-Ausgabe- und Ruecknahme-Workflows starten, sofern die Rolle dazu berechtigt ist.
+9. Berechtigte Nutzer koennen aus der Lagerliste per Kontextmenue den Lagerort eines Sets oeffnen, setzen oder leeren.
+10. Nutzer kann die gefilterte Lagerliste als XLSX herunterladen.
+11. In den Komponentenspalten beginnt die Modell- und Zustandsangabe gezielt in einer neuen Zeile nach der vollstaendigen Inventarnummer. Verfuegbarkeit und Zustand verwenden dieselben farbigen Kennzeichnungen wie die Set-Liste.
+12. Tabellenlisten heben jede zweite Datenzeile mittelhell grau hervor; beim Ueberfahren wird die jeweilige Zeile dezent mintgruen dargestellt. Fachliche Warn- und Auswahlfarben bleiben erhalten.
+
+## Workflow: Listen schnell anzeigen
+
+1. Nutzer oeffnet eine Inventar-, Set- oder Schadensliste.
+2. System laedt nur die fuer die aktuelle Seite benoetigten Datensaetze und ergaenzt Detaildaten seitenbezogen.
+3. System verwendet Datenbankfilter, Sortierung und Indizes fuer einfache Filter, statt den gesamten Bestand im Serverprozess zu sortieren.
+4. System darf fuer komplexe kombinierte Suchen temporaer auf bestehende Sammelabfragen zurueckfallen, bis eine dedizierte View oder RPC vorhanden ist.
+5. Detailansichten laden nur bei geoeffneter Detailaktion die zusaetzlichen Detaildaten.
+6. Set-Liste und Lagerliste nutzen die verfuegbare Browserbreite mit einem schmalen, responsiven Seitenabstand, damit Tabellenzellen moeglichst einzeilig bleiben.
+
+## Darstellung: Inventarnummer in der Geraeteliste
+
+- Ziel und Nutzerrollen: Admin, iPad-Verwaltung und weitere bereits leseberechtigte Rollen erkennen die Geraetekategorie durch ein blaues Icon hinter jeder Inventarnummer schneller.
+- Datenmodell: Die vorhandene Inventarnummer der Komponente bleibt unveraendert.
+- Rechte und Datenschutz: Bestehende Lese-, Erstell-, Aenderungs- und Loeschrechte bleiben unveraendert; keine neuen Daten oder Auditvorgaenge.
+- Akzeptanz: Jede Inventarnummer in der Geraeteliste zeigt rechts neben dem vollstaendigen Text ein blaues Kategorie-Icon: Tablet fuer iPad, Stift fuer Pencil und Keyboard fuer Tastatur. Weitere Kategorien verwenden vorerst das allgemeine Geraete-Icon als Fallback. Das dekorative Icon ist fuer Screenreader ausgeblendet und loest keine Aktion aus.
+- Offene Fragen: keine.
+
+## Darstellung: Set-Detailansicht
+
+- Schadenseintraege zeigen Schadensnummer, betroffenen Gegenstand sowie Inventarnummern der im Vorgang gespeicherten Komponente und Austauschkomponente. Fehlende Zuordnungen erscheinen als `-`; aktuelle Set-Komponenten ersetzen keine historischen Vorgangszuordnungen. Statusfarben: Entwurf/Storniert grau, Offen gelb, In Bearbeitung blau, Bericht erzeugt violett, Bericht unterschrieben tuerkis, Abgeschlossen gruen. Bestehende Leserechte/RLS gelten auch fuer die Komponenten-Verknuepfungen.
+- Zustand und Verfuegbarkeit verwenden passende dekorative FontAwesome-Icons statt Punkten; die ausgeschriebene Bezeichnung bleibt erhalten.
+- Set-Liste und Set-Detailansicht kennzeichnen die Verfuegbarkeit zusaetzlich zum lesbaren Wort farbig: Frei gruen, Zugeordnet violett, Ausgegeben blau, Blockiert rot und Unklar grau. Reserviert erscheint violett, Zurücksetzen gelb, falls diese Werte vorliegen. Unbekannte Werte bleiben lesbar und neutral grau. Die gemeinsame Darstellung aendert weder Datenmodell noch Rollenrechte oder Workflows und erzeugt keine Schreib-/Auditvorgaenge.
+- Zustandsanzeigen in Listen, Details, Filtern und Lagerexport verwenden zentral die Schreibweisen `OK`, `Unvollständig`, `Beschädigt, nutzbar`, `Defekt`, `Gesperrt, kein MDM` und `Unklar`. Bekannte ASCII-Varianten werden fuer die Anzeige normalisiert; gespeicherte Fachwerte und Legacy-Originalwerte bleiben erhalten. Rollenrechte und Datenmodell aendern sich nicht.
+- Auch die Zustandsspalte der Set-Liste verwendet dieselbe farbige Kennzeichnung wie die Detailansicht. Der vorhandene Link zu den Geraeten bleibt erhalten; Datenmodell und Rollenrechte bleiben unveraendert.
+- Die Schreibweisen `unvollständig` und `unvollstaendig` erhalten beide die gelbe Kennzeichnung.
+- Die Setnummer wird gross und fett hervorgehoben. Der Zustand bleibt als Wort sichtbar und erhaelt zusaetzlich eine farbige Kennzeichnung: ok gruen, unvollstaendig gelb, defekt rot, unklar oder unbekannt neutral grau.
+- Vor den Aufgaben erscheint eine lesende Liste der direkt ueber `damage_case.set_id` zugeordneten Schadensfaelle mit Nummer, Kurzbeschreibung, Meldedatum und Status, neueste zuerst. Auch abgeschlossene und stornierte Faelle bleiben sichtbar; jeder Eintrag verlinkt seine Detailansicht. Leere Liste und Ladefehler sind unterscheidbar.
+- Leserechte: `admin`, `ipad_verwaltung` und `readonly`, serverseitig durch Seitenzugriff und bestehenden Supabase-Client mit RLS abgesichert. Keine neuen Schreibrechte oder Auditvorgaenge. Die Daten werden nur fuer ein geoeffnetes Set geladen.
+- Assumption: Die Schadenshistorie folgt der gespeicherten Set-Zuordnung des Vorgangs, nicht der heutigen Zuordnung einer eventuell ausgetauschten Komponente.
+- Ziel: Admin und iPad-Verwaltung koennen die vorhandenen Set-Angaben schneller erfassen; weitere leseberechtigte Rollen behalten ihren bestehenden Zugriff.
+- Set-, Personen- und Komponentenfelder werden ab 640 px Bildschirmbreite in drei gleich breiten Spalten angezeigt, auf kleineren Bildschirmen untereinander.
+- Im Abschnitt Set stehen in der ersten Zeile Setnummer, Verfügbarkeit und Zustand; in der zweiten Zeile Legacy-Status, Marker und Lagerort.
+- Datenmodell und Rechte fuer Lesen, Erstellen, Aendern und Loeschen bleiben unveraendert. Die Ansicht bleibt lesend; es entstehen keine neuen personenbezogenen Daten oder auditpflichtigen Schreibvorgaenge.
+- Akzeptanz: Die genannte Reihenfolge ist sichtbar, lange Werte umbrechen innerhalb ihrer Spalte, und die mobile Ansicht bleibt ohne horizontales Scrollen lesbar.
+- Offene Fragen: keine.
 
 ## Datenobjekte
 
@@ -78,7 +118,10 @@ Die Schule braucht eine verlaessliche Uebersicht ueber alle Komponenten eines iP
 - Sets koennen einer Person zugeordnet sein und trotzdem physisch im Lager oder Wagen liegen, insbesondere bei Schuelern der 5. und 6. Klassen.
 - Wagenplaetze sollen vorrangig komplette Sets enthalten.
 - Fuer Lagerorte gibt es eine zusaetzliche Lagerliste mit Defaultfilter W1 und XLSX-Export.
-- Die Lagerliste kann frei nach Person, Setnummer und Inventarnummern der Set-Komponenten durchsucht werden.
+- Die Lagerliste kann frei nach Person, Setnummer und Inventarnummern der Set-Komponenten durchsucht und nach iPad-Speichergroesse gefiltert werden.
+- Admin und iPad-Verwaltung koennen den Lagerort eines Sets direkt aus dem Kontextmenue der Lagerliste aendern.
+- Inventarlisten sollen bei Standardansicht und einfachen Filtern serverseitig paginiert werden.
+- Listen sollen fuer haeufige Filter und Sortierungen passende Datenbankindizes verwenden.
 
 ## Offene Fragen
 

@@ -9,6 +9,7 @@ Use this skill for operational component swaps in Supabase.
 
 ## Rules
 
+- Make all operational database changes exclusively in Supabase and verify them there. `db/iPad-Verwaltung.db` is a read-only historical reference; open it with `sqlite3 -readonly` or Python URI `mode=ro` and never change its data or schema. User-requested corrections target Supabase. If Supabase is unavailable, report the limitation instead of writing to SQLite; SQLite changes do not update the WebApp.
 - Treat `inventory_set.legacy_set_id` as the user-facing set number.
 - Treat `set_component_assignment.valid_until is null` as the current component assignment.
 - Never infer current membership only from inventory-number suffixes; use suffixes only as a plausibility check.

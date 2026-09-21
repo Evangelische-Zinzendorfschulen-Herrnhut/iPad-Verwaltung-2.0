@@ -328,7 +328,29 @@ function line(x1: number, y1: number, x2: number, y2: number) {
   return `${x1} ${y1} m ${x2} ${y2} l S`;
 }
 
-function wrapText(text: string, maxChars: number) {
+function approximateTextWidth(text: string, size: number) {
+  return encodeWinAnsi(text).split("").reduce((width, char) => {
+    if (char === " ") {
+      return width + size * 0.28;
+    }
+
+    if ("ilI.,:;!|'".includes(char)) {
+      return width + size * 0.24;
+    }
+
+    if ("mwMW@#%".includes(char)) {
+      return width + size * 0.78;
+    }
+
+    if (/[A-Z0-9]/.test(char)) {
+      return width + size * 0.58;
+    }
+
+    return width + size * 0.48;
+  }, 0);
+}
+
+function wrapText(text: string, maxWidth: number, size = 10) {
   const words = text.split(/\s+/).filter(Boolean);
   const lines: string[] = [];
   let current = "";
@@ -336,7 +358,7 @@ function wrapText(text: string, maxChars: number) {
   for (const word of words) {
     const next = current ? `${current} ${word}` : word;
 
-    if (next.length > maxChars && current) {
+    if (approximateTextWidth(next, size) > maxWidth && current) {
       lines.push(current);
       current = word;
     } else {
@@ -355,13 +377,20 @@ function textBlock(
   x: number,
   y: number,
   text: string,
-  maxChars: number,
+  maxWidth: number,
   maxLines = 3,
   size = 10,
 ) {
-  return wrapText(text || "-", maxChars)
+  const lines = wrapText(text || "-", maxWidth, size);
+  const visibleLines = lines.slice(0, maxLines);
+
+  if (lines.length > maxLines) {
+    visibleLines[visibleLines.length - 1] = `${visibleLines[visibleLines.length - 1].slice(0, -3)}...`;
+  }
+
+  return visibleLines
     .slice(0, maxLines)
-    .map((lineText, index) => textLine(x, y - index * 12, lineText, size))
+    .map((lineText, index) => textLine(x, y - index * 10, lineText, size))
     .join("\n");
 }
 
@@ -374,15 +403,18 @@ function tableSection(
   const left = 48;
   const right = 548;
   const labelX = 58;
-  const valueX = 258;
+  const valueX = 208;
   const headerHeight = 20;
+  const labelMaxWidth = valueX - labelX - 12;
+  const valueMaxWidth = right - valueX - 12;
+  const maxLines = 3;
   const rowHeights = rows.map((row) => {
     const lineCount = Math.max(
-      wrapText(row.label, 27).slice(0, 3).length,
-      wrapText(row.value || "-", 43).slice(0, 3).length,
+      wrapText(row.label, labelMaxWidth, 8).slice(0, maxLines).length,
+      wrapText(row.value || "-", valueMaxWidth, 8).slice(0, maxLines).length,
     );
 
-    return 22 + Math.max(0, lineCount - 1) * 12;
+    return 20 + Math.max(0, lineCount - 1) * 10;
   });
   const tableBottom =
     y - headerHeight - rowHeights.reduce((sum, height) => sum + height, 0);
@@ -404,8 +436,8 @@ function tableSection(
     }
 
     commands.push("0.86 0.86 0.86 RG", line(left, rowBottom, right, rowBottom), "0 g");
-    commands.push(textBlock(labelX, rowTop - 14, row.label, 27, 3, 8));
-    commands.push(textBlock(valueX, rowTop - 14, row.value || "-", 43, 3, 8));
+    commands.push(textBlock(labelX, rowTop - 14, row.label, labelMaxWidth, maxLines, 8));
+    commands.push(textBlock(valueX, rowTop - 14, row.value || "-", valueMaxWidth, maxLines, 8));
   });
 
   return tableBottom - 8;
@@ -486,7 +518,7 @@ function buildPdfContent(data: {
     { label: "Klasse", value: classLabel || "-" },
   ]);
 
-  const signatureY = Math.max(y - 18, 80);
+  const signatureY = Math.max(y - 30, 80);
   commands.push(
     "0 g",
     line(48, signatureY, 250, signatureY),

@@ -1,21 +1,23 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 
 import { requireAppUser, type CurrentAppUser } from "@/lib/auth/current-user";
 import { createClient } from "@/lib/supabase/server";
+import { navigationIconByKind } from "./object-link-icon";
 
 export const metadata: Metadata = {
   title: "Start | iPad-Verwaltung",
 };
 
 const foundations = [
-  { label: "Personen und Klassen", href: "/personen" },
-  { label: "Set-Zuordnung", href: "/sets" },
-  { label: "Geräteliste", href: "/geraete" },
-  { label: "Schadensfälle", href: "/schadensfaelle" },
-  { label: "Aus- und Rückgabeliste", href: "/ausgaben" },
-  { label: "Aufgaben", href: "/aufgaben" },
-  { label: "Lagerliste", href: "/sets/w1" },
+  { label: "Personen und Klassen", href: "/personen", icon: navigationIconByKind.person },
+  { label: "Set-Zuordnung", href: "/sets", icon: navigationIconByKind.set },
+  { label: "Geräteliste", href: "/geraete", icon: navigationIconByKind.devices },
+  { label: "Schadensfälle", href: "/schadensfaelle", icon: navigationIconByKind.damage },
+  { label: "Aus- und Rückgabeliste", href: "/ausgaben", icon: navigationIconByKind.assignments },
+  { label: "Aufgaben", href: "/aufgaben", icon: navigationIconByKind.tasks },
+  { label: "Lagerliste", href: "/sets/w1", icon: navigationIconByKind.storage },
 ];
 
 type DashboardSlice = {
@@ -427,10 +429,15 @@ export default async function Home() {
           {foundations.map((item) => (
             item.href ? (
               <Link
-                className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm transition hover:border-zinc-300 hover:shadow"
+                className="flex items-center gap-3 rounded-lg border border-zinc-200 bg-white p-4 shadow-sm transition hover:border-zinc-300 hover:shadow"
                 href={item.href}
                 key={item.label}
               >
+                <FontAwesomeIcon
+                  aria-hidden="true"
+                  className="h-5 w-5 shrink-0 text-zinc-600"
+                  icon={item.icon}
+                />
                 <p className="font-medium">{item.label}</p>
               </Link>
             ) : (

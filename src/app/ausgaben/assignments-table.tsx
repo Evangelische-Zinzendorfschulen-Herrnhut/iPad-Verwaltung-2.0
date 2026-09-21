@@ -8,6 +8,11 @@ import {
 import Link from "next/link";
 import { MouseEvent, useEffect, useState } from "react";
 
+import {
+  ObjectLinkIcon,
+  objectLinkIconClassName,
+} from "../object-link-icon";
+
 export type AssignmentTableRow = {
   classLabel: string;
   editHref: string;
@@ -119,14 +124,24 @@ export function AssignmentsTable({
           <tbody>
             {rows.map((row) => (
               <tr
-                className="border-t border-zinc-100 hover:bg-zinc-50"
+                className="border-t border-zinc-100 hover:bg-emerald-100"
                 key={row.id}
                 onContextMenu={(event) => openContextMenu(event, row)}
               >
                 <td className="px-4 py-3 font-semibold">
-                  <Link className="hover:underline" href={row.setHref}>
-                    {row.setLabel}
-                  </Link>
+                  <span className="inline-flex items-center gap-2 align-middle">
+                    <Link
+                      aria-label={`${row.setLabel} in der Setliste anzeigen`}
+                      className={objectLinkIconClassName("set")}
+                      href={row.setHref}
+                      title="Set in Setliste anzeigen"
+                    >
+                      <ObjectLinkIcon kind="set" />
+                    </Link>
+                    <Link className="hover:underline" href={row.setHref}>
+                      {row.setLabel}
+                    </Link>
+                  </span>
                 </td>
                 <td className="px-4 py-3">{row.person}</td>
                 <td className="px-4 py-3">{row.classLabel}</td>

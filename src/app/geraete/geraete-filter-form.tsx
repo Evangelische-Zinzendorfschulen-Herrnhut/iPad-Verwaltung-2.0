@@ -84,7 +84,16 @@ export function GeraeteFilterForm({
         router.push(target);
       });
     },
-    [assignment, category, condition, pathname, router, search, setNumber, sort],
+    [
+      assignment,
+      category,
+      condition,
+      pathname,
+      router,
+      search,
+      setNumber,
+      sort,
+    ],
   );
 
   function handleSelectChange(event: ChangeEvent<HTMLSelectElement>) {
@@ -165,7 +174,7 @@ export function GeraeteFilterForm({
           value={condition}
         >
           <option value="">Alle</option>
-          <option value="ok">Ok</option>
+          <option value="ok">OK</option>
           <option value="beschädigt_nutzbar">Beschädigt, nutzbar</option>
           <option value="defekt">Defekt</option>
           <option value="gesperrt_kein_mdm">Gesperrt, kein MDM</option>

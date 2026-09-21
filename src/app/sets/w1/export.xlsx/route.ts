@@ -1,3 +1,4 @@
+import { conditionLabel } from "@/lib/condition";
 import { getCurrentAppUser, hasAnyRole } from "@/lib/auth/current-user";
 import { createSimpleWorkbook } from "@/lib/xlsx/simple-workbook";
 import { loadWagenOverview } from "../../wagen-overview";
@@ -14,6 +15,7 @@ const storageFilters = [
   { label: "Regal1", value: "Regal1" },
   { label: "Alle Lagerorte", value: "all" },
 ];
+const ipadStorageFilters = [32, 64, 128, 256];
 
 function getStorageFilter(searchParams: URLSearchParams) {
   const storage = searchParams.get("storage") ?? "";
@@ -21,6 +23,14 @@ function getStorageFilter(searchParams: URLSearchParams) {
   return storageFilters.some((filter) => filter.value === storage)
     ? storage
     : "W1";
+}
+
+function getIpadStorageFilter(searchParams: URLSearchParams) {
+  const ipadStorage = searchParams.get("ipadStorage") ?? "";
+
+  return ipadStorageFilters.includes(Number(ipadStorage))
+    ? Number(ipadStorage)
+    : null;
 }
 
 function slugifyStorage(value: string) {
@@ -40,6 +50,7 @@ export async function GET(request: Request) {
 
   const searchParams = new URL(request.url).searchParams;
   const selectedStorage = getStorageFilter(searchParams);
+  const selectedIpadStorage = getIpadStorageFilter(searchParams);
   const selectedStorageLabel =
     storageFilters.find((filter) => filter.value === selectedStorage)?.label
     ?? "Wagen W1";
@@ -47,6 +58,7 @@ export async function GET(request: Request) {
   const rows = await loadWagenOverview(
     selectedStorage === "all" ? null : selectedStorage,
     query,
+    selectedIpadStorage,
   );
   const workbook = createSimpleWorkbook([
     {
@@ -74,7 +86,7 @@ export async function GET(request: Request) {
           row.pencil,
           row.keyboard,
           row.availability,
-          row.condition,
+          conditionLabel(row.condition),
           row.storageLabel,
           row.legacyStatus,
         ]),

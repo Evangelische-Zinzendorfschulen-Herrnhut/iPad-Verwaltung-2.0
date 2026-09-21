@@ -53,6 +53,28 @@ function normalizeText(value) {
   return trimmed || null;
 }
 
+function normalizeInventoryNumber(value) {
+  const text = normalizeText(value);
+
+  if (!text) {
+    return null;
+  }
+
+  const match = text.match(/^E\s*0*(\d{1,6})\s*(?:\/\s*0*(\d{1,4})\s*)?$/i);
+
+  if (!match) {
+    return text;
+  }
+
+  const inventoryPart = `E${match[1].padStart(6, "0")}`;
+
+  if (match[2] === undefined) {
+    return inventoryPart;
+  }
+
+  return `${inventoryPart} / ${match[2].padStart(4, "0")}`;
+}
+
 function normalizeInteger(value) {
   if (value === null || value === undefined || value === "") {
     return null;
@@ -220,7 +242,7 @@ function roleForComponent(category) {
 }
 
 function inventoryNumberSetSuffix(value) {
-  const text = normalizeText(value);
+  const text = normalizeInventoryNumber(value);
 
   if (!text) {
     return null;
@@ -358,7 +380,7 @@ async function importComponents(supabase, devices, invoicePositionByLegacyNumber
       .from("inventory_component")
       .upsert(
         {
-          legacy_inventory_number: device.InvNr,
+          legacy_inventory_number: normalizeInventoryNumber(device.InvNr),
           legacy_set_number: normalizeInteger(device.SetNr),
           category,
           model: normalizeText(device.Typ),
@@ -380,7 +402,7 @@ async function importComponents(supabase, devices, invoicePositionByLegacyNumber
       throw error;
     }
 
-    componentByInventoryNumber.set(data.legacy_inventory_number, data);
+    componentByInventoryNumber.set(normalizeInventoryNumber(data.legacy_inventory_number), data);
   }
 
   return componentByInventoryNumber;
@@ -455,7 +477,7 @@ async function importSetComponents(supabase, sets, setByLegacyId, components) {
     const candidates = [legacySet.iPad, legacySet.Pencil, legacySet.Tastatur];
 
     for (const inventoryNumber of candidates) {
-      const component = components.get(normalizeText(inventoryNumber));
+      const component = components.get(normalizeInventoryNumber(inventoryNumber));
 
       if (!setId || !inventoryNumber || !component) {
         if (inventoryNumber) {

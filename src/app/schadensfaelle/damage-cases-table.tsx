@@ -231,7 +231,7 @@ export function DamageCasesTable({
           <tbody>
             {cases.map((caseRow) => (
               <tr
-                className="border-t border-zinc-100 hover:bg-zinc-50"
+                className="border-t border-zinc-100 hover:bg-emerald-100"
                 key={caseRow.id}
                 onContextMenu={(event) => openContextMenu(event, caseRow.id)}
               >

@@ -203,7 +203,7 @@ export function PersonSelectionList({ people }: PersonSelectionListProps) {
                       className={
                         selected
                           ? "bg-emerald-50 ring-1 ring-inset ring-emerald-500"
-                          : "transition hover:bg-zinc-50"
+                          : "transition hover:bg-emerald-100"
                       }
                       key={person.id}
                     >

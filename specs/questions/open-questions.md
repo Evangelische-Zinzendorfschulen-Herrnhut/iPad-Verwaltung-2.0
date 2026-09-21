@@ -32,4 +32,13 @@
 
 ## Aktuelle naechste Frage
 
+### USB-Adapter-Nachtrag, Stand 2026-09-15
+
+- Teilnachtrag erledigt: Zehn eindeutig zuordenbare Adapter sind aktuellen Sets zugeordnet; historische Adapter-Ausgaben aus Excel sind in der Herkunft dokumentiert, nicht als unbelegte historische Set-Zugehoerigkeit zurueckdatiert. Eine belegte abgeschlossene Adapter-Zuordnung wurde nachgetragen. Weitere Eintraege warten auf die untenstehende Modellentscheidung beziehungsweise auf Antworten zu Namensabweichungen, Doppel-Ausgaben, fehlenden Personen und bestehenden Bestandszuordnungen. Personenbezogene Details verbleiben in Supabase und im Arbeitsdialog.
+
+- Personenunabhaengige Setbindung: Sollen Adapter direkt Personen zugeordnet werden koennen, auch ohne aktuelles Set? Entscheidung ausstehend.
+- Historische Nachtraege: Fehlende Rueckgabedaten und Setnummern nicht aus anderen Vorgaengen ableiten. Konkrete Rueckfragen stehen im Arbeitsdialog; bestaetigte personenbezogene Angaben sind ausschliesslich in Supabase dokumentiert.
+- Set-Rueckfrage am 2026-09-15 geklaert: Die Angabe 406 wurde auf das vorhandene Set 403 korrigiert und dessen Personenzuordnung in Supabase nachgetragen. Urspruengliches Ausgabedatum bleibt unbekannt; kein Datum erfunden. Die angefragte historische Setnummer und das Adapter-Rueckgabedatum wurden ebenfalls bestaetigt und in Supabase nachgetragen.
+- Zwei bestehende gleichnamige Personeneintraege mit gleicher E-Mail bleiben nach der bestaetigten Personentyp-Korrektur bis zur gesonderten Dublettenentscheidung erhalten.
+
 Bitte zuerst klaeren: Wie sollen Dubletten beim Personenimport behandelt werden: importieren mit Status `dublette`, zusammenführen, oder zunächst vom Import ausschließen?

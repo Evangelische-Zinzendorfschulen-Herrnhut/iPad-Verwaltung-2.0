@@ -184,8 +184,8 @@ export function SetsFilterForm({
           value={condition}
         >
           <option value="">Alle</option>
-          <option value="ok">Ok</option>
-          <option value="unvollständig">Unvollstaendig</option>
+          <option value="ok">OK</option>
+          <option value="unvollständig">Unvollständig</option>
           <option value="defekt">Defekt</option>
           <option value="unklar">Unklar</option>
         </select>

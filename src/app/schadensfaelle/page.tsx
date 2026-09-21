@@ -1,3 +1,4 @@
+import { ReplacementComponentSearch, type ReplacementOption } from "./replacement-component-search";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
@@ -265,6 +266,17 @@ function optionalText(value: FormDataEntryValue | null) {
   return text || null;
 }
 
+const exchangeStatusOptions = [
+  { label: "Nicht angegeben", value: "" },
+  { label: "Erforderlich", value: "erforderlich" },
+  { label: "Ausgegeben", value: "ausgegeben" },
+  { label: "Kein Austausch", value: "kein Austausch" },
+  { label: "Nicht erforderlich", value: "nicht erforderlich" },
+  { label: "Set getauscht", value: "Set getauscht" },
+  { label: "Settausch angefragt", value: "Settausch angefragt" },
+  { label: "Vorläufig", value: "vorläufig" },
+];
+
 async function updateDamageCase(formData: FormData) {
   "use server";
 
@@ -309,6 +321,10 @@ async function updateDamageCase(formData: FormData) {
     "abrechenbar",
     "nicht_abrechenbar",
   ];
+  const validExchangeStatuses = exchangeStatusOptions.map(
+    (option) => option.value,
+  );
+  const exchangeStatus = String(formData.get("exchange_status") ?? "").trim();
   const normalizedProblemType =
     caseType === "technisches_problem"
       ? problemType || "hardware"
@@ -323,7 +339,8 @@ async function updateDamageCase(formData: FormData) {
       !validProblemTypes.includes(normalizedProblemType)) ||
     !validAffectedItems.includes(affectedItem) ||
     !validStatuses.includes(status) ||
-    !validBillingAssessments.includes(billingAssessment)
+    !validBillingAssessments.includes(billingAssessment) ||
+    !validExchangeStatuses.includes(exchangeStatus)
   ) {
     redirect(appendFlagToHref(returnTo, "error", "missing_required"));
   }
@@ -339,9 +356,23 @@ async function updateDamageCase(formData: FormData) {
   }
 
   const supabase = await createClient();
+  const replacementInventoryNumber = String(formData.get("replacement_inventory_number") ?? "").trim();
+  let replacementComponentId: string | undefined;
+  if (replacementInventoryNumber) {
+    const replacementResult = await supabase.from("inventory_component")
+      .select("id")
+      .eq("legacy_inventory_number", replacementInventoryNumber)
+      .maybeSingle();
+    if (replacementResult.error) throw replacementResult.error;
+    if (!replacementResult.data) {
+      throw new Error("Keine Komponente mit dieser Inventarnummer gefunden.");
+    }
+    replacementComponentId = replacementResult.data.id;
+  }
   const { data: updatedDamageCase, error } = await supabase
     .from("damage_case")
     .update({
+      ...(replacementComponentId ? { replacement_component_id: replacementComponentId } : {}),
       affected_item: affectedItem,
       billing_assessment: billingAssessment,
       case_type: caseType,
@@ -350,7 +381,7 @@ async function updateDamageCase(formData: FormData) {
       handler: nullableText(formData, "handler"),
       incident_description: nullableText(formData, "incident_description"),
       internal_note: nullableText(formData, "internal_note"),
-      legacy_exchange_status: nullableText(formData, "exchange_status"),
+      legacy_exchange_status: exchangeStatus || null,
       legacy_insurance_warranty: nullableText(formData, "liability"),
       location: nullableText(formData, "location"),
       occurred_at: occurredAt || null,
@@ -369,6 +400,7 @@ async function updateDamageCase(formData: FormData) {
   }
 
   if (
+    !replacementComponentId &&
     caseType === "technisches_problem" &&
     normalizedProblemType === "hardware" &&
     updatedDamageCase?.component_id
@@ -857,6 +889,43 @@ export default async function SchadensfaellePage({
       } as DamageCaseDetail)
     : null;
   const editCase = editId && canManageDamageCases ? detailCase : null;
+  const replacementOptions: ReplacementOption[] = [];
+  if (editCase?.component && !editCase.replacement_component) {
+    const damagedResult = await supabase.from("inventory_component")
+      .select("id,category").eq("legacy_inventory_number", editCase.component.legacy_inventory_number).single();
+    if (damagedResult.error) throw damagedResult.error;
+    for (let offset = 0; ; offset += 500) {
+      const result = await supabase.from("inventory_component")
+        .select("id,legacy_inventory_number,model,storage_label,assignments:set_component_assignment(valid_until,set_id,inventory_set:set_id(id,legacy_set_id,condition,availability,assigned_person_id,storage_label,person_assignments:set_person_assignment(returned_at)))")
+        .eq("category", damagedResult.data.category)
+        .in("condition", ["ok", "beschädigt_nutzbar"])
+        .neq("id", damagedResult.data.id)
+        .order("legacy_inventory_number")
+        .range(offset, offset + 499);
+      if (result.error) throw result.error;
+      for (const component of result.data ?? []) {
+        const activeAssignment = component.assignments.find((assignment) => assignment.valid_until === null);
+        const sourceSet = normalizeJoin(activeAssignment?.inventory_set);
+        const eligibleSource = sourceSet
+          && sourceSet.id !== editCase.inventory_set?.id
+          && ["frei", "blockiert"].includes(sourceSet.availability)
+          && !sourceSet.assigned_person_id
+          && !sourceSet.person_assignments.some((assignment: { returned_at: string | null }) => assignment.returned_at === null);
+        if (!activeAssignment || eligibleSource) {
+          replacementOptions.push({
+            id: component.id,
+            inventoryNumber: component.legacy_inventory_number,
+            model: component.model,
+            storage: component.storage_label || sourceSet?.storage_label || null,
+            priority: sourceSet?.condition === "unvollständig" ? 0 : !activeAssignment ? 1 : 2,
+            source: sourceSet ? `Set ${sourceSet.legacy_set_id}${sourceSet.condition === "unvollständig" ? " · Unvollständig – bevorzugt" : ""} (${sourceSet.availability === "frei" ? "Frei" : "Blockiert"})` : "Ohne Set-Zuordnung",
+          });
+        }
+      }
+      if ((result.data?.length ?? 0) < 500) break;
+    }
+  }
+  replacementOptions.sort((a, b) => a.priority - b.priority);
   const detailClassResult =
     detailCase?.person?.id && detailCase.person.person_type === "schueler"
       ? await supabase
@@ -1364,6 +1433,46 @@ export default async function SchadensfaellePage({
               </section>
 
               <section className="grid gap-4 rounded-lg border border-zinc-200 p-4">
+                <h3 className="font-semibold">Austausch</h3>
+                {editCase.replacement_component ? (
+                  <Field label="Ersatzkomponente" value={formatComponent(editCase.replacement_component)} />
+                ) : editCase.component ? (
+                  <ReplacementComponentSearch options={replacementOptions} />
+                ) : (
+                  <p className="text-sm text-zinc-500">Für die Ersatzsuche muss dem Schadensfall eine konkrete Komponente zugeordnet sein.</p>
+                )}
+                <p className="text-sm text-zinc-600">
+                  {editCase.replacement_component
+                    ? "Der dokumentierte Austausch bleibt erhalten. Für einen weiteren Tausch bitte einen neuen Schadensfall anlegen."
+                    : "Mit einer Ersatzkomponente wird beim Speichern sofort getauscht: Der Ersatz wird ins Set eingesetzt und die bisherige Komponente als defekt markiert. Bitte auch das Austauschdatum angeben."}
+                </p>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <FormField label="Austauschstatus">
+                    <select
+                      className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
+                      defaultValue={editCase.legacy_exchange_status === "angefragt" ? "erforderlich" : editCase.legacy_exchange_status ?? ""}
+                      name="exchange_status"
+                    >
+                      {exchangeStatusOptions.map((option) => (
+                        <option key={option.value || "empty"} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </FormField>
+
+                  <FormField label="Ersatz ausgegeben am">
+                    <input
+                      className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
+                      defaultValue={editCase.replacement_issued_at ?? ""}
+                      name="replacement_issued_at"
+                      type="date"
+                    />
+                  </FormField>
+                </div>
+              </section>
+
+              <section className="grid gap-4 rounded-lg border border-zinc-200 p-4">
                 <h3 className="font-semibold">Bearbeitung</h3>
                 <div className="grid gap-4 md:grid-cols-3">
                   <FormField label="Haftung">
@@ -1398,25 +1507,6 @@ export default async function SchadensfaellePage({
                       className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
                       defaultValue={editCase.handler ?? ""}
                       name="handler"
-                    />
-                  </FormField>
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  <FormField label="Austauschstatus">
-                    <input
-                      className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
-                      defaultValue={editCase.legacy_exchange_status ?? ""}
-                      name="exchange_status"
-                    />
-                  </FormField>
-
-                  <FormField label="Ersatz ausgegeben am">
-                    <input
-                      className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
-                      defaultValue={editCase.replacement_issued_at ?? ""}
-                      name="replacement_issued_at"
-                      type="date"
                     />
                   </FormField>
                 </div>

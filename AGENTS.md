@@ -75,6 +75,7 @@ Eine Funktion ist fertig, wenn:
 - Initiale Adminadresse wird ueber `INITIAL_ADMIN_EMAIL` konfiguriert.
 - Initiale Buchhaltungsadresse: buchhaltung.invalid.
 - Legacy-Datenquelle ist `db/iPad-Verwaltung.db`. Sie enthaelt bekannte Inkonsistenzen und darf nur mit Validierungs-/Bereinigungslogik migriert werden.
+- Die SQLite-Legacy-Datenbank ausschliesslich lesend oeffnen (`sqlite3 -readonly` oder Python-URI `mode=ro`); weder Daten noch Schema aendern. Alle fachlichen Datenkorrekturen und Zuordnungen ausschliesslich in Supabase durchfuehren und dort nachlesen. Korrekturauftraege beziehen sich auf Supabase, nicht auf SQLite. Supabase ist die fuehrende Datenquelle der WebApp; SQLite wird nicht automatisch synchronisiert und ist bei fehlendem Supabase-Zugriff kein Schreibersatz.
 - Ausleihrelevante Personentypen sind Schueler, Lehrer, Mitarbeiter, Referendar und Praktikant.
 - Personentyp und Personenstatus werden getrennt gespeichert; Legacy-`BenutzerTyp` wird normalisiert.
 - Schulsozialarbeit wird als `mitarbeiter` gefuehrt; fuer `referendar` und `praktikant` gelten vorlaeufig Lehrer-Regeln.
@@ -107,6 +108,8 @@ Eine Funktion ist fertig, wenn:
 - Personen/Klassen-Zielschema ist in `specs/data/schema-persons-classes.md` beschrieben.
 
 ## Agentenhinweise
+
+- Bei UI-Aenderungen mit Icons den Projekt-Skill `skills/ipad-ui-icons/SKILL.md` lesen und die dort dokumentierten Bedeutungen sowie die zentrale Icon-Zuordnung wiederverwenden.
 
 - Erst vorhandene Specs lesen, dann Code schreiben.
 - Bei Unsicherheit offene Frage in `specs/questions/open-questions.md` ergaenzen.

@@ -1,3 +1,4 @@
+import { conditionLabel } from "@/lib/condition";
 import { createClient } from "@/lib/supabase/server";
 
 type InventorySetRow = {
@@ -75,6 +76,7 @@ export type WagenOverviewRow = {
   detailHref: string;
   id: string;
   ipad: string;
+  ipadStorageGb: number | null;
   ipadMdmHref: string | null;
   keyboard: string;
   legacySetId: number;
@@ -123,10 +125,20 @@ function componentLabel(component: ComponentRow | null) {
   const model = component.model ? ` · ${component.model}` : "";
   const condition =
     component.condition && component.condition !== "ok"
-      ? ` · ${component.condition}`
+      ? ` · ${conditionLabel(component.condition)}`
       : "";
 
   return `${component.legacy_inventory_number ?? ""}${model}${condition}`.trim();
+}
+
+function parseIpadStorageGb(component: ComponentRow | null) {
+  if (!component?.model) {
+    return null;
+  }
+
+  const match = component.model.match(/\b(32|64|128|256)\s*GB\b/i);
+
+  return match ? Number.parseInt(match[1], 10) : null;
 }
 
 function deriveSetCondition(
@@ -208,6 +220,7 @@ function matchesSearch(row: WagenOverviewRow, search: string) {
 export async function loadWagenOverview(
   storageFilter: string | null = "W1",
   searchFilter = "",
+  ipadStorageFilter: number | null = null,
 ) {
   const supabase = await createClient();
   let setQuery = supabase
@@ -379,6 +392,7 @@ export async function loadWagenOverview(
         detailHref: `/sets?setId=${set.legacy_set_id}`,
         id: set.id,
         ipad: componentLabel(ipadComponent),
+        ipadStorageGb: parseIpadStorageGb(ipadComponent),
         ipadMdmHref: ipadComponent?.serial_number
           ? `https://mdm.evssn.de/#/devices/inventory?page=0&limit=100&search=${encodeURIComponent(ipadComponent.serial_number)}`
           : null,
@@ -402,6 +416,9 @@ export async function loadWagenOverview(
       };
     })
     .filter((row) => matchesSearch(row, searchFilter.trim()))
+    .filter((row) =>
+      ipadStorageFilter ? row.ipadStorageGb === ipadStorageFilter : true,
+    )
     .sort((first, second) => {
       if (first.storagePlace && second.storagePlace) {
         return (

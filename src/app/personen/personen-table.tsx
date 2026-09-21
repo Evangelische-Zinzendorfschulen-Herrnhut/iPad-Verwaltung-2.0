@@ -84,7 +84,7 @@ export function PersonenTable({ canEdit, rows }: PersonenTableProps) {
           <tbody>
             {rows.map((row) => (
               <tr
-                className="border-t border-zinc-100 hover:bg-zinc-50"
+                className="border-t border-zinc-100 hover:bg-emerald-100"
                 key={row.id}
                 onContextMenu={(event) => openContextMenu(event, row)}
               >

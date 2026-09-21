@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Icon-Link-Konzept iPad-Verwaltung</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #18181b;
+        --muted: #71717a;
+        --line: #e4e4e7;
+        --soft: #f4f4f5;
+        --person: #047857;
+        --set: #b45309;
+        --device: #2563eb;
+        --mdm: #52525b;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: #fafafa;
+        color: var(--ink);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", sans-serif;
+        line-height: 1.45;
+      }
+
+      main {
+        margin: 0 auto;
+        max-width: 1040px;
+        padding: 48px 24px;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 30px;
+        letter-spacing: 0;
+      }
+
+      .intro {
+        margin: 8px 0 28px;
+        max-width: 760px;
+        color: var(--muted);
+      }
+
+      section {
+        margin-top: 28px;
+      }
+
+      h2 {
+        margin: 0 0 12px;
+        font-size: 18px;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .card {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fff;
+        padding: 18px;
+      }
+
+      .icon-button {
+        display: inline-flex;
+        width: 32px;
+        height: 32px;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: #fff;
+        color: #3f3f46;
+        text-decoration: none;
+        transition:
+          background 120ms ease,
+          border-color 120ms ease,
+          color 120ms ease,
+          transform 120ms ease;
+      }
+
+      .icon-button:hover {
+        border-color: #a1a1aa;
+        background: var(--soft);
+        color: #09090b;
+        transform: translateY(-1px);
+      }
+
+      .icon-button svg {
+        width: 15px;
+        height: 15px;
+        fill: currentColor;
+      }
+
+      .icon-button.person {
+        color: var(--person);
+      }
+
+      .icon-button.set {
+        color: var(--set);
+      }
+
+      .icon-button.mdm {
+        color: var(--mdm);
+      }
+
+      .icon-button.devices {
+        color: var(--device);
+      }
+
+      .label {
+        margin-top: 14px;
+        font-weight: 700;
+      }
+
+      .target {
+        margin-top: 2px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fff;
+        font-size: 14px;
+      }
+
+      th,
+      td {
+        padding: 12px 14px;
+        text-align: left;
+        vertical-align: middle;
+      }
+
+      th {
+        background: var(--soft);
+        color: #52525b;
+        font-weight: 600;
+      }
+
+      tr + tr {
+        border-top: 1px solid #f0f0f1;
+      }
+
+      .cell-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: 650;
+      }
+
+      .note {
+        margin-top: 10px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      @media (max-width: 760px) {
+        main {
+          padding: 28px 16px;
+        }
+
+        .grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Icon-Link-Konzept</h1>
+      <p class="intro">
+        Einheitliche Font-Awesome-Solid-Icons fuer Links in Tabellen der
+        iPad-Verwaltung. Die Icons beschreiben das Zielobjekt, nicht nur die
+        Tatsache, dass ein Link existiert.
+      </p>
+
+      <section>
+        <h2>Vorgeschlagenes Icon-Set</h2>
+        <div class="grid">
+          <div class="card">
+            <a class="icon-button person" href="#" title="Person anzeigen">
+              <svg viewBox="0 0 448 512" aria-hidden="true">
+                <path
+                  d="M224 248a120 120 0 1 0 0-240 120 120 0 1 0 0 240zm-29.7 56C95.8 304 16 383.8 16 482.3 16 498.7 29.3 512 45.7 512l356.6 0c16.4 0 29.7-13.3 29.7-29.7 0-98.5-79.8-178.3-178.3-178.3l-59.4 0z"
+                />
+              </svg>
+            </a>
+            <div class="label">Person</div>
+            <div class="target">faUser · zur Personenliste</div>
+          </div>
+
+          <div class="card">
+            <a class="icon-button set" href="#" title="Set anzeigen">
+              <svg viewBox="0 0 448 512" aria-hidden="true">
+                <path
+                  d="M369.4 128l-34.3-48-222.1 0-34.3 48 290.7 0zM0 148.5c0-13.3 4.2-26.3 11.9-37.2L60.9 42.8C72.9 26 92.3 16 112.9 16l222.1 0c20.7 0 40.1 10 52.1 26.8l48.9 68.5c7.8 10.9 11.9 23.9 11.9 37.2L448 416c0 35.3-28.7 64-64 64L64 480c-35.3 0-64-28.7-64-64L0 148.5z"
+                />
+              </svg>
+            </a>
+            <div class="label">Set</div>
+            <div class="target">faBox · zur Setliste</div>
+          </div>
+
+          <div class="card">
+            <a class="icon-button set" href="#" title="Set anzeigen">
+              <svg viewBox="0 0 512 512" aria-hidden="true">
+                <path
+                  d="M224 0l0 64c0 8.8 7.2 16 16 16l32 0c8.8 0 16-7.2 16-16l0-64 32 0c35.3 0 64 28.7 64 64l0 128c0 5.5-.7 10.9-2 16l-252 0c-1.3-5.1-2-10.5-2-16l0-128c0-35.3 28.7-64 64-64l32 0zm96 512c-11.2 0-21.8-2.9-31-8 9.5-16.5 15-35.6 15-56l0-128c0-20.4-5.5-39.5-15-56 9.2-5.1 19.7-8 31-8l32 0 0 64c0 8.8 7.2 16 16 16l32 0c8.8 0 16-7.2 16-16l0-64 32 0c35.3 0 64 28.7 64 64l0 128c0 35.3-28.7 64-64 64l-128 0zM0 320c0-35.3 28.7-64 64-64l32 0 0 64c0 8.8 7.2 16 16 16l32 0c8.8 0 16-7.2 16-16l0-64 32 0c35.3 0 64 28.7 64 64l0 128c0 35.3-28.7 64-64 64L64 512c-35.3 0-64-28.7-64-64L0 320z"
+                />
+              </svg>
+            </a>
+            <div class="label">Set Alternative</div>
+            <div class="target">faBoxesStacked · zur Setliste</div>
+          </div>
+
+          <div class="card">
+            <a class="icon-button set" href="#" title="Setliste anzeigen">
+              <svg viewBox="0 0 512 512" aria-hidden="true">
+                <path
+                  d="M40 48C26.7 48 16 58.7 16 72l0 48c0 13.3 10.7 24 24 24l48 0c13.3 0 24-10.7 24-24l0-48c0-13.3-10.7-24-24-24L40 48zM192 64c-17.7 0-32 14.3-32 32s14.3 32 32 32l288 0c17.7 0 32-14.3 32-32s-14.3-32-32-32L192 64zm0 160c-17.7 0-32 14.3-32 32s14.3 32 32 32l288 0c17.7 0 32-14.3 32-32s-14.3-32-32-32l-288 0zm0 160c-17.7 0-32 14.3-32 32s14.3 32 32 32l288 0c17.7 0 32-14.3 32-32s-14.3-32-32-32l-288 0zM16 232l0 48c0 13.3 10.7 24 24 24l48 0c13.3 0 24-10.7 24-24l0-48c0-13.3-10.7-24-24-24l-48 0c-13.3 0-24 10.7-24 24zM40 368c-13.3 0-24 10.7-24 24l0 48c0 13.3 10.7 24 24 24l48 0c13.3 0 24-10.7 24-24l0-48c0-13.3-10.7-24-24-24l-48 0z"
+                />
+              </svg>
+            </a>
+            <div class="label">Setliste Alternative</div>
+            <div class="target">faList · zur Setliste</div>
+          </div>
+
+          <div class="card">
+            <a class="icon-button mdm" href="#" title="Im MDM oeffnen">
+              <svg viewBox="0 0 448 512" aria-hidden="true">
+                <path
+                  d="M0 64C0 28.7 28.7 0 64 0L384 0c35.3 0 64 28.7 64 64l0 384c0 35.3-28.7 64-64 64L64 512c-35.3 0-64-28.7-64-64L0 64zM256 432a32 32 0 1 0 -64 0 32 32 0 1 0 64 0zM384 64l-320 0 0 288 320 0 0-288z"
+                />
+              </svg>
+            </a>
+            <div class="label">MDM</div>
+            <div class="target">faTabletScreenButton · zum MDM</div>
+          </div>
+
+          <div class="card">
+            <a class="icon-button devices" href="#" title="Geraete anzeigen">
+              <svg viewBox="0 0 512 512" aria-hidden="true">
+                <path
+                  d="M232.5 5.2c14.9-6.9 32.1-6.9 47 0l218.6 101c8.5 3.9 13.9 12.4 13.9 21.8s-5.4 17.9-13.9 21.8l-218.6 101c-14.9 6.9-32.1 6.9-47 0L13.9 149.8C5.4 145.8 0 137.3 0 128s5.4-17.9 13.9-21.8L232.5 5.2zM48.1 218.4l164.3 75.9c27.7 12.8 59.6 12.8 87.3 0l164.3-75.9 34.1 15.8c8.5 3.9 13.9 12.4 13.9 21.8s-5.4 17.9-13.9 21.8l-218.6 101c-14.9 6.9-32.1 6.9-47 0L13.9 277.8C5.4 273.8 0 265.3 0 256s5.4-17.9 13.9-21.8l34.1-15.8zM13.9 362.2l34.1-15.8 164.3 75.9c27.7 12.8 59.6 12.8 87.3 0l164.3-75.9 34.1 15.8c8.5 3.9 13.9 12.4 13.9 21.8s-5.4 17.9-13.9 21.8l-218.6 101c-14.9 6.9-32.1 6.9-47 0L13.9 405.8C5.4 401.8 0 393.3 0 384s5.4-17.9 13.9-21.8z"
+                />
+              </svg>
+            </a>
+            <div class="label">Geraeteliste</div>
+            <div class="target">faLayerGroup · Komponenten anzeigen</div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Beispiel in einer Tabelle</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Set</th>
+              <th>Person</th>
+              <th>iPad</th>
+              <th>Zustand</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>
+                <span class="cell-link">
+                  <a class="icon-button set" href="#" title="Setliste anzeigen">
+                    <svg viewBox="0 0 512 512" aria-hidden="true">
+                      <path
+                        d="M40 48C26.7 48 16 58.7 16 72l0 48c0 13.3 10.7 24 24 24l48 0c13.3 0 24-10.7 24-24l0-48c0-13.3-10.7-24-24-24L40 48zM192 64c-17.7 0-32 14.3-32 32s14.3 32 32 32l288 0c17.7 0 32-14.3 32-32s-14.3-32-32-32L192 64zm0 160c-17.7 0-32 14.3-32 32s14.3 32 32 32l288 0c17.7 0 32-14.3 32-32s-14.3-32-32-32l-288 0zm0 160c-17.7 0-32 14.3-32 32s14.3 32 32 32l288 0c17.7 0 32-14.3 32-32s-14.3-32-32-32l-288 0zM16 232l0 48c0 13.3 10.7 24 24 24l48 0c13.3 0 24-10.7 24-24l0-48c0-13.3-10.7-24-24-24l-48 0c-13.3 0-24 10.7-24 24zM40 368c-13.3 0-24 10.7-24 24l0 48c0 13.3 10.7 24 24 24l48 0c13.3 0 24-10.7 24-24l0-48c0-13.3-10.7-24-24-24l-48 0z"
+                      />
+                    </svg>
+                  </a>
+                  Set 7
+                </span>
+              </td>
+              <td>
+                <span class="cell-link">
+                  <a class="icon-button person" href="#" title="Person anzeigen">
+                    <svg viewBox="0 0 448 512" aria-hidden="true">
+                      <path
+                        d="M224 248a120 120 0 1 0 0-240 120 120 0 1 0 0 240zm-29.7 56C95.8 304 16 383.8 16 482.3 16 498.7 29.3 512 45.7 512l356.6 0c16.4 0 29.7-13.3 29.7-29.7 0-98.5-79.8-178.3-178.3-178.3l-59.4 0z"
+                      />
+                    </svg>
+                  </a>
+                  Arlt, Fynn-Luca
+                </span>
+              </td>
+              <td>
+                <span class="cell-link">
+                  E001234 / 0007
+                  <a class="icon-button mdm" href="#" title="Im MDM oeffnen">
+                    <svg viewBox="0 0 448 512" aria-hidden="true">
+                      <path
+                        d="M0 64C0 28.7 28.7 0 64 0L384 0c35.3 0 64 28.7 64 64l0 384c0 35.3-28.7 64-64 64L64 512c-35.3 0-64-28.7-64-64L0 64zM256 432a32 32 0 1 0 -64 0 32 32 0 1 0 64 0zM384 64l-320 0 0 288 320 0 0-288z"
+                      />
+                    </svg>
+                  </a>
+                </span>
+              </td>
+              <td>
+                <span class="cell-link">
+                  <a
+                    class="icon-button devices"
+                    href="#"
+                    title="Geraete dieses Sets anzeigen"
+                  >
+                    <svg viewBox="0 0 512 512" aria-hidden="true">
+                      <path
+                        d="M232.5 5.2c14.9-6.9 32.1-6.9 47 0l218.6 101c8.5 3.9 13.9 12.4 13.9 21.8s-5.4 17.9-13.9 21.8l-218.6 101c-14.9 6.9-32.1 6.9-47 0L13.9 149.8C5.4 145.8 0 137.3 0 128s5.4-17.9 13.9-21.8L232.5 5.2zM48.1 218.4l164.3 75.9c27.7 12.8 59.6 12.8 87.3 0l164.3-75.9 34.1 15.8c8.5 3.9 13.9 12.4 13.9 21.8s-5.4 17.9-13.9 21.8l-218.6 101c-14.9 6.9-32.1 6.9-47 0L13.9 277.8C5.4 273.8 0 265.3 0 256s5.4-17.9 13.9-21.8l34.1-15.8zM13.9 362.2l34.1-15.8 164.3 75.9c27.7 12.8 59.6 12.8 87.3 0l164.3-75.9 34.1 15.8c8.5 3.9 13.9 12.4 13.9 21.8s-5.4 17.9-13.9 21.8l-218.6 101c-14.9 6.9-32.1 6.9-47 0L13.9 405.8C5.4 401.8 0 393.3 0 384s5.4-17.9 13.9-21.8z"
+                      />
+                    </svg>
+                  </a>
+                  ok
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <p class="note">
+          Hinweis: In der App sollten die Icons per FontAwesomeIcon-Komponente
+          gerendert werden. Diese Vorschau bettet die SVGs nur direkt ein, damit
+          die Datei eigenstaendig funktioniert.
+        </p>
+      </section>
+    </main>
+  </body>
+</html>

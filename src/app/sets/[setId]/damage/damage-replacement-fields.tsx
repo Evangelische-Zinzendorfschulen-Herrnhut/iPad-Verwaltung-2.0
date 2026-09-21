@@ -60,40 +60,73 @@ export function DamageReplacementFields({
 
   return (
     <>
-      <FormFieldLabel label="Komponente">
-        <select
-          className="inventory-number rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
-          name="component_id"
-          onChange={(event) => setComponentId(event.target.value)}
-          value={componentId}
-        >
-          <option value="">Keine Komponente mit Inventarnummer</option>
-          {currentComponents.map((component) => (
-            <option key={component.id} value={component.id}>
-              {component.label}
-            </option>
-          ))}
-        </select>
-      </FormFieldLabel>
+      <CurrentComponentSelect
+        componentId={componentId}
+        currentComponents={currentComponents}
+        setComponentId={setComponentId}
+      />
 
-      <FormFieldLabel label="Ersatzkomponente">
-        <select
-          className="inventory-number rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2 disabled:bg-zinc-100 disabled:text-zinc-500"
-          disabled={!selectedComponent}
-          name="replacement_component_id"
-        >
-          <option value="">
-            {selectedComponent
-              ? "Keine Ersatzkomponente"
-              : "Erst Komponente auswählen"}
-          </option>
-          {matchingReplacementComponents.map((component) => (
-            <option key={component.id} value={component.id}>
-              {component.label} · {component.sourceLabel}
-            </option>
-          ))}
-        </select>
-      </FormFieldLabel>
+      <ReplacementComponentSelect
+        matchingReplacementComponents={matchingReplacementComponents}
+        selectedComponent={selectedComponent}
+      />
     </>
+  );
+}
+
+export function CurrentComponentSelect({
+  componentId,
+  currentComponents,
+  setComponentId,
+}: {
+  componentId: string;
+  currentComponents: CurrentComponentOption[];
+  setComponentId: (componentId: string) => void;
+}) {
+  return (
+    <FormFieldLabel label="Komponente">
+      <select
+        className="inventory-number rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
+        name="component_id"
+        onChange={(event) => setComponentId(event.target.value)}
+        value={componentId}
+      >
+        <option value="">Keine Komponente mit Inventarnummer</option>
+        {currentComponents.map((component) => (
+          <option key={component.id} value={component.id}>
+            {component.label}
+          </option>
+        ))}
+      </select>
+    </FormFieldLabel>
+  );
+}
+
+export function ReplacementComponentSelect({
+  matchingReplacementComponents,
+  selectedComponent,
+}: {
+  matchingReplacementComponents: ReplacementComponentOption[];
+  selectedComponent: CurrentComponentOption | undefined;
+}) {
+  return (
+    <FormFieldLabel label="Ersatzkomponente">
+      <select
+        className="inventory-number rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2 disabled:bg-zinc-100 disabled:text-zinc-500"
+        disabled={!selectedComponent}
+        name="replacement_component_id"
+      >
+        <option value="">
+          {selectedComponent
+            ? "Keine Ersatzkomponente"
+            : "Erst Komponente auswählen"}
+        </option>
+        {matchingReplacementComponents.map((component) => (
+          <option key={component.id} value={component.id}>
+            {component.label} · {component.sourceLabel}
+          </option>
+        ))}
+      </select>
+    </FormFieldLabel>
   );
 }

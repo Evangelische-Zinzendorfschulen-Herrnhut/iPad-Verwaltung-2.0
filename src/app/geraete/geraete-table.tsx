@@ -1,9 +1,26 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { MouseEvent, useEffect, useState } from "react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faKeyboard,
+  faLayerGroup,
+  faPen,
+  faTabletScreenButton,
+} from "@fortawesome/free-solid-svg-icons";
+
+import {
+  ObjectLinkIcon,
+  objectLinkIconClassName,
+} from "../object-link-icon";
+
+const categoryIcons: Record<string, typeof faTabletScreenButton> = {
+  ipad: faTabletScreenButton,
+  pencil: faPen,
+  tastatur: faKeyboard,
+};
 
 export type GeraeteTableRow = {
   assignmentLabel: string;
@@ -114,12 +131,21 @@ export function GeraeteTable({
           <tbody>
             {rows.map((row) => (
               <tr
-                className="border-t border-zinc-100 hover:bg-zinc-50"
+                className="border-t border-zinc-100 hover:bg-emerald-100"
                 key={row.id}
                 onContextMenu={(event) => openContextMenu(event, row)}
               >
                 <td className="inventory-number whitespace-nowrap px-4 py-3 font-semibold">
-                  {row.legacyInventoryNumber}
+                  <span className="inline-flex items-center gap-2 align-middle">
+                    <span>{row.legacyInventoryNumber}</span>
+                    <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center text-blue-700">
+                      <FontAwesomeIcon
+                        aria-hidden="true"
+                        className="block h-3.5 w-3.5"
+                        icon={categoryIcons[row.categoryLabel.trim().toLowerCase()] ?? faLayerGroup}
+                      />
+                    </span>
+                  </span>
                 </td>
                 <td className="px-4 py-3">{row.categoryLabel}</td>
                 <td className="px-4 py-3">
@@ -136,19 +162,12 @@ export function GeraeteTable({
                     <span className="inline-flex items-center gap-2 align-middle">
                       <Link
                         aria-label={`Set ${row.setLabel} in der Setliste anzeigen`}
-                        className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full align-middle transition hover:scale-105"
+                        className={objectLinkIconClassName("set")}
                         href={row.setHref}
                         target="_blank"
                         title="Set in Setliste anzeigen"
                       >
-                        <Image
-                          alt=""
-                          aria-hidden="true"
-                          className="block h-5 w-5"
-                          height={20}
-                          src="/arrow_right_orange.svg"
-                          width={20}
-                        />
+                        <ObjectLinkIcon kind="set" />
                       </Link>
                       <span>{row.setLabel}</span>
                     </span>

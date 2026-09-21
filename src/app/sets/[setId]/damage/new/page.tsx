@@ -1,3 +1,4 @@
+import { DamageExchangeForm, DamageExchangeFields } from "../../../damage-exchange-form";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
@@ -6,7 +7,6 @@ import type { ReactNode } from "react";
 import { getCurrentAppUser, hasAnyRole } from "@/lib/auth/current-user";
 import { createClient } from "@/lib/supabase/server";
 import { FieldIcon } from "@/app/schadensfaelle/field-icon";
-import { DamageReplacementFields } from "../damage-replacement-fields";
 
 export const metadata: Metadata = {
   title: "Neuer Schaden | iPad-Verwaltung",
@@ -46,11 +46,6 @@ type CurrentAssignmentRow = {
 
 type RawCurrentAssignmentRow = Omit<CurrentAssignmentRow, "person"> & {
   person: CurrentAssignmentRow["person"] | CurrentAssignmentRow["person"][];
-};
-
-type InventorySetOptionRow = {
-  id: string;
-  legacy_set_id: number;
 };
 
 type InventoryComponentOptionRow = {
@@ -137,6 +132,17 @@ function affectedItemLabel(value: string) {
 
   return labels[value] ?? value;
 }
+
+const exchangeStatusOptions = [
+  { label: "Nicht angegeben", value: "" },
+  { label: "Erforderlich", value: "erforderlich" },
+  { label: "Ausgegeben", value: "ausgegeben" },
+  { label: "Kein Austausch", value: "kein Austausch" },
+  { label: "Nicht erforderlich", value: "nicht erforderlich" },
+  { label: "Set getauscht", value: "Set getauscht" },
+  { label: "Settausch angefragt", value: "Settausch angefragt" },
+  { label: "Vorläufig", value: "vorläufig" },
+];
 
 function getSingleParam(
   searchParams: Record<string, string | string[] | undefined>,
@@ -541,7 +547,9 @@ async function createDamageCase(formData: FormData) {
   const caseType = String(formData.get("case_type") ?? "");
   const problemType = String(formData.get("problem_type") ?? "");
   const affectedItem = String(formData.get("affected_item") ?? "");
-  const status = String(formData.get("status") ?? "offen");
+  const status = formData.get("billing_assessment") === "nicht_abrechenbar"
+    ? "abgeschlossen"
+    : String(formData.get("status") ?? "offen");
   const componentId = String(formData.get("component_id") ?? "");
   const replacementComponentId = String(
     formData.get("replacement_component_id") ?? "",
@@ -560,20 +568,27 @@ async function createDamageCase(formData: FormData) {
   const handler = String(formData.get("handler") ?? "").trim();
   const billingAssessment = String(formData.get("billing_assessment") ?? "unklar");
   const liability = String(formData.get("liability") ?? "").trim();
-  const exchangeStatus = String(formData.get("exchange_status") ?? "").trim();
+  const exchangeStatus = replacementComponentId || replacementSetId ? "ausgegeben" : String(formData.get("exchange_status") ?? "").trim();
   const hasStorageLabelField = formData.has("storage_label");
   const storageLabel = String(formData.get("storage_label") ?? "").trim();
   const returnTo = String(formData.get("return_to") ?? "/sets");
 
   const validProblemTypes = ["hardware", "software"];
+  const validExchangeStatuses = exchangeStatusOptions.map(
+    (option) => option.value,
+  );
   const normalizedProblemType =
     caseType === "schaden" || caseType === "verlust" ? "hardware" : problemType;
 
   if (
+    (Boolean(replacementComponentId) && (affectedItem !== "component" || !componentId)) ||
+    (Boolean(replacementSetId) && affectedItem !== "set") ||
+    (Boolean(replacementComponentId || replacementSetId) && !replacementIssuedAt) ||
     !setId ||
     !caseType ||
     !affectedItem ||
     !reportedAt ||
+    !validExchangeStatuses.includes(exchangeStatus) ||
     (caseType === "technisches_problem" &&
       !validProblemTypes.includes(normalizedProblemType))
   ) {
@@ -587,6 +602,22 @@ async function createDamageCase(formData: FormData) {
   }
 
   const supabase = await createClient();
+  if (replacementComponentId) {
+    const original = await supabase.from("inventory_component").select("category").eq("id", componentId).single();
+    const replacement = await supabase.from("inventory_component").select("category,condition").eq("id", replacementComponentId).single();
+    const originalLink = await supabase.from("set_component_assignment").select("id").eq("component_id", componentId).eq("set_id", setId).is("valid_until", null).maybeSingle();
+    const source = await supabase.from("set_component_assignment").select("set_id").eq("component_id", replacementComponentId).is("valid_until", null).maybeSingle();
+    if (original.error || replacement.error || originalLink.error || source.error || !originalLink.data || source.data?.set_id === setId || original.data?.category !== replacement.data?.category || !["ok", "beschädigt_nutzbar"].includes(replacement.data?.condition ?? "")) {
+      throw new Error("Die Ersatzkomponente passt nicht zur Schadenskomponente oder ist nicht verfügbar.");
+    }
+    if (source.data) {
+    const sourceSet = await supabase.from("inventory_set").select("availability,assigned_person_id").eq("id", source.data.set_id).single();
+    const sourcePerson = await supabase.from("set_person_assignment").select("id").eq("set_id", source.data.set_id).is("returned_at", null).maybeSingle();
+    if (sourceSet.error || sourcePerson.error || !["frei", "blockiert"].includes(sourceSet.data?.availability ?? "") || sourceSet.data?.assigned_person_id || sourcePerson.data) {
+      throw new Error("Die Ersatzkomponente muss aus einem freien oder blockierten Set ohne Personenzuordnung stammen.");
+    }
+    }
+  }
   const [{ data: set }, { data: person }, { data: component }] = await Promise.all([
     supabase
       .from("inventory_set")
@@ -654,7 +685,9 @@ async function createDamageCase(formData: FormData) {
       location: location || null,
       witnesses: witnesses || null,
       handler: handler || null,
-      internal_note: internalNote || null,
+      internal_note: [internalNote, billingAssessment === "nicht_abrechenbar"
+        ? `Automatisch abgeschlossen wegen Abrechnung „Nicht abrechenbar“ am ${new Date().toISOString()} durch Nutzer ${appUser!.id}.`
+        : null].filter(Boolean).join("\n") || null,
       billing_assessment: billingAssessment,
       legacy_exchange_status: exchangeStatus || null,
       legacy_insurance_warranty: liability || null,
@@ -794,25 +827,42 @@ export default async function DamageNewPage({
         .order("role", { ascending: true }),
       supabase
         .from("inventory_set")
-        .select("id,legacy_set_id")
+        .select("id,legacy_set_id,storage_label,person_assignments:set_person_assignment(returned_at),components:set_component_assignment(role,valid_until)")
+        .eq("availability", "frei")
+        .eq("condition", "ok")
+        .is("assigned_person_id", null)
         .order("legacy_set_id", { ascending: true })
         .limit(1000),
-      supabase
-        .from("inventory_component")
-        .select("id,category,legacy_inventory_number,model")
-        .order("legacy_inventory_number", { ascending: true })
-        .limit(3000),
+      (async () => {
+        const data: InventoryComponentOptionRow[] = [];
+        for (let offset = 0; ; offset += 500) {
+          const result = await supabase.from("inventory_component")
+            .select("id,category,legacy_inventory_number,model")
+            .in("condition", ["ok", "beschädigt_nutzbar"])
+            .order("legacy_inventory_number").range(offset, offset + 499);
+          if (result.error) throw result.error;
+          data.push(...result.data);
+          if (result.data.length < 500) return { data };
+        }
+      })(),
       supabase
         .from("inventory_set")
-        .select("id,legacy_set_id")
-        .eq("availability", "frei")
+        .select("id,legacy_set_id,condition,availability,storage_label,person_assignments:set_person_assignment(returned_at)")
+        .is("assigned_person_id", null)
+        .in("availability", ["frei", "blockiert"])
         .order("legacy_set_id", { ascending: true })
         .limit(1000),
-      supabase
-        .from("set_component_assignment")
-        .select("component_id,set_id")
-        .is("valid_until", null)
-        .limit(4000),
+      (async () => {
+        const data: ComponentAssignmentCandidateRow[] = [];
+        for (let offset = 0; ; offset += 500) {
+          const result = await supabase.from("set_component_assignment")
+            .select("component_id,set_id").is("valid_until", null)
+            .order("id").range(offset, offset + 499);
+          if (result.error) throw result.error;
+          data.push(...result.data);
+          if (result.data.length < 500) return { data };
+        }
+      })(),
     ]);
 
   if (!set) {
@@ -833,18 +883,18 @@ export default async function DamageNewPage({
     ...componentAssignment,
     component: normalizeJoin(componentAssignment.component),
   }));
-  const setOptions = (setOptionsData ?? []) as InventorySetOptionRow[];
+  const setOptions = (setOptionsData ?? []).filter((option) =>
+    !option.person_assignments.some((assignment) => assignment.returned_at === null)
+    && ["ipad", "pencil", "keyboard"].every((role) => option.components.some((component) => component.role === role && component.valid_until === null)),
+  );
   const componentOptions = (componentOptionsData ??
     []) as InventoryComponentOptionRow[];
-  const freeSets = (freeSetData ?? []) as InventorySetOptionRow[];
+  const freeSets = (freeSetData ?? []).filter((item) => !item.person_assignments.some((assignment) => assignment.returned_at === null));
   const currentComponentAssignments = (currentComponentAssignmentData ??
     []) as ComponentAssignmentCandidateRow[];
   const freeSetIdSet = new Set(freeSets.map((freeSet) => freeSet.id));
   const freeSetLabelById = new Map(
-    freeSets.map((freeSet) => [freeSet.id, `freies Set ${freeSet.legacy_set_id}`]),
-  );
-  const assignedComponentIds = new Set(
-    currentComponentAssignments.map((assignment) => assignment.component_id),
+    freeSets.map((freeSet) => [freeSet.id, `Set ${freeSet.legacy_set_id} · ${freeSet.condition === "unvollständig" ? "Unvollständig – bevorzugt" : "Vollständiges Set"} · ${freeSet.availability === "frei" ? "Frei" : "Blockiert"} · Lagerort: ${freeSet.storage_label || "-"}`]),
   );
   const freeSetComponentSourceById = new Map(
     currentComponentAssignments
@@ -854,15 +904,21 @@ export default async function DamageNewPage({
         freeSetLabelById.get(assignment.set_id) ?? "freies Set",
       ]),
   );
+  const assignedComponentIds = new Set(currentComponentAssignments.map((assignment) => assignment.component_id));
+  const preferredSetIds = new Set(freeSets.filter((set) => set.condition === "unvollständig").map((set) => set.id));
+  const preferredComponentIds = new Set(currentComponentAssignments.filter((assignment) => preferredSetIds.has(assignment.set_id)).map((assignment) => assignment.component_id));
   const replacementComponentOptions = componentOptions
     .filter(
       (component) =>
         component.id !== componentAssignments.find(
           (assignment) => assignment.component_id === component.id,
         )?.component_id &&
-        (freeSetComponentSourceById.has(component.id) ||
-          !assignedComponentIds.has(component.id)),
+        (freeSetComponentSourceById.has(component.id) || !assignedComponentIds.has(component.id)),
     )
+    .sort((a, b) => {
+      const priority = (id: string) => preferredComponentIds.has(id) ? 0 : !assignedComponentIds.has(id) ? 1 : 2;
+      return priority(a.id) - priority(b.id);
+    })
     .map((component) => ({
       category: component.category,
       id: component.id,
@@ -910,7 +966,7 @@ export default async function DamageNewPage({
           </p>
         )}
 
-        <form
+        <DamageExchangeForm
           action={createDamageCase}
           className={
             embedded
@@ -923,83 +979,105 @@ export default async function DamageNewPage({
           <input name="person_id" type="hidden" value={assignment?.person_id ?? ""} />
           <input name="return_to" type="hidden" value={returnTo} />
 
-          <div className="grid gap-4 sm:grid-cols-3">
-            <FormFieldLabel label="Vorgangsart">
-              <select
-                className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
-                defaultValue={
-                  isProblemMode ? "technisches_problem" : "schaden"
-                }
-                name="case_type"
-                required
-              >
-                <option value="schaden">Schaden</option>
-                <option value="verlust">Verlust</option>
-                <option value="technisches_problem">Technisches Problem</option>
-              </select>
-            </FormFieldLabel>
+          <section className="grid gap-4 rounded-lg border border-zinc-200 p-4">
+            <h3 className="font-semibold">Kernangaben</h3>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <FormFieldLabel label="Vorgangsart">
+                <select
+                  className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
+                  defaultValue={isProblemMode ? "technisches_problem" : "schaden"}
+                  name="case_type"
+                  required
+                >
+                  <option value="schaden">Schaden</option>
+                  <option value="verlust">Verlust</option>
+                  <option value="technisches_problem">Technisches Problem</option>
+                </select>
+              </FormFieldLabel>
 
-            <FormFieldLabel label="Meldedatum">
-              <input
-                className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
-                defaultValue={today}
-                name="reported_at"
-                required
-                type="date"
-              />
-            </FormFieldLabel>
+              <FormFieldLabel label="Problemart">
+                <select
+                  className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
+                  defaultValue="hardware"
+                  name="problem_type"
+                >
+                  <option value="hardware">Hardware</option>
+                  <option value="software">Software</option>
+                </select>
+              </FormFieldLabel>
 
-            <FormFieldLabel label="Status">
-              <select
-                className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
-                name="status"
-                defaultValue="offen"
-              >
-                <option value="offen">Offen</option>
-                <option value="in_bearbeitung">In Bearbeitung</option>
-              </select>
-            </FormFieldLabel>
-          </div>
+              <FormFieldLabel label="Status">
+                <select
+                  className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
+                  defaultValue="offen"
+                  name="status"
+                >
+                  <option value="offen">Offen</option>
+                  <option value="in_bearbeitung">In Bearbeitung</option>
+                  <option value="abgeschlossen">Abgeschlossen</option>
+                </select>
+              </FormFieldLabel>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <FormFieldLabel label="Problemart">
-              <select
-                className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
-                defaultValue="hardware"
-                name="problem_type"
-              >
-                <option value="hardware">Hardware</option>
-                <option value="software">Software</option>
-              </select>
-            </FormFieldLabel>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FormFieldLabel label="Betroffen">
+                <select
+                  className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
+                  name="affected_item"
+                  required
+                >
+                  <option value="component">Konkrete Komponente</option>
+                  <option value="set">Ganzes Set</option>
+                  <option value="power_adapter">Netzteil zum iPad</option>
+                  <option value="charging_cable">Kabel zum iPad</option>
+                  <option value="other">Sonstiges Zubehör</option>
+                </select>
+              </FormFieldLabel>
 
-            <FormFieldLabel label="Betroffen">
-              <select
-                className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
-                name="affected_item"
-                required
-              >
-                <option value="component">Konkrete Komponente</option>
-                <option value="set">Ganzes Set</option>
-                <option value="power_adapter">Netzteil zum iPad</option>
-                <option value="charging_cable">Kabel zum iPad</option>
-                <option value="other">Sonstiges Zubehör</option>
-              </select>
-            </FormFieldLabel>
+              <FormFieldLabel label="Komponente">
+                <select
+                  className="inventory-number rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
+                  name="component_id"
+                >
+                  <option value="">Keine Komponente mit Inventarnummer</option>
+                  {currentComponentOptions.map((component) => (
+                    <option key={component.id} value={component.id}>
+                      {component.label}
+                    </option>
+                  ))}
+                </select>
+              </FormFieldLabel>
+            </div>
+          </section>
 
-            <DamageReplacementFields
-              currentComponents={currentComponentOptions}
-              replacementComponents={replacementComponentOptions}
-            />
-          </div>
+          <section className="grid gap-4 rounded-lg border border-zinc-200 p-4">
+            <h3 className="font-semibold">Schaden</h3>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <FormFieldLabel label="Meldedatum">
+                <input
+                  className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
+                  defaultValue={today}
+                  name="reported_at"
+                  required
+                  type="date"
+                />
+              </FormFieldLabel>
 
-          <div className="grid gap-4 sm:grid-cols-3">
-            <FormFieldLabel label="Ort">
-              <input
-                className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
-                name="location"
-              />
-            </FormFieldLabel>
+              <FormFieldLabel label="Ereignisdatum">
+                <input
+                  className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
+                  name="occurred_at"
+                  type="date"
+                />
+              </FormFieldLabel>
+
+              <FormFieldLabel label="Ort">
+                <input
+                  className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
+                  name="location"
+                />
+              </FormFieldLabel>
+            </div>
 
             {isProblemMode ? (
               <FormFieldLabel label="Lagerort">
@@ -1012,122 +1090,100 @@ export default async function DamageNewPage({
               </FormFieldLabel>
             ) : null}
 
-            <FormFieldLabel label="Haftung">
-              <select
-                className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
-                name="liability"
-              >
-                <option value="">Unklar</option>
-                <option value="Eltern">Eltern</option>
-                <option value="Schule">Schule</option>
-                <option value="Garantie">Garantie</option>
-              </select>
-            </FormFieldLabel>
+            {isProblemMode ? null : (
+              <FormFieldLabel label="Hergang | Wie">
+                <textarea
+                  className="min-h-24 rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
+                  name="incident_description"
+                />
+              </FormFieldLabel>
+            )}
 
-            <FormFieldLabel label="Erste Einschätzung">
-              <select
-                className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
-                name="billing_assessment"
-              >
-                <option value="unklar">Unklar</option>
-                <option value="abrechenbar">Abrechenbar</option>
-                <option value="nicht_abrechenbar">Nicht abrechenbar</option>
-              </select>
-            </FormFieldLabel>
-          </div>
-
-          <FormFieldLabel label="Ereignisdatum">
-            <input
-              className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
-              name="occurred_at"
-              type="date"
-            />
-          </FormFieldLabel>
-
-          {isProblemMode ? null : (
-            <FormFieldLabel label="Hergang | Wie">
+            <FormFieldLabel
+              label={isProblemMode ? "Problembeschreibung" : "Schadenbeschreibung | was"}
+            >
               <textarea
-                className="min-h-24 rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
-                name="incident_description"
+                className="min-h-28 rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
+                name="detail_description"
               />
             </FormFieldLabel>
-          )}
 
-          <FormFieldLabel
-            label={isProblemMode ? "Problembeschreibung" : "Schadenbeschreibung | was"}
-          >
-            <textarea
-              className="min-h-28 rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
-              name="detail_description"
-            />
-          </FormFieldLabel>
+            {isProblemMode ? null : (
+              <FormFieldLabel label="Zeugen">
+                <textarea
+                  className="min-h-20 rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
+                  name="witnesses"
+                />
+              </FormFieldLabel>
+            )}
+          </section>
 
-          {isProblemMode ? null : (
-            <FormFieldLabel label="Zeugen">
-              <textarea
-                className="min-h-20 rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
-                name="witnesses"
-              />
-            </FormFieldLabel>
-          )}
+          <DamageExchangeFields current={currentComponentOptions} components={replacementComponentOptions} sets={setOptions.filter((option) => option.id !== set.id)} />
 
-          <FormFieldLabel label="Bearbeiter">
-            <input
-              className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
-              defaultValue={appUser.fullName ?? appUser.displayName ?? appUser.email}
-              name="handler"
-            />
-          </FormFieldLabel>
-
-          <section className="grid gap-4 border-t border-zinc-200 pt-4">
-            <h3 className="text-sm font-semibold text-zinc-700">Geräteaustausch</h3>
+          <section className="grid gap-4 rounded-lg border border-zinc-200 p-4">
+            <h3 className="font-semibold">Bearbeitung</h3>
             <div className="grid gap-4 sm:grid-cols-3">
-              <FormFieldLabel label="Austauschstatus">
+              <FormFieldLabel label="Haftung">
                 <select
                   className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
-                  name="exchange_status"
+                  name="liability"
                 >
-                  <option value="">Kein Austausch</option>
-                  <option value="angefragt">Angefragt</option>
-                  <option value="ausgegeben">Ausgegeben</option>
-                  <option value="vorläufig">Vorläufig</option>
-                  <option value="nicht erforderlich">Nicht erforderlich</option>
+                  <option value="">Unklar</option>
+                  <option value="Eltern">Eltern</option>
+                  <option value="Schule">Schule</option>
+                  <option value="Garantie">Garantie</option>
                 </select>
               </FormFieldLabel>
 
-            <FormFieldLabel label="Ersatz ausgegeben am">
-              <input
-                className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
-                name="replacement_issued_at"
-                type="date"
-              />
-            </FormFieldLabel>
+              <FormFieldLabel label="Abrechnung">
+                <select
+                  className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
+                  name="billing_assessment"
+                >
+                  <option value="unklar">Unklar</option>
+                  <option value="abrechenbar">Abrechenbar</option>
+                  <option value="nicht_abrechenbar">Nicht abrechenbar</option>
+                </select>
+              </FormFieldLabel>
 
-            <FormFieldLabel label="Ersatzset">
-              <select
-                className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
-                name="replacement_set_id"
-              >
-                <option value="">Kein Ersatzset</option>
-                {setOptions
-                  .filter((option) => option.id !== set.id)
-                  .map((option) => (
-                    <option key={option.id} value={option.id}>
-                      {option.legacy_set_id}
-                    </option>
-                  ))}
-              </select>
-            </FormFieldLabel>
+              <FormFieldLabel label="Bearbeiter">
+                <input
+                  className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
+                  defaultValue={appUser.fullName ?? appUser.displayName ?? appUser.email}
+                  name="handler"
+                />
+              </FormFieldLabel>
             </div>
 
+            <FormFieldLabel label="Interne Notiz">
+              <textarea
+                className="min-h-20 rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
+                name="internal_note"
+              />
+            </FormFieldLabel>
           </section>
 
-          <FormFieldLabel label="Interne Notiz">
-            <input
-              className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
-              name="internal_note"
-            />
-          </FormFieldLabel>
+          <section className="rounded-lg border border-zinc-200 p-4">
+            <h3 className="font-semibold">Zuordnung</h3>
+            <dl className="mt-4 grid gap-4 sm:grid-cols-2">
+              <div>
+                <dt className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+                  Person
+                </dt>
+                <dd className="mt-1 text-sm font-medium text-zinc-900">
+                  {formatPerson(assignment?.person ?? null)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+                  Set
+                </dt>
+                <dd className="mt-1 text-sm font-medium text-zinc-900">
+                  {set.legacy_set_id}
+                </dd>
+              </div>
+            </dl>
+          </section>
 
           <div className="flex flex-wrap justify-end gap-3 border-t border-zinc-200 pt-4">
             <Link
@@ -1140,7 +1196,7 @@ export default async function DamageNewPage({
               Meldung speichern
             </button>
           </div>
-        </form>
+        </DamageExchangeForm>
       </section>
     </main>
   );

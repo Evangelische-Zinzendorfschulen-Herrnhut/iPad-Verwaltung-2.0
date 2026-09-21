@@ -1,8 +1,14 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
+import { SetConditionBadge } from "./set-condition-badge";
+import { SetAvailabilityBadge } from "./set-availability-badge";
 import { MouseEvent, useEffect, useState } from "react";
+
+import {
+  ObjectLinkIcon,
+  objectLinkIconClassName,
+} from "../object-link-icon";
 
 export type SetsTableRow = {
   availability: string;
@@ -158,7 +164,7 @@ export function SetsTable({ releaseAction, rows, taskAction }: SetsTableProps) {
           <tbody>
             {rows.map((row) => (
               <tr
-                className="border-t border-zinc-100 hover:bg-zinc-50"
+                className="border-t border-zinc-100 hover:bg-emerald-100"
                 key={row.id}
                 onContextMenu={(event) => openContextMenu(event, row)}
               >
@@ -169,18 +175,11 @@ export function SetsTable({ releaseAction, rows, taskAction }: SetsTableProps) {
                       {row.personHref ? (
                         <Link
                           aria-label={`${row.person} in der Personenliste anzeigen`}
-                          className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full align-middle transition hover:scale-105"
+                          className={objectLinkIconClassName("person")}
                           href={row.personHref}
                           title="Person in Personenliste anzeigen"
                         >
-                          <Image
-                            alt=""
-                            aria-hidden="true"
-                            className="block h-5 w-5"
-                            height={20}
-                            src="/arrow_right_green.svg"
-                            width={20}
-                          />
+                          <ObjectLinkIcon kind="person" />
                         </Link>
                       ) : null}
                       <span>{row.person}</span>
@@ -190,18 +189,11 @@ export function SetsTable({ releaseAction, rows, taskAction }: SetsTableProps) {
                       {row.previousPersonHref ? (
                         <Link
                           aria-label={`${row.previousPerson} in der Personenliste anzeigen`}
-                          className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full align-middle opacity-70 transition hover:scale-105 hover:opacity-100"
+                          className={`${objectLinkIconClassName("person")} opacity-70 hover:opacity-100`}
                           href={row.previousPersonHref}
                           title="Person in Personenliste anzeigen"
                         >
-                          <Image
-                            alt=""
-                            aria-hidden="true"
-                            className="block h-5 w-5"
-                            height={20}
-                            src="/arrow_right_green.svg"
-                            width={20}
-                          />
+                          <ObjectLinkIcon kind="person" />
                         </Link>
                       ) : null}
                       <span>ehemals {row.previousPerson}</span>
@@ -216,20 +208,13 @@ export function SetsTable({ releaseAction, rows, taskAction }: SetsTableProps) {
                     {row.ipadMdmHref ? (
                       <a
                         aria-label={`iPad ${row.ipad} im MDM öffnen`}
-                        className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full align-middle transition hover:scale-105"
+                        className={objectLinkIconClassName("mdm")}
                         href={row.ipadMdmHref}
                         rel="noreferrer"
                         target="_blank"
                         title="Im MDM öffnen"
                       >
-                        <Image
-                          alt=""
-                          aria-hidden="true"
-                          className="block h-5 w-5"
-                          height={20}
-                          src="/arrow_right.svg"
-                          width={20}
-                        />
+                        <ObjectLinkIcon kind="mdm" />
                       </a>
                     ) : null}
                   </span>
@@ -237,26 +222,19 @@ export function SetsTable({ releaseAction, rows, taskAction }: SetsTableProps) {
                 <td className="inventory-number px-4 py-3 whitespace-nowrap">{row.pencil}</td>
                 <td className="inventory-number px-4 py-3 whitespace-nowrap">{row.keyboard}</td>
                 <td className="px-4 py-3">{row.storageLabel}</td>
-                <td className="px-4 py-3">{row.availability}</td>
+                <td className="px-4 py-3"><SetAvailabilityBadge value={row.availability} /></td>
                 <td className="px-4 py-3">
                   <span className="inline-flex items-center gap-2 align-middle">
                     <Link
                       aria-label={`Geräte von Set ${row.legacySetId} anzeigen`}
-                      className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full align-middle transition hover:scale-105"
+                      className={objectLinkIconClassName("devices")}
                       href={row.devicesHref}
                       target="_blank"
                       title="Geräte dieses Sets anzeigen"
                     >
-                      <Image
-                        alt=""
-                        aria-hidden="true"
-                        className="block h-5 w-5"
-                        height={20}
-                        src="/arrow_right_orange.svg"
-                        width={20}
-                      />
+                      <ObjectLinkIcon kind="devices" />
                     </Link>
-                    <span>{row.condition}</span>
+                    <SetConditionBadge value={row.condition} />
                   </span>
                 </td>
                 <td className="px-4 py-3 text-zinc-600">

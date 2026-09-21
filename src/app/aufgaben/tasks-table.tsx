@@ -3,6 +3,11 @@
 import Link from "next/link";
 import { MouseEvent, useEffect, useState } from "react";
 
+import {
+  ObjectLinkIcon,
+  objectLinkIconClassName,
+} from "../object-link-icon";
+
 type TaskStatus = "offen" | "in_bearbeitung" | "erledigt" | "archiviert";
 type TaskPriority = "normal" | "hoch";
 
@@ -80,6 +85,46 @@ function relatedObjectLabel(type: string | null) {
   return type ? (labels[type] ?? type) : "-";
 }
 
+function objectLinkKindFromType(type: string | null) {
+  if (type === "person") {
+    return "person";
+  }
+
+  if (type === "set") {
+    return "set";
+  }
+
+  if (type === "komponente") {
+    return "devices";
+  }
+
+  if (type === "schadensfall") {
+    return "damage";
+  }
+
+  return null;
+}
+
+function objectLinkKindFromLabel(label: string) {
+  if (label.includes("Person")) {
+    return "person";
+  }
+
+  if (label === "Setliste") {
+    return "set";
+  }
+
+  if (label === "Geräteliste") {
+    return "devices";
+  }
+
+  if (label === "Schadensfälle") {
+    return "damage";
+  }
+
+  return null;
+}
+
 function formatDate(value: string | null) {
   if (!value) {
     return "-";
@@ -127,14 +172,32 @@ function RelatedObjectField({ task }: { task: TaskListRow }) {
       </dt>
       <dd className="mt-1 break-words text-sm font-medium">
         {task.related_object_href && task.related_object_label ? (
-          <Link
-            className="text-emerald-700 underline decoration-emerald-300 underline-offset-2 hover:text-emerald-900"
-            href={task.related_object_href}
-            rel="noreferrer"
-            target="_blank"
-          >
-            {task.related_object_label}
-          </Link>
+          <span className="inline-flex items-center gap-2 align-middle">
+            {objectLinkKindFromType(task.related_object_type) ? (
+              <Link
+                aria-label={`${task.related_object_label} anzeigen`}
+                className={objectLinkIconClassName(
+                  objectLinkKindFromType(task.related_object_type)!,
+                )}
+                href={task.related_object_href}
+                rel="noreferrer"
+                target="_blank"
+                title={`${relatedObjectLabel(task.related_object_type)} anzeigen`}
+              >
+                <ObjectLinkIcon
+                  kind={objectLinkKindFromType(task.related_object_type)!}
+                />
+              </Link>
+            ) : null}
+            <Link
+              className="text-emerald-700 underline decoration-emerald-300 underline-offset-2 hover:text-emerald-900"
+              href={task.related_object_href}
+              rel="noreferrer"
+              target="_blank"
+            >
+              {task.related_object_label}
+            </Link>
+          </span>
         ) : (
           <span className="text-zinc-900">
             {task.related_object_id ?? "-"}
@@ -173,27 +236,42 @@ function RelatedLinks({ task }: { task: TaskListRow }) {
               </p>
               <div className="mt-1 grid gap-1">
                 {links.map((link) => (
-                  <Link
-                    className="group flex min-h-10 items-center justify-between gap-4 py-1 text-sm"
-                    href={link.href}
+                  <div
+                    className="flex min-h-10 items-center gap-2 py-1 text-sm"
                     key={link.href}
-                    rel="noreferrer"
-                    target="_blank"
                   >
+                    {objectLinkKindFromLabel(link.label) ? (
+                      <Link
+                        aria-label={`${link.description} anzeigen`}
+                        className={objectLinkIconClassName(
+                          objectLinkKindFromLabel(link.label)!,
+                        )}
+                        href={link.href}
+                        rel="noreferrer"
+                        target="_blank"
+                        title={`${link.label} anzeigen`}
+                      >
+                        <ObjectLinkIcon
+                          kind={objectLinkKindFromLabel(link.label)!}
+                        />
+                      </Link>
+                    ) : null}
                     <span className="min-w-0">
-                      <span className="block break-words font-semibold text-emerald-700 underline decoration-emerald-300 underline-offset-2 group-hover:text-emerald-900">
+                      <Link
+                        className="block break-words font-semibold text-emerald-700 underline decoration-emerald-300 underline-offset-2 hover:text-emerald-900"
+                        href={link.href}
+                        rel="noreferrer"
+                        target="_blank"
+                      >
                         {link.description}
-                      </span>
+                      </Link>
                       {link.meta ? (
                         <span className="mt-1 block text-xs text-zinc-600">
                           {link.meta}
                         </span>
                       ) : null}
                     </span>
-                    <span aria-hidden="true" className="shrink-0 text-zinc-400">
-                      ↗
-                    </span>
-                  </Link>
+                  </div>
                 ))}
               </div>
             </div>
@@ -281,7 +359,7 @@ export function TasksTable({
 
                 return (
                   <tr
-                    className="border-t border-zinc-100 hover:bg-zinc-50"
+                    className="border-t border-zinc-100 hover:bg-emerald-100"
                     key={task.id}
                     onContextMenu={(event) => openContextMenu(event, task)}
                   >

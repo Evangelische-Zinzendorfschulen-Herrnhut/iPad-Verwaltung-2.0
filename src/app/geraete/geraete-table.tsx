@@ -15,6 +15,8 @@ import {
   ObjectLinkIcon,
   objectLinkIconClassName,
 } from "../object-link-icon";
+import { SetAvailabilityBadge } from "../sets/set-availability-badge";
+import { SetConditionBadge } from "../sets/set-condition-badge";
 
 const categoryIcons: Record<string, typeof faTabletScreenButton> = {
   ipad: faTabletScreenButton,
@@ -23,7 +25,7 @@ const categoryIcons: Record<string, typeof faTabletScreenButton> = {
 };
 
 export type GeraeteTableRow = {
-  assignmentLabel: string;
+  assignmentAvailability: string | null;
   categoryLabel: string;
   condition: string;
   conditionLabel: string;
@@ -156,7 +158,9 @@ export function GeraeteTable({
                     </span>
                   ) : null}
                 </td>
-                <td className="px-4 py-3">{row.conditionLabel}</td>
+                <td className="px-4 py-3">
+                  <SetConditionBadge value={row.condition} />
+                </td>
                 <td className="px-4 py-3">
                   {row.setHref ? (
                     <span className="inline-flex items-center gap-2 align-middle">
@@ -175,7 +179,13 @@ export function GeraeteTable({
                     row.setLabel
                   )}
                 </td>
-                <td className="px-4 py-3">{row.assignmentLabel}</td>
+                <td className="px-4 py-3">
+                  {row.assignmentAvailability ? (
+                    <SetAvailabilityBadge value={row.assignmentAvailability} />
+                  ) : (
+                    "Ohne Set"
+                  )}
+                </td>
                 <td className="px-4 py-3">{row.storageLabel}</td>
                 <td className="whitespace-nowrap px-4 py-3">
                   {row.purchaseDateLabel}

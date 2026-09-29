@@ -83,7 +83,8 @@ type SetAssignmentRow = {
     availability: string;
     condition: string;
     id: string;
-    legacy_set_id: number;
+    inventory_number: string | null;
+    legacy_set_id: number | null;
     storage_label: string | null;
   } | null;
 };
@@ -108,7 +109,8 @@ type DamageCaseRow = {
   status: string;
   inventory_set: {
     id: string;
-    legacy_set_id: number;
+    inventory_number: string | null;
+    legacy_set_id: number | null;
   } | null;
   component: {
     legacy_inventory_number: string;
@@ -161,10 +163,21 @@ function filteredListHref(pathname: "/schadensfaelle" | "/sets", person: PersonR
   return `${pathname}?${params.toString()}`;
 }
 
-function setDetailHref(set: { id: string; legacy_set_id: number }) {
+function setIdentifier(set: {
+  inventory_number: string | null;
+  legacy_set_id: number | null;
+}) {
+  return set.inventory_number || String(set.legacy_set_id ?? "-");
+}
+
+function setDetailHref(set: {
+  id: string;
+  inventory_number: string | null;
+  legacy_set_id: number | null;
+}) {
   const params = new URLSearchParams({
     detail: set.id,
-    setId: String(set.legacy_set_id),
+    setId: setIdentifier(set),
   });
 
   return `/sets?${params.toString()}`;
@@ -279,7 +292,7 @@ export default async function PersonDetailPage({
       supabase
         .from("set_person_assignment")
         .select(
-          "id,issued_at,returned_at,legacy_status,issue_note,return_note,inventory_set:set_id(id,legacy_set_id,availability,condition,storage_label)",
+          "id,issued_at,returned_at,legacy_status,issue_note,return_note,inventory_set:set_id(id,inventory_number,legacy_set_id,availability,condition,storage_label)",
         )
         .eq("person_id", personId)
         .order("returned_at", { ascending: false, nullsFirst: true })
@@ -288,7 +301,7 @@ export default async function PersonDetailPage({
       supabase
         .from("damage_case")
         .select(
-          "id,damage_number,case_type,affected_item,status,reported_at,occurred_at,short_description,billing_assessment,legacy_insurance_warranty,inventory_set:set_id(id,legacy_set_id),component:component_id(legacy_inventory_number,model)",
+          "id,damage_number,case_type,affected_item,status,reported_at,occurred_at,short_description,billing_assessment,legacy_insurance_warranty,inventory_set:set_id(id,inventory_number,legacy_set_id),component:component_id(legacy_inventory_number,model)",
         )
         .eq("person_id", personId)
         .order("damage_number", { ascending: false }),
@@ -475,7 +488,7 @@ export default async function PersonDetailPage({
                         {assignment.inventory_set ? (
                           <span className="inline-flex items-center gap-2 align-middle">
                             <Link
-                              aria-label={`Set ${assignment.inventory_set.legacy_set_id} in der Setliste anzeigen`}
+                              aria-label={`Set ${setIdentifier(assignment.inventory_set)} in der Setliste anzeigen`}
                               className={objectLinkIconClassName("set")}
                               href={setDetailHref(assignment.inventory_set)}
                               title="Set in Setliste anzeigen"
@@ -486,7 +499,7 @@ export default async function PersonDetailPage({
                               className="hover:underline"
                               href={setDetailHref(assignment.inventory_set)}
                             >
-                              Set {assignment.inventory_set.legacy_set_id}
+                              Set {setIdentifier(assignment.inventory_set)}
                             </Link>
                           </span>
                         ) : (
@@ -579,7 +592,7 @@ export default async function PersonDetailPage({
                         {damageCase.inventory_set ? (
                           <span className="inline-flex items-center gap-2 align-middle">
                             <Link
-                              aria-label={`Set ${damageCase.inventory_set.legacy_set_id} in der Setliste anzeigen`}
+                              aria-label={`Set ${setIdentifier(damageCase.inventory_set)} in der Setliste anzeigen`}
                               className={objectLinkIconClassName("set")}
                               href={setDetailHref(damageCase.inventory_set)}
                               title="Set in Setliste anzeigen"
@@ -590,7 +603,7 @@ export default async function PersonDetailPage({
                               className="hover:underline"
                               href={setDetailHref(damageCase.inventory_set)}
                             >
-                              Set {damageCase.inventory_set.legacy_set_id}
+                              Set {setIdentifier(damageCase.inventory_set)}
                             </Link>
                           </span>
                         ) : (

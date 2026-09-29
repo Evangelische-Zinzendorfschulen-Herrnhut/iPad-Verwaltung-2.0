@@ -103,6 +103,12 @@ Die Schule braucht eine verlaessliche Uebersicht ueber alle Komponenten eines iP
 
 - Die Geräteliste kann alle iPads gemeinsam oder nach 32, 64, 128 und 256 GB
   Speicher filtern.
+- Die Zuordnungsspalte der Geräteliste zeigt bei Komponenten in einem Set die
+  konkrete Verfügbarkeit mit denselben Begriffen und Farbmarkierungen wie die
+  Set-Liste. Komponenten ohne aktuelle Set-Zuordnung werden als `Ohne Set`
+  angezeigt.
+- Die Gerätedetails listen alle Schadensfälle auf, in denen die Komponente als
+  betroffenes Gerät oder Austauschgerät vorkommt, und verlinken den Fall.
 
 - Eine Komponente kann ueber Inventarnummer oder Seriennummer gefunden werden.
 - Der aktuelle Status ist eindeutig sichtbar.

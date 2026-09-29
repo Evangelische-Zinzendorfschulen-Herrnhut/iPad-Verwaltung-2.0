@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { getCurrentAppUser, hasAnyRole } from "@/lib/auth/current-user";
 import { createClient } from "@/lib/supabase/server";
 import { SectionTabs } from "../section-tabs";
+import { DamageStatusBadge } from "../sets/damage-status-badge";
 import { GeraeteFilterForm } from "./geraete-filter-form";
 import { GeraeteTable, type GeraeteTableRow } from "./geraete-table";
 import { PageSizeSelect } from "./page-size-select";
@@ -89,6 +90,18 @@ type InventoryComponentListRow = {
 };
 
 type DeviceSort = "inventory" | "category" | "set" | "condition";
+
+type ComponentDamageCaseRow = {
+  id: string;
+  damage_number: number;
+  component_id: string | null;
+  replacement_component_id: string | null;
+  reported_at: string;
+  short_description: string;
+  status: string;
+  component: { legacy_inventory_number: string | null } | { legacy_inventory_number: string | null }[] | null;
+  replacement_component: { legacy_inventory_number: string | null } | { legacy_inventory_number: string | null }[] | null;
+};
 
 const DEFAULT_PAGE_SIZE = 10;
 const PAGE_SIZE_OPTIONS = [10, 25, 50] as const;
@@ -276,16 +289,6 @@ function assignmentKind(assignment: ComponentAssignmentRow | undefined) {
   }
 
   return assignment.set.availability === "frei" ? "free_set" : "assigned_set";
-}
-
-function assignmentLabel(assignment: ComponentAssignmentRow | undefined) {
-  if (!assignment?.set) {
-    return "Ohne Set";
-  }
-
-  return assignment.set.availability === "frei"
-    ? "In freiem Set"
-    : "In zugeordnetem/ausgegebenem Set";
 }
 
 function chunkValues<T>(values: T[], size = QUERY_BATCH_SIZE) {
@@ -907,7 +910,7 @@ export default async function GeraetePage({
     const assignment = assignmentByComponentId.get(component.id);
 
     return {
-      assignmentLabel: assignmentLabel(assignment),
+      assignmentAvailability: assignment?.set?.availability || null,
       categoryLabel: categoryLabel(component.category),
       condition: component.condition,
       conditionLabel: conditionLabel(component.condition),
@@ -963,6 +966,22 @@ export default async function GeraetePage({
     : undefined;
   const editInvoicePosition = normalizeJoined(editComponent?.invoice_position);
   const editInvoice = normalizeJoined(editInvoicePosition?.invoice);
+  let editDamageCases: ComponentDamageCaseRow[] = [];
+
+  if (editComponent) {
+    const { data: damageCases, error: damageCasesError } = await supabase
+      .from("damage_case")
+      .select("id,damage_number,component_id,replacement_component_id,reported_at,short_description,status,component:component_id(legacy_inventory_number),replacement_component:replacement_component_id(legacy_inventory_number)")
+      .or(`component_id.eq.${editComponent.id},replacement_component_id.eq.${editComponent.id}`)
+      .order("reported_at", { ascending: false })
+      .order("damage_number", { ascending: false });
+
+    if (damageCasesError) {
+      throw damageCasesError;
+    }
+
+    editDamageCases = (damageCases ?? []) as ComponentDamageCaseRow[];
+  }
   const closeEditHref = buildGeraeteHref(params, {
     edit: null,
     page: currentPage,
@@ -1335,6 +1354,56 @@ export default async function GeraetePage({
                     </dd>
                   </div>
                 </dl>
+              </section>
+
+              <section className="grid gap-3">
+                <h3 className="font-semibold">Schäden zu diesem Gerät</h3>
+                {editDamageCases.length ? (
+                  <ul className="grid gap-2">
+                    {editDamageCases.map((damageCase) => (
+                      <li key={damageCase.id}>
+                        <Link
+                          className="flex flex-wrap items-start justify-between gap-3 rounded-md border border-zinc-200 px-3 py-3 transition hover:bg-zinc-50 focus-visible:outline-2 focus-visible:outline-emerald-600"
+                          href={`/schadensfaelle?detail=${damageCase.id}`}
+                        >
+                          <div className="min-w-0 flex-1">
+                            <p className="break-words text-sm font-semibold text-zinc-950">
+                              Schaden {damageCase.damage_number}
+                            </p>
+                            <p className="mt-1 text-sm text-zinc-700">
+                              Rolle: {damageCase.component_id === editComponent.id ? "Betroffenes Gerät" : "Austauschgerät"}
+                            </p>
+                            <dl className="mt-2 grid gap-2 text-xs sm:grid-cols-2">
+                              <div>
+                                <dt className="text-zinc-500">InvNr Komponente</dt>
+                                <dd className="inventory-number mt-1 break-words">
+                                  {normalizeJoined(damageCase.component)?.legacy_inventory_number || "-"}
+                                </dd>
+                              </div>
+                              <div>
+                                <dt className="text-zinc-500">InvNr Austauschkomponente</dt>
+                                <dd className="inventory-number mt-1 break-words">
+                                  {normalizeJoined(damageCase.replacement_component)?.legacy_inventory_number || "-"}
+                                </dd>
+                              </div>
+                            </dl>
+                            <p className="mt-2 break-words text-sm text-zinc-600">
+                              {damageCase.short_description || "Ohne Kurzbeschreibung"}
+                            </p>
+                            <p className="mt-1 text-xs text-zinc-500">
+                              Gemeldet: {formatDate(damageCase.reported_at) || "-"}
+                            </p>
+                          </div>
+                          <DamageStatusBadge value={damageCase.status} />
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="rounded-md border border-zinc-200 px-3 py-2 text-sm text-zinc-500">
+                    Keine Schadensfälle zu diesem Gerät vorhanden.
+                  </p>
+                )}
               </section>
 
               <div className="sticky bottom-0 -mx-6 flex justify-end gap-3 border-t border-zinc-200 bg-white px-6 py-4">

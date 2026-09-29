@@ -10,9 +10,9 @@ export function SetConditionBadge({
   const normalized = normalizeCondition(String(value ?? "unklar"));
   const colors = normalized === "ok"
     ? "bg-emerald-100 text-emerald-800"
-    : normalized === "defekt"
+    : normalized === "defekt" || normalized === "gesperrt_kein_mdm"
       ? "bg-red-100 text-red-800"
-      : normalized === "unvollständig"
+      : normalized === "unvollständig" || normalized === "beschädigt_nutzbar"
         ? "bg-amber-100 text-amber-800"
         : "bg-zinc-100 text-zinc-700";
 

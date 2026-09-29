@@ -55,6 +55,7 @@ In der Personenliste sind nur die wichtigsten Stammdaten sichtbar. Fuer Verwaltu
 - Given ein berechtigter Nutzer sieht die Personenliste, When er eine Person per Kontextmenue oeffnet, Then erscheint eine Detailansicht zur gewaehlten Person.
 - Given eine Person hat eine aktuelle Klassenzuordnung, When die Detailansicht angezeigt wird, Then werden Klasse und Schuljahr angezeigt.
 - Given eine Person hat Set-Zuordnungen, When die Detailansicht angezeigt wird, Then werden aktuelle und historische Set-Zuordnungen mit Ausgabe- und Rueckgabedatum angezeigt.
+- Given eine Set-Zuordnung verweist auf ein Set mit neuer Setkennung statt Legacy-Setnummer, When die Detailansicht angezeigt wird, Then wird die neue Setkennung in Zuordnungen, Links und Schadensfaellen verwendet.
 - Given eine Person hat Schadensfaelle, When die Detailansicht angezeigt wird, Then werden alle Schadensfaelle mit Nummer, Meldedatum, Art, betroffenem Objekt, Status, Abrechnungseinschaetzung und Beschreibung angezeigt.
 - Given ein Schadensfall ist mit Set oder Komponente verknuepft, When die Detailansicht angezeigt wird, Then werden Set und Komponente in der Schadensfallzeile angezeigt.
 - Given ein Admin oeffnet das Kontextmenue einer Person, When er `Datensatz bearbeiten` waehlt, Then oeffnet sich die Detailseite im Bearbeitungsmodus.

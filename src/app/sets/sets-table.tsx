@@ -24,7 +24,7 @@ export type SetsTableRow = {
   issueLabel: string | null;
   issueProtocolHref: string | null;
   keyboard: string;
-  legacySetId: number;
+  setIdentifier: string;
   legacyStatus: string | null;
   pencil: string;
   person: string;
@@ -123,7 +123,7 @@ export function SetsTable({ releaseAction, rows, taskAction }: SetsTableProps) {
       returnProtocolHref: row.returnProtocolHref,
       returnSetHref: row.returnSetHref,
       setId: row.id,
-      setLabel: `Set ${row.legacySetId}`,
+      setLabel: `Set ${row.setIdentifier}`,
       storageHref: row.storageHref,
       x: event.clientX,
       y: event.clientY,
@@ -168,7 +168,7 @@ export function SetsTable({ releaseAction, rows, taskAction }: SetsTableProps) {
                 key={row.id}
                 onContextMenu={(event) => openContextMenu(event, row)}
               >
-                <td className="px-4 py-3 font-semibold">{row.legacySetId}</td>
+                <td className="px-4 py-3 font-semibold">{row.setIdentifier}</td>
                 <td className="px-4 py-3">
                   {row.person !== "-" ? (
                     <span className="inline-flex items-center gap-2 align-middle">
@@ -226,7 +226,7 @@ export function SetsTable({ releaseAction, rows, taskAction }: SetsTableProps) {
                 <td className="px-4 py-3">
                   <span className="inline-flex items-center gap-2 align-middle">
                     <Link
-                      aria-label={`Geräte von Set ${row.legacySetId} anzeigen`}
+                      aria-label={`Geräte von Set ${row.setIdentifier} anzeigen`}
                       className={objectLinkIconClassName("devices")}
                       href={row.devicesHref}
                       target="_blank"

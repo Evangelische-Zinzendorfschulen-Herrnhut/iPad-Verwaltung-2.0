@@ -25,7 +25,8 @@ export const metadata: Metadata = {
 
 type InventorySetRow = {
   id: string;
-  legacy_set_id: number;
+  legacy_set_id: number | null;
+  inventory_number: string | null;
   condition: string;
   availability: string;
   legacy_status: string | null;
@@ -40,7 +41,7 @@ type ComponentAssignmentRow = {
   role: string;
   component: {
     id: string;
-    legacy_inventory_number: string;
+    legacy_inventory_number: string | null;
     category: string;
     model: string | null;
     serial_number: string | null;
@@ -462,8 +463,28 @@ function componentLabel(component: ComponentAssignmentRow["component"]) {
     return "-";
   }
 
-  const model = component.model ? ` · ${component.model}` : "";
-  return `${component.legacy_inventory_number}${model}`;
+  let displayModel = component.model;
+
+  if (component.category === "ipad" && component.model?.includes("iPad A16")) {
+    const capacity = component.model.match(/(32|64|128|256)\s*GB/i)?.[1];
+    displayModel = capacity ? `iPad A16 · ${capacity} GB` : "iPad A16";
+  } else if (component.category === "pencil" && component.model?.includes("Pencil 2")) {
+    displayModel = "eiP Pencil 2";
+  } else if (component.category === "keyboard" && component.model?.includes("Smart Rugged")) {
+    displayModel = "Smart Rugged Tastatur";
+  }
+
+  if (component.legacy_inventory_number) {
+    return displayModel
+      ? `${component.legacy_inventory_number} · ${displayModel}`
+      : component.legacy_inventory_number;
+  }
+
+  return displayModel || component.category;
+}
+
+function setIdentifier(set: Pick<InventorySetRow, "inventory_number" | "legacy_set_id">) {
+  return set.inventory_number || String(set.legacy_set_id ?? "-");
 }
 
 function deriveSetCondition(
@@ -1280,7 +1301,7 @@ export default async function SetsPage({
   let setQuery = supabase
     .from("inventory_set")
     .select(
-      "id,legacy_set_id,condition,availability,legacy_status,storage_label,marker,assigned_person_id,assigned_person:assigned_person_id(id,first_name,last_name,email,person_type)",
+      "id,legacy_set_id,inventory_number,condition,availability,legacy_status,storage_label,marker,assigned_person_id,assigned_person:assigned_person_id(id,first_name,last_name,email,person_type)",
     );
 
   const requiredSetIdsByFilter: string[][] = [];
@@ -1305,11 +1326,35 @@ export default async function SetsPage({
       }
     }
 
+
+    const { data: matchingSetsByInventoryNumber, error: inventoryNumberError } =
+      await supabase
+        .from("inventory_set")
+        .select("id")
+        .ilike("inventory_number", setIdQuery);
+
+    if (inventoryNumberError) {
+      throw inventoryNumberError;
+    }
+
+    for (const set of matchingSetsByInventoryNumber ?? []) {
+      matchingSetIds.add(set.id);
+    }
+
     requiredSetIdsByFilter.push([...matchingSetIds]);
   }
 
   if (query) {
     const matchingSetIds = new Set<string>();
+
+    const { data: matchingSets } = await supabase
+      .from("inventory_set")
+      .select("id")
+      .ilike("inventory_number", `%${query}%`);
+
+    for (const set of matchingSets ?? []) {
+      matchingSetIds.add(set.id);
+    }
 
     const { data: matchingComponents } = await supabase
       .from("inventory_component")
@@ -1605,7 +1650,7 @@ export default async function SetsPage({
         { numeric: true },
       );
 
-      return personComparison || firstSet.legacy_set_id - secondSet.legacy_set_id;
+      return personComparison || setIdentifier(firstSet).localeCompare(setIdentifier(secondSet), "de-DE", { numeric: true });
     }
 
     if (sort === "first_name") {
@@ -1617,7 +1662,7 @@ export default async function SetsPage({
         { numeric: true },
       );
 
-      return personComparison || firstSet.legacy_set_id - secondSet.legacy_set_id;
+      return personComparison || setIdentifier(firstSet).localeCompare(setIdentifier(secondSet), "de-DE", { numeric: true });
     }
 
     if (sort === "class") {
@@ -1640,11 +1685,11 @@ export default async function SetsPage({
           "de-DE",
           { numeric: true },
         ) ||
-        firstSet.legacy_set_id - secondSet.legacy_set_id
+        setIdentifier(firstSet).localeCompare(setIdentifier(secondSet), "de-DE", { numeric: true })
       );
     }
 
-    return firstSet.legacy_set_id - secondSet.legacy_set_id;
+    return setIdentifier(firstSet).localeCompare(setIdentifier(secondSet), "de-DE", { numeric: true });
   });
   const filteredCount = sortedSets.length;
   const totalPages = Math.max(1, Math.ceil(filteredCount / PAGE_SIZE));
@@ -1850,7 +1895,7 @@ export default async function SetsPage({
         availability === "ausgegeben" || availability === "frei"
           ? buildDamageHref(params, set.id)
           : null,
-      devicesHref: `/geraete?set=${set.legacy_set_id}`,
+      devicesHref: `/geraete?set=${encodeURIComponent(setIdentifier(set))}`,
       detailHref: buildDetailHref(params, set.id),
       id: set.id,
       ipad: componentLabel(ipad),
@@ -1867,7 +1912,7 @@ export default async function SetsPage({
       issueProtocolHref:
         currentAssignment?.issued_at || previousPerson ? `/sets/${set.id}/issue-protocol` : null,
       keyboard: componentLabel(keyboard),
-      legacySetId: set.legacy_set_id,
+      setIdentifier: setIdentifier(set),
       legacyStatus: set.legacy_status,
       pencil: componentLabel(pencil),
       person: formatPerson(
@@ -2129,7 +2174,7 @@ export default async function SetsPage({
                     Datensatz anzeigen
                   </h2>
                   <p className="mt-2 text-sm text-zinc-600">
-                    Set {setToShowDetail.legacy_set_id}
+                    Set {setIdentifier(setToShowDetail)}
                   </p>
                 </div>
                 <Link
@@ -2144,7 +2189,7 @@ export default async function SetsPage({
                 <section className="grid gap-3">
                   <h3 className="font-semibold">Set</h3>
                   <dl className="grid gap-3 sm:grid-cols-3">
-                    <DetailField label="Setnummer" value={setToShowDetail.legacy_set_id} emphasis />
+                    <DetailField label="Setkennung" value={setIdentifier(setToShowDetail)} emphasis />
                     <DetailField label="Verfügbarkeit" value={detailAvailability} availability />
                     <DetailField label="Zustand" value={setToShowDetail.condition} condition />
                     <DetailField label="Legacy-Status" value={setToShowDetail.legacy_status} />
@@ -2245,7 +2290,7 @@ export default async function SetsPage({
                       <h3 className="font-semibold">Anstehende Aufgaben</h3>
                       <Link
                         className="text-sm font-medium text-emerald-700 hover:text-emerald-900"
-                        href={`/aufgaben?q=${encodeURIComponent(String(setToShowDetail.legacy_set_id))}`}
+                        href={`/aufgaben?q=${encodeURIComponent(setIdentifier(setToShowDetail))}`}
                       >
                         Aufgabenliste
                       </Link>
@@ -2273,7 +2318,7 @@ export default async function SetsPage({
                                   <p className="mt-1 text-xs text-zinc-500">
                                     {relatedComponent
                                       ? `${relatedComponent.category}: ${componentLabel(relatedComponent)}`
-                                      : `Set ${setToShowDetail.legacy_set_id}`}
+                                      : `Set ${setIdentifier(setToShowDetail)}`}
                                   </p>
                                 </div>
                                 <div className="flex flex-wrap justify-end gap-2 text-xs">
@@ -2321,7 +2366,7 @@ export default async function SetsPage({
                     {isPreparedIssue ? "Set ausgeben" : "Set vorbereiten"}
                   </h2>
                   <p className="mt-2 text-sm text-zinc-600">
-                    Set {setToIssue.legacy_set_id}
+                    Set {setIdentifier(setToIssue)}
                   </p>
                 </div>
                 <Link
@@ -2437,7 +2482,7 @@ export default async function SetsPage({
                     Lagerort ändern
                   </h2>
                   <p className="mt-2 text-sm text-zinc-600">
-                    Set {setToEditStorage.legacy_set_id}
+                    Set {setIdentifier(setToEditStorage)}
                   </p>
                 </div>
                 <Link
@@ -2552,7 +2597,7 @@ export default async function SetsPage({
                     Set-Liste
                   </p>
                   <h2 className="mt-1 text-2xl font-semibold tracking-tight">
-                    Set {setToReturn.legacy_set_id} zurücknehmen
+                    Set {setIdentifier(setToReturn)} zurücknehmen
                   </h2>
                   <p className="mt-2 text-sm text-zinc-600">
                     {formatPerson(personToReturn, classToReturn)}

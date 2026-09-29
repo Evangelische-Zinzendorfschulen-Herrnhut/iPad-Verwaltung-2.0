@@ -101,6 +101,9 @@ Die Schule braucht eine verlaessliche Uebersicht ueber alle Komponenten eines iP
 
 ## Akzeptanzkriterien
 
+- Die Geräteliste kann alle iPads gemeinsam oder nach 32, 64, 128 und 256 GB
+  Speicher filtern.
+
 - Eine Komponente kann ueber Inventarnummer oder Seriennummer gefunden werden.
 - Der aktuelle Status ist eindeutig sichtbar.
 - Das Anschaffungsdatum ist als optionales Geräteattribut in der Geräteliste sichtbar und fuer berechtigte Nutzer pflegbar.
@@ -127,4 +130,7 @@ Die Schule braucht eine verlaessliche Uebersicht ueber alle Komponenten eines iP
 
 - Gibt es Barcodes oder QR-Codes auf den Komponenten oder Sets?
 - Welche MDM-Daten sollen angezeigt oder synchronisiert werden?
-- Werden Pencil und Tastatur einzeln inventarisiert?
+- Bestehende Pencil und Tastaturen bleiben einzeln inventarisiert. Bei den
+  Mietsets werden Pencil und Tastatur als einzelne pruefbare Komponenten ohne
+  eigene Inventarnummer gefuehrt; die M-Inventarnummer des iPads bezeichnet
+  das gesamte Set.

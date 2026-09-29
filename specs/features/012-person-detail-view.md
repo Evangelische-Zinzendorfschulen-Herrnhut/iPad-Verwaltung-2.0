@@ -50,7 +50,7 @@ In der Personenliste sind nur die wichtigsten Stammdaten sichtbar. Fuer Verwaltu
 
 ## Akzeptanzkriterien
 
-- Das gemeinsame Bereichsmenü zeigt vor jeder Beschriftung das im Projekt-Skill festgelegte Icon. Icons sind dekorativ; aktive Markierung und horizontales Scrollen auf schmalen Bildschirmen bleiben erhalten.
+- Das gemeinsame Bereichsmenü beginnt mit dem Link `Home` zur Startseite und zeigt vor jeder Beschriftung das im Projekt-Skill festgelegte Icon. Icons sind dekorativ; aktive Markierung und horizontales Scrollen auf schmalen Bildschirmen bleiben erhalten.
 
 - Given ein berechtigter Nutzer sieht die Personenliste, When er eine Person per Kontextmenue oeffnet, Then erscheint eine Detailansicht zur gewaehlten Person.
 - Given eine Person hat eine aktuelle Klassenzuordnung, When die Detailansicht angezeigt wird, Then werden Klasse und Schuljahr angezeigt.

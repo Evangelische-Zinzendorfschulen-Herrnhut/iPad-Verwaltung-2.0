@@ -4,6 +4,8 @@ import {
   faListCheck,
   faWarehouse,
   faClipboard,
+  faFileInvoiceDollar,
+  faHouse,
   faLayerGroup,
   faList,
   faTabletScreenButton,
@@ -27,6 +29,8 @@ export const objectIconByKind = {
 export const navigationIconByKind = {
   ...objectIconByKind,
   assignments: faArrowRightArrowLeft,
+  home: faHouse,
+  invoices: faFileInvoiceDollar,
   tasks: faListCheck,
   storage: faWarehouse,
 };

@@ -140,19 +140,25 @@ Wichtige Felder:
 - Status
 - letzter Login
 
-### Rechnung
+### Beschaffungsbeleg
 
-Einkaufsrechnung fuer beschaffte Komponenten.
+Rechnung oder Mietvertrag fuer beschaffte beziehungsweise gemietete
+Komponenten.
 
 Wichtige Felder:
 
-- Legacy-Rechnungsnummer
-- Rechnungsdatum
-- Lieferant
+- Typ: Rechnung oder Mietvertrag
+- Belegnummer beziehungsweise Vertragsnummer
+- Rechnungsdatum optional
+- Lieferant beziehungsweise Vermieter
+- Vertragsbeginn optional
+- Laufzeit in Monaten optional
+- Vertragsende optional
 
 Regeln:
 
-- Das Rechnungsdatum ist die Quelle fuer das Anschaffungsdatum von Komponenten, wenn die Komponente ueber eine Rechnungsposition verknuepft ist.
+- Das Rechnungsdatum ist die Quelle fuer das Anschaffungsdatum gekaufter Komponenten, wenn die Komponente ueber eine Rechnungsposition verknuepft ist.
+- Bei Mietvertraegen bleiben Vertragsbeginn und Vertragsende leer, solange das Auslieferungsdatum nicht feststeht.
 - `buchhaltung`, `ipad_verwaltung` und `admin` duerfen Rechnungsdaten lesen.
 - Im MVP importiert `admin` Rechnungsdaten aus der Legacy-Datenbank.
 

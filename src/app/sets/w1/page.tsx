@@ -21,9 +21,9 @@ export const metadata: Metadata = {
 const storageFilters = [
   { label: "Wagen W1", value: "W1" },
   { label: "Wagen W2", value: "W2" },
-  { label: "Wagen W3", value: "W3" },
-  { label: "Wagen W4", value: "W4" },
-  { label: "Wagen W5", value: "W5" },
+  { label: "Wagen W3 7-2", value: "W3" },
+  { label: "Wagen W4 7-1", value: "W4" },
+  { label: "Wagen W5 7-3", value: "W5" },
   { label: "Wagen W6", value: "W6" },
   { label: "Schrank1", value: "Schrank1" },
   { label: "Schrank2", value: "Schrank2" },

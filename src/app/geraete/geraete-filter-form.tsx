@@ -157,6 +157,10 @@ export function GeraeteFilterForm({
         >
           <option value="">Alle</option>
           <option value="ipad">iPad</option>
+          <option value="ipad_32">iPad · 32 GB</option>
+          <option value="ipad_64">iPad · 64 GB</option>
+          <option value="ipad_128">iPad · 128 GB</option>
+          <option value="ipad_256">iPad · 256 GB</option>
           <option value="pencil">Pencil</option>
           <option value="keyboard">Tastatur</option>
           <option value="adapter">Adapter</option>

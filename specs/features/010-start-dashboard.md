@@ -6,10 +6,11 @@ draft
 
 ## Ziel
 
-Angemeldete Nutzer sehen auf der Startseite zwischen Anmeldebestätigung und
-Arbeitsbereich-Links kompakte Auswertungen zu den wichtigsten Listen. Die
-Auswertungen helfen, Set-Verfügbarkeit, aktive Personen nach Typ und
-Schadensfälle schnell einzuschätzen.
+Angemeldete Nutzer sehen auf der Startseite unter der Anmeldebestätigung die
+Arbeitsbereich-Links und kompakte Auswertungen zu den wichtigsten Listen in
+einem gemeinsamen zweispaltigen Bereich. Die Auswertungen helfen,
+Set-Verfügbarkeit, aktive Personen nach Typ und Schadensfälle schnell
+einzuschätzen.
 
 ## Zielgruppe
 
@@ -21,7 +22,8 @@ Schadensfälle schnell einzuschätzen.
 
 1. Nutzer meldet sich an.
 2. System zeigt die Anmeldebestätigung.
-3. System zeigt ein Dashboard mit Kreisdiagrammen zu vorhandenen Listen.
+3. System zeigt links die Arbeitsbereich-Links und rechts ein Dashboard mit
+   Kreisdiagrammen zu vorhandenen Listen.
 4. Nutzer kann daraus ableiten, welche Liste als Nächstes geprüft werden soll.
 
 ## Datenobjekte
@@ -46,13 +48,16 @@ geändert werden, ist kein zusätzlicher Audit-Log erforderlich.
 
 ## Akzeptanzkriterien
 
-- Das Dashboard erscheint auf der Startseite zwischen Anmeldebestätigung und
-  Arbeitsbereich-Links.
+- Unter der Anmeldebestätigung erscheinen die Arbeitsbereich-Links links und
+  die Auswertungen rechts in einem zweispaltigen Bereich mit unveränderter
+  Gesamtbreite der Startseite.
+- Auf schmalen Bildschirmen werden Arbeitsbereich-Links und Auswertungen
+  untereinander dargestellt.
 - Die Auswertungen werden als Kreisdiagramme dargestellt.
 - Mindestens Sets, aktive Personen und Schadensfälle werden ausgewertet.
 - Leere Datenbestände werden verständlich dargestellt.
 - Nicht angemeldete Nutzer sehen keine aggregierten Fachdaten.
-- Alle sieben Arbeitsbereich-Links zeigen ein passendes, einheitlich großes
+- Alle acht Arbeitsbereich-Links zeigen ein passendes, einheitlich großes
   Font-Awesome-Icon vor der weiterhin sichtbaren Beschriftung. Die Icons sind
   dekorativ und werden für Screenreader ausgeblendet.
 - Die Bedeutung bestehender Objekt-Icons bleibt konsistent: Sets verwenden

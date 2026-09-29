@@ -18,6 +18,7 @@ const foundations = [
   { label: "Aus- und Rückgabeliste", href: "/ausgaben", icon: navigationIconByKind.assignments },
   { label: "Aufgaben", href: "/aufgaben", icon: navigationIconByKind.tasks },
   { label: "Lagerliste", href: "/sets/w1", icon: navigationIconByKind.storage },
+  { label: "Beschaffung", href: "/rechnungen", icon: navigationIconByKind.invoices },
 ];
 
 type DashboardSlice = {
@@ -417,17 +418,9 @@ export default async function Home() {
           </div>
         </div>
 
-        {dashboardCharts.length > 0 ? (
-          <section className="mt-6 grid gap-3 lg:grid-cols-2">
-            {dashboardCharts.map((chart) => (
-              <PieChartCard chart={chart} key={chart.title} />
-            ))}
-          </section>
-        ) : null}
-
-        <div className="mt-10 grid gap-3 sm:grid-cols-2">
-          {foundations.map((item) => (
-            item.href ? (
+        <div className="mt-6 grid items-start gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+          <nav aria-label="Arbeitsbereiche" className="grid gap-3">
+            {foundations.map((item) => (
               <Link
                 className="flex items-center gap-3 rounded-lg border border-zinc-200 bg-white p-4 shadow-sm transition hover:border-zinc-300 hover:shadow"
                 href={item.href}
@@ -440,15 +433,16 @@ export default async function Home() {
                 />
                 <p className="font-medium">{item.label}</p>
               </Link>
-            ) : (
-              <div
-                key={item.label}
-                className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm"
-              >
-                <p className="font-medium">{item.label}</p>
-              </div>
-            )
-          ))}
+            ))}
+          </nav>
+
+          {dashboardCharts.length > 0 ? (
+            <section aria-label="Auswertungen" className="grid gap-3">
+              {dashboardCharts.map((chart) => (
+                <PieChartCard chart={chart} key={chart.title} />
+              ))}
+            </section>
+          ) : null}
         </div>
         </div>
       </section>

@@ -11,6 +11,7 @@ Die Bedeutung eines Icons bleibt über Startseite, Listen und Detailseiten hinwe
 
 | Bedeutung | Font-Awesome-Icon | Zentraler Schlüssel |
 | --- | --- | --- |
+| Startseite | `faHouse` | `home` |
 | Set / Set-Zuordnung | `faList` | `set` |
 | Geräte / Geräteliste | `faLayerGroup` | `devices` |
 | Person / Personen und Klassen | `faUser` | `person` |
@@ -19,6 +20,7 @@ Die Bedeutung eines Icons bleibt über Startseite, Listen und Detailseiten hinwe
 | Aus- und Rückgabeliste | `faArrowRightArrowLeft` | `assignments` |
 | Aufgaben | `faListCheck` | `tasks` |
 | Lagerliste | `faWarehouse` | `storage` |
+| Beschaffung (Rechnungen und Mietvertraege) | `faFileInvoiceDollar` | `invoices` |
 
 ## Umsetzung
 

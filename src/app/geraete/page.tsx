@@ -20,7 +20,7 @@ type ComponentRow = {
   id: string;
   invoice_position: InvoicePositionRow | InvoicePositionRow[] | null;
   invoice_position_number: number | null;
-  legacy_inventory_number: string;
+  legacy_inventory_number: string | null;
   legacy_set_number: number | null;
   legacy_status: string | null;
   manufacturer: string | null;
@@ -48,7 +48,8 @@ type ComponentAssignmentRow = {
   set: {
     availability: string;
     condition: string;
-    legacy_set_id: number;
+    legacy_set_id: number | null;
+    inventory_number: string | null;
     storage_label: string | null;
   } | null;
 };
@@ -68,7 +69,7 @@ type InventoryComponentListRow = {
   invoice_legacy_position_number: number | null;
   invoice_position_number: number | null;
   invoice_supplier: string | null;
-  legacy_inventory_number: string;
+  legacy_inventory_number: string | null;
   legacy_set_number: number | null;
   legacy_status: string | null;
   manufacturer: string | null;
@@ -79,6 +80,7 @@ type InventoryComponentListRow = {
   set_availability: string | null;
   set_condition: string | null;
   set_legacy_set_id: number | null;
+  set_inventory_number?: string | null;
   set_storage_label: string | null;
   storage_label: string | null;
   assigned_count: number;
@@ -254,10 +256,11 @@ function formatSet(assignment: ComponentAssignmentRow | undefined) {
     return "-";
   }
 
-  return String(assignment.set.legacy_set_id);
+  return assignment.set.inventory_number || String(assignment.set.legacy_set_id ?? "-");
 }
 
-function inventoryNumberSetPart(inventoryNumber: string) {
+function inventoryNumberSetPart(inventoryNumber: string | null) {
+  if (!inventoryNumber) return null;
   const match = inventoryNumber.match(/\/\s*(\d+)\s*$/);
 
   if (!match) {
@@ -317,6 +320,7 @@ function matchesQuery(
     component.purchase_date,
     assignment?.role,
     assignment?.set?.legacy_set_id,
+    assignment?.set?.inventory_number,
     assignment?.set?.availability,
   ]
     .filter((value) => value !== null && value !== undefined)
@@ -343,16 +347,17 @@ function matchesSetFilter(
   return (
     String(component.legacy_set_number ?? "") === normalizedFilter ||
     String(assignment?.set?.legacy_set_id ?? "") === normalizedFilter ||
+    assignment?.set?.inventory_number?.toLocaleLowerCase("de-DE") === normalizedFilter.toLocaleLowerCase("de-DE") ||
     normalizedInventorySetPart === normalizedFilter
   );
 }
 
 function sortValue(component: ComponentRow, assignment: ComponentAssignmentRow | undefined) {
   return {
-    category: `${component.category} ${component.legacy_inventory_number}`,
-    condition: `${component.condition} ${component.legacy_inventory_number}`,
-    inventory: component.legacy_inventory_number,
-    set: `${assignment?.set?.legacy_set_id ?? 999999} ${component.legacy_inventory_number}`,
+    category: `${component.category} ${component.legacy_inventory_number ?? ""}`,
+    condition: `${component.condition} ${component.legacy_inventory_number ?? ""}`,
+    inventory: component.legacy_inventory_number ?? component.model ?? component.category,
+    set: `${formatSet(assignment)} ${component.legacy_inventory_number ?? component.model ?? ""}`,
   };
 }
 
@@ -389,7 +394,7 @@ async function fetchAllCurrentAssignments(
     const { data, error } = await supabase
       .from("set_component_assignment")
       .select(
-        "component_id,role,set:set_id(legacy_set_id,availability,condition,storage_label)",
+        "component_id,role,set:set_id(legacy_set_id,inventory_number,availability,condition,storage_label)",
       )
       .is("valid_until", null)
       .range(from, from + QUERY_BATCH_SIZE - 1);
@@ -443,7 +448,7 @@ async function fetchComponentIdsForSetFilter(
 
   const matchingComponentIds = new Set<string>();
   const numericSetFilter = Number.parseInt(setFilter, 10);
-  const [legacySetComponentsResult, assignedSetComponentsResult, inventoryPartResults] =
+  const [legacySetComponentsResult, assignedSetComponentsResult, inventorySetResult, inventoryPartResults] =
     await Promise.all([
       Number.isInteger(numericSetFilter)
         ? supabase
@@ -451,6 +456,11 @@ async function fetchComponentIdsForSetFilter(
             .select("id")
             .eq("legacy_set_number", numericSetFilter)
         : Promise.resolve({ data: [], error: null }),
+      supabase
+        .from("set_component_assignment")
+        .select("component_id,set:set_id!inner(inventory_number)")
+        .is("valid_until", null)
+        .ilike("set.inventory_number", setFilter),
       Number.isInteger(numericSetFilter)
         ? supabase
             .from("set_component_assignment")
@@ -476,6 +486,10 @@ async function fetchComponentIdsForSetFilter(
     throw assignedSetComponentsResult.error;
   }
 
+  if (inventorySetResult.error) {
+    throw inventorySetResult.error;
+  }
+
   for (const result of inventoryPartResults) {
     if (result.error) {
       throw result.error;
@@ -496,6 +510,11 @@ async function fetchComponentIdsForSetFilter(
     }
   }
 
+
+  for (const assignment of inventorySetResult.data ?? []) {
+    if (assignment.component_id) matchingComponentIds.add(assignment.component_id);
+  }
+
   return [...matchingComponentIds];
 }
 
@@ -509,7 +528,7 @@ async function fetchAssignmentsForComponents(
     const { data, error } = await supabase
       .from("set_component_assignment")
       .select(
-        "component_id,role,set:set_id(legacy_set_id,availability,condition,storage_label)",
+        "component_id,role,set:set_id(legacy_set_id,inventory_number,availability,condition,storage_label)",
       )
       .is("valid_until", null)
       .in("component_id", componentIdBatch);
@@ -568,13 +587,15 @@ function assignmentFromListRow(
     role: row.assignment_role,
     set:
       row.set_legacy_set_id ||
+      row.set_inventory_number ||
       row.set_availability ||
       row.set_condition ||
       row.set_storage_label
         ? {
             availability: row.set_availability ?? "",
             condition: row.set_condition ?? "",
-            legacy_set_id: row.set_legacy_set_id ?? 0,
+            legacy_set_id: row.set_legacy_set_id ?? null,
+            inventory_number: row.set_inventory_number ?? null,
             storage_label: row.set_storage_label,
           }
         : null,
@@ -583,14 +604,12 @@ function assignmentFromListRow(
 
 function shouldUseComponentListRpc({
   assignmentFilter,
-  query,
   sort,
 }: {
   assignmentFilter: string;
-  query: string;
   sort: DeviceSort;
 }) {
-  return Boolean(assignmentFilter || query || sort === "set");
+  return Boolean(assignmentFilter || sort === "set");
 }
 
 async function updateComponent(formData: FormData) {
@@ -614,7 +633,7 @@ async function updateComponent(formData: FormData) {
   const category = normalizeRequiredText(formData.get("category"));
   const condition = normalizeRequiredText(formData.get("condition"));
 
-  if (!componentId || !legacyInventoryNumber || !category || !condition) {
+  if (!componentId || !category || !condition || (category === "ipad" && !legacyInventoryNumber)) {
     redirect(returnTo);
   }
 
@@ -627,7 +646,7 @@ async function updateComponent(formData: FormData) {
       invoice_position_number: normalizeOptionalNumber(
         formData.get("invoice_position_number"),
       ),
-      legacy_inventory_number: legacyInventoryNumber,
+      legacy_inventory_number: legacyInventoryNumber || null,
       legacy_set_number: normalizeOptionalNumber(formData.get("legacy_set_number")),
       legacy_status: normalizeOptionalText(formData.get("legacy_status")),
       manufacturer: normalizeOptionalText(formData.get("manufacturer")),
@@ -732,6 +751,9 @@ export default async function GeraetePage({
   const query = getSingleParam(params, "q").trim();
   const setFilter = getSingleParam(params, "set").trim();
   const categoryFilter = getSingleParam(params, "category");
+  const ipadStorageMatch = categoryFilter.match(/^ipad_(32|64|128|256)$/);
+  const ipadStorageGb = ipadStorageMatch?.[1] ?? null;
+  const componentCategoryFilter = ipadStorageGb ? "ipad" : categoryFilter;
   const conditionFilter = getSingleParam(params, "condition");
   const assignmentFilter = getSingleParam(params, "assignment");
   const sort = getSortParam(params);
@@ -755,7 +777,6 @@ export default async function GeraetePage({
   const rangeEnd = rangeStart + pageSize - 1;
   const useRpcComponentList = shouldUseComponentListRpc({
     assignmentFilter,
-    query,
     sort,
   });
   const filteredComponentIds =
@@ -774,8 +795,25 @@ export default async function GeraetePage({
       : directComponentQuery.eq("id", "00000000-0000-0000-0000-000000000000");
   }
 
-  if (categoryFilter) {
-    directComponentQuery = directComponentQuery.eq("category", categoryFilter);
+  if (componentCategoryFilter) {
+    directComponentQuery = directComponentQuery.eq("category", componentCategoryFilter);
+  }
+
+  if (ipadStorageGb) {
+    directComponentQuery = directComponentQuery.ilike("model", `%${ipadStorageGb}%GB%`);
+  }
+
+  if (query) {
+    const pattern = `%${query}%`;
+    directComponentQuery = directComponentQuery.or([
+      `legacy_inventory_number.ilike.${pattern}`,
+      `manufacturer.ilike.${pattern}`,
+      `model.ilike.${pattern}`,
+      `serial_number.ilike.${pattern}`,
+      `legacy_status.ilike.${pattern}`,
+      `storage_label.ilike.${pattern}`,
+      `notes.ilike.${pattern}`,
+    ].join(","));
   }
 
   if (conditionFilter) {
@@ -791,7 +829,7 @@ export default async function GeraetePage({
       useRpcComponentList
         ? supabase.rpc("inventory_component_list", {
             p_assignment_filter: assignmentFilter || null,
-            p_category: categoryFilter || null,
+            p_category: componentCategoryFilter || null,
             p_condition: conditionFilter || null,
             p_limit: pageSize,
             p_offset: rangeStart,
@@ -883,7 +921,7 @@ export default async function GeraetePage({
       inventoryNumberSetPart: inventoryNumberSetPart(
         component.legacy_inventory_number,
       ),
-      legacyInventoryNumber: component.legacy_inventory_number,
+      legacyInventoryNumber: component.legacy_inventory_number || "-",
       legacySetNumber: component.legacy_set_number,
       legacyStatus: component.legacy_status,
       manufacturerModel: [component.manufacturer, component.model]
@@ -892,7 +930,7 @@ export default async function GeraetePage({
       purchaseDateLabel: formatDate(component.purchase_date),
       serialNumber: component.serial_number,
       setHref: assignment?.set
-        ? `/sets?setId=${encodeURIComponent(String(assignment.set.legacy_set_id))}`
+        ? `/sets?setId=${encodeURIComponent(formatSet(assignment))}`
         : null,
       setLabel: formatSet(assignment),
       storageHref: canEditComponents
@@ -1109,7 +1147,7 @@ export default async function GeraetePage({
                     Inventarnummer
                     <input
                       className="inventory-number rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
-                      defaultValue={editComponent.legacy_inventory_number}
+                      defaultValue={editComponent.legacy_inventory_number ?? ""}
                       name="legacy_inventory_number"
                       required
                     />

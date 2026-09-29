@@ -9,11 +9,13 @@ type SectionTabsProps = {
     | "wagen-w1"
     | "ausgaben"
     | "geraete"
+    | "rechnungen"
     | "schadensfaelle"
     | "aufgaben";
 };
 
 const tabs = [
+  { key: "home", label: "Home", href: "/", icon: navigationIconByKind.home },
   { key: "personen", label: "Personen", href: "/personen", icon: navigationIconByKind.person },
   { key: "sets", label: "Sets", href: "/sets", icon: navigationIconByKind.set },
   { key: "ausgaben", label: "Aus-/Rückgaben", href: "/ausgaben", icon: navigationIconByKind.assignments },
@@ -21,6 +23,7 @@ const tabs = [
   { key: "schadensfaelle", label: "Schadensfälle", href: "/schadensfaelle", icon: navigationIconByKind.damage },
   { key: "aufgaben", label: "Aufgaben", href: "/aufgaben", icon: navigationIconByKind.tasks },
   { key: "wagen-w1", label: "Lagerliste", href: "/sets/w1", icon: navigationIconByKind.storage },
+  { key: "rechnungen", label: "Beschaffung", href: "/rechnungen", icon: navigationIconByKind.invoices },
 ] as const;
 
 export function SectionTabs({ active }: SectionTabsProps) {

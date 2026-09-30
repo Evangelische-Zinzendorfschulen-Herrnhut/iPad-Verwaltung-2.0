@@ -216,6 +216,9 @@ export function DamageCasesTable({
         <table className="w-full min-w-[960px] table-fixed border-collapse text-left text-sm">
           <thead className="bg-zinc-100 text-zinc-600">
             <tr>
+              <th className="w-20 whitespace-nowrap px-4 py-3 font-medium">
+                Nr.
+              </th>
               <th className="w-28 whitespace-nowrap px-4 py-3 font-medium">
                 Datum
               </th>
@@ -225,7 +228,6 @@ export function DamageCasesTable({
               <th className="w-32 px-4 py-3 font-medium">Art</th>
               <th className="w-36 px-4 py-3 font-medium">Status</th>
               <th className="px-4 py-3 font-medium">Beschreibung</th>
-              <th className="w-20 px-4 py-3 font-medium">Nr.</th>
             </tr>
           </thead>
           <tbody>
@@ -235,6 +237,9 @@ export function DamageCasesTable({
                 key={caseRow.id}
                 onContextMenu={(event) => openContextMenu(event, caseRow.id)}
               >
+                <td className="w-20 px-4 py-3 font-semibold">
+                  {caseRow.damage_number}
+                </td>
                 <td className="w-28 whitespace-nowrap px-4 py-3">
                   {caseRow.reported_at}
                 </td>
@@ -262,9 +267,6 @@ export function DamageCasesTable({
                 </td>
                 <td className="w-36 px-4 py-3">{caseRow.status}</td>
                 <td className="truncate px-4 py-3">{caseRow.short_description}</td>
-                <td className="w-20 px-4 py-3 font-semibold">
-                  {caseRow.damage_number}
-                </td>
               </tr>
             ))}
           </tbody>

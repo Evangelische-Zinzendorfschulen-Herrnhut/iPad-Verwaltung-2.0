@@ -3,26 +3,16 @@
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { MouseEvent, useEffect, useState } from "react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import {
-  faKeyboard,
-  faLayerGroup,
-  faPen,
-  faTabletScreenButton,
-} from "@fortawesome/free-solid-svg-icons";
-
 import {
   ObjectLinkIcon,
   objectLinkIconClassName,
 } from "../object-link-icon";
+import {
+  ComponentCategoryIcon,
+  componentCategoryIconClassName,
+} from "../component-category-icon";
 import { SetAvailabilityBadge } from "../sets/set-availability-badge";
 import { SetConditionBadge } from "../sets/set-condition-badge";
-
-const categoryIcons: Record<string, typeof faTabletScreenButton> = {
-  ipad: faTabletScreenButton,
-  pencil: faPen,
-  tastatur: faKeyboard,
-};
 
 export type GeraeteTableRow = {
   assignmentAvailability: string | null;
@@ -140,12 +130,8 @@ export function GeraeteTable({
                 <td className="inventory-number whitespace-nowrap px-4 py-3 font-semibold">
                   <span className="inline-flex items-center gap-2 align-middle">
                     <span>{row.legacyInventoryNumber}</span>
-                    <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center text-blue-700">
-                      <FontAwesomeIcon
-                        aria-hidden="true"
-                        className="block h-3.5 w-3.5"
-                        icon={categoryIcons[row.categoryLabel.trim().toLowerCase()] ?? faLayerGroup}
-                      />
+                    <span className={componentCategoryIconClassName}>
+                      <ComponentCategoryIcon category={row.categoryLabel} />
                     </span>
                   </span>
                 </td>

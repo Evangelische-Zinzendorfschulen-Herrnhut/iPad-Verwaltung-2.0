@@ -1,3 +1,4 @@
+import { SharePointFolderSection } from "../sharepoint-folder-section";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
@@ -289,6 +290,7 @@ export default async function SchadensfallDetailPage({ params }: DetailPageProps
           <Field label="Hergang" value={damageCase.incident_description} />
           <Field label="Ort" value={damageCase.location} />
           <Field label="Zeugen" value={damageCase.witnesses} />
+          <div className="col-span-full"><dt className="sr-only">Fotos / Dateien</dt><dd><SharePointFolderSection caseId={damageCase.id} /></dd></div>
           <Field label="Interne Notiz" value={damageCase.internal_note} />
         </FieldGroup>
 

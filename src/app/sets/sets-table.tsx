@@ -9,6 +9,10 @@ import {
   ObjectLinkIcon,
   objectLinkIconClassName,
 } from "../object-link-icon";
+import {
+  ComponentCategoryIcon,
+  componentCategoryIconClassName,
+} from "../component-category-icon";
 
 export type SetsTableRow = {
   availability: string;
@@ -78,6 +82,19 @@ type TaskDrawerState = {
   setId: string;
   setLabel: string;
 } | null;
+
+function splitComponentLabel(label: string) {
+  const [inventoryNumber, ...details] = label.split(" · ");
+
+  return {
+    detail: details.join(" · "),
+    inventoryNumber,
+  };
+}
+
+function hasComponent(label: string) {
+  return splitComponentLabel(label).inventoryNumber.trim() !== "-";
+}
 
 export function SetsTable({ releaseAction, rows, taskAction }: SetsTableProps) {
   const [contextMenu, setContextMenu] = useState<ContextMenuState>(null);
@@ -204,23 +221,54 @@ export function SetsTable({ releaseAction, rows, taskAction }: SetsTableProps) {
                 </td>
                 <td className="inventory-number px-4 py-3 whitespace-nowrap align-middle">
                   <span className="inline-flex items-center gap-2 align-middle">
-                    <span>{row.ipad}</span>
-                    {row.ipadMdmHref ? (
+                    <span>{splitComponentLabel(row.ipad).inventoryNumber}</span>
+                    {hasComponent(row.ipad) && row.ipadMdmHref ? (
                       <a
                         aria-label={`iPad ${row.ipad} im MDM öffnen`}
-                        className={objectLinkIconClassName("mdm")}
+                        className={`${componentCategoryIconClassName} transition hover:scale-105 hover:text-blue-900`}
                         href={row.ipadMdmHref}
                         rel="noreferrer"
                         target="_blank"
                         title="Im MDM öffnen"
                       >
-                        <ObjectLinkIcon kind="mdm" />
+                        <ComponentCategoryIcon category="ipad" />
                       </a>
+                    ) : hasComponent(row.ipad) ? (
+                      <span className={componentCategoryIconClassName}>
+                        <ComponentCategoryIcon category="ipad" />
+                      </span>
+                    ) : null}
+                    {splitComponentLabel(row.ipad).detail ? (
+                      <span>{splitComponentLabel(row.ipad).detail}</span>
                     ) : null}
                   </span>
                 </td>
-                <td className="inventory-number px-4 py-3 whitespace-nowrap">{row.pencil}</td>
-                <td className="inventory-number px-4 py-3 whitespace-nowrap">{row.keyboard}</td>
+                <td className="inventory-number px-4 py-3 whitespace-nowrap">
+                  <span className="inline-flex items-center gap-2 align-middle">
+                    <span>{splitComponentLabel(row.pencil).inventoryNumber}</span>
+                    {hasComponent(row.pencil) ? (
+                      <span className={componentCategoryIconClassName}>
+                        <ComponentCategoryIcon category="pencil" />
+                      </span>
+                    ) : null}
+                    {splitComponentLabel(row.pencil).detail ? (
+                      <span>{splitComponentLabel(row.pencil).detail}</span>
+                    ) : null}
+                  </span>
+                </td>
+                <td className="inventory-number px-4 py-3 whitespace-nowrap">
+                  <span className="inline-flex items-center gap-2 align-middle">
+                    <span>{splitComponentLabel(row.keyboard).inventoryNumber}</span>
+                    {hasComponent(row.keyboard) ? (
+                      <span className={componentCategoryIconClassName}>
+                        <ComponentCategoryIcon category="keyboard" />
+                      </span>
+                    ) : null}
+                    {splitComponentLabel(row.keyboard).detail ? (
+                      <span>{splitComponentLabel(row.keyboard).detail}</span>
+                    ) : null}
+                  </span>
+                </td>
                 <td className="px-4 py-3">{row.storageLabel}</td>
                 <td className="px-4 py-3"><SetAvailabilityBadge value={row.availability} /></td>
                 <td className="px-4 py-3">

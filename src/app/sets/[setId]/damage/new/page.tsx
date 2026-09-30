@@ -1,3 +1,4 @@
+import { provisionDamageFolder } from "@/lib/sharepoint/folder-service";
 import { DamageExchangeForm, DamageExchangeFields } from "../../../damage-exchange-form";
 import Link from "next/link";
 import type { Metadata } from "next";
@@ -776,8 +777,15 @@ async function createDamageCase(formData: FormData) {
     }
   }
 
+  if (damageCase) {
+    // External configuration/network failures must never undo the saved case.
+    try { await provisionDamageFolder(damageCase.id); } catch { /* Retry is available in the case details. */ }
+    redirect(`/schadensfaelle?detail=${damageCase.id}&damage_created=1`);
+  }
   redirect(appendFlagToHref(returnTo, "damage_created", "1"));
 }
+
+export const maxDuration = 60;
 
 export default async function DamageNewPage({
   params,
@@ -1117,6 +1125,11 @@ export default async function DamageNewPage({
               </FormFieldLabel>
             )}
           </section>
+
+          <div className="rounded-lg border border-zinc-200 p-4 text-sm">
+            <h3 className="font-semibold">Fotos / Dateien</h3>
+            <p className="mt-2 text-zinc-600">Nach dem Speichern können Sie den Fallordner über „Fotos in SharePoint öffnen“ aufrufen und dort Fotos aufnehmen oder hochladen.</p>
+          </div>
 
           <DamageExchangeFields current={currentComponentOptions} components={replacementComponentOptions} sets={setOptions.filter((option) => option.id !== set.id)} />
 

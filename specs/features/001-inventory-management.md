@@ -83,6 +83,13 @@ Verifikation am 30.09.2026: Google Chrome, angemeldete Sitzung, warmer Next.js-E
 - Akzeptanz: Jede Inventarnummer in der Geraeteliste zeigt rechts neben dem vollstaendigen Text ein blaues Kategorie-Icon: Tablet fuer iPad, Stift fuer Pencil und Keyboard fuer Tastatur. Weitere Kategorien verwenden vorerst das allgemeine Geraete-Icon als Fallback. Das dekorative Icon ist fuer Screenreader ausgeblendet und loest keine Aktion aus.
 - Offene Fragen: keine.
 
+## Darstellung: Komponenten-Icons in der Set-Liste
+
+- Ziel und Nutzerrollen: Alle bereits leseberechtigten Rollen erkennen iPad, Pencil und Tastatur in der Set-Liste schneller und konsistent zur Geraeteliste.
+- Datenmodell, Rechte, Datenschutz und Audit bleiben unveraendert; die Darstellung nutzt nur bereits geladene Komponentendaten.
+- Akzeptanz: Die Inventarnummern in den Spalten iPad, Pencil und Tastatur zeigen unmittelbar hinter der vollstaendigen Inventarnummer dasselbe blaue Kategorie-Icon wie die Geraeteliste; optionale Speicher- oder Modellangaben folgen danach ohne zusaetzlichen Trennpunkt, da das Icon die visuelle Trennung uebernimmt. Leere Komponentenfelder zeigen nur `-` und kein Icon. Das blaue iPad-Icon ersetzt optisch das bisherige graue MDM-Icon und behaelt dessen Linkziel; Pencil- und Tastatur-Icon sind dekorativ und fuer Screenreader ausgeblendet.
+- Offene Fragen: keine.
+
 ## Darstellung: Set-Detailansicht
 
 - Schadenseintraege zeigen Schadensnummer, betroffenen Gegenstand sowie Inventarnummern der im Vorgang gespeicherten Komponente und Austauschkomponente. Fehlende Zuordnungen erscheinen als `-`; aktuelle Set-Komponenten ersetzen keine historischen Vorgangszuordnungen. Statusfarben: Entwurf/Storniert grau, Offen gelb, In Bearbeitung blau, Bericht erzeugt violett, Bericht unterschrieben tuerkis, Abgeschlossen gruen. Bestehende Leserechte/RLS gelten auch fuer die Komponenten-Verknuepfungen.

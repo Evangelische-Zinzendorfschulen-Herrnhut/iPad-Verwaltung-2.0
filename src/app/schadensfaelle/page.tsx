@@ -1,3 +1,4 @@
+import { SharePointFolderSection } from "./sharepoint-folder-section";
 import { ReplacementComponentSearch, type ReplacementOption } from "./replacement-component-search";
 import Link from "next/link";
 import type { Metadata } from "next";
@@ -1187,6 +1188,7 @@ export default async function SchadensfaellePage({
                   />
                   <Field label="Abrechnung" value={detailCase.billing_assessment} />
                   <Field label="Zeugen" value={detailCase.witnesses} />
+                  <div className="col-span-full"><dt className="sr-only">Fotos / Dateien</dt><dd><SharePointFolderSection caseId={detailCase.id} /></dd></div>
                   <Field label="Interne Notiz" value={detailCase.internal_note} />
                 </dl>
               </section>
@@ -1430,6 +1432,7 @@ export default async function SchadensfaellePage({
                     name="witnesses"
                   />
                 </FormField>
+                <SharePointFolderSection caseId={editCase.id} />
               </section>
 
               <section className="grid gap-4 rounded-lg border border-zinc-200 p-4">

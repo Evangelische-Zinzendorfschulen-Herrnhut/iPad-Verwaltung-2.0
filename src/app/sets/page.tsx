@@ -1243,61 +1243,12 @@ export default async function SetsPage({
   const canManageSets = hasAnyRole(appUser, ["admin", "ipad_verwaltung"]);
   const canReadTasks = hasAnyRole(appUser, ["admin"]);
   const canEditSetStorage = canManageSets;
-  const [{ data: classOptionData }, { data: personOptionData }] = await Promise.all([
-    supabase
-      .from("school_class")
-      .select("id,label,grade_level")
-      .eq("active", true)
-      .order("grade_level", { ascending: true, nullsFirst: false })
-      .order("label", { ascending: true }),
-    canManageSets
-      ? supabase
-          .from("person")
-          .select("id,legacy_user_id,first_name,last_name,email,person_type")
-          .eq("status", "aktiv")
-          .order("last_name", { ascending: true, nullsFirst: false })
-          .order("first_name", { ascending: true, nullsFirst: false })
-          .limit(5000)
-      : Promise.resolve({ data: [] }),
-  ]);
-  const classOptions = (classOptionData ?? []) as SchoolClassOptionRow[];
-  const personOptions = (personOptionData ?? []) as PersonOptionRow[];
-  const personOptionClassByPersonId = new Map<string, string>();
-
-  for (const personIdBatch of chunkValues(
-    personOptions.map((person) => person.id),
-  )) {
-    const { data: personOptionClassData, error: personOptionClassError } =
-      await supabase
-        .from("person_class_assignment")
-        .select("person_id,school_class:school_class_id(label,grade_level)")
-        .is("valid_until", null)
-        .in("person_id", personIdBatch);
-
-    if (personOptionClassError) {
-      throw personOptionClassError;
-    }
-
-    for (const assignment of (personOptionClassData ?? []) as RawPersonClassAssignmentRow[]) {
-      const schoolClass = normalizeJoined(assignment.school_class);
-
-      if (schoolClass) {
-        personOptionClassByPersonId.set(assignment.person_id, schoolClass.label);
-      }
-    }
-  }
-
-  const personSelectionOptions: PersonSelectionOption[] = personOptions.map(
-    (person) => ({
-      classLabel: personOptionClassByPersonId.get(person.id) ?? null,
-      email: person.email,
-      firstName: person.first_name,
-      id: person.id,
-      lastName: person.last_name,
-      legacyUserId: person.legacy_user_id,
-      personType: person.person_type,
-    }),
-  );
+  const classOptionsQuery = supabase
+    .from("school_class")
+    .select("id,label,grade_level")
+    .eq("active", true)
+    .order("grade_level", { ascending: true, nullsFirst: false })
+    .order("label", { ascending: true });
   let setQuery = supabase
     .from("inventory_set")
     .select(
@@ -1306,7 +1257,9 @@ export default async function SetsPage({
 
   const requiredSetIdsByFilter: string[][] = [];
 
-  if (setIdQuery) {
+  if (setIdQuery && !Number.isInteger(Number.parseInt(setIdQuery, 10))) {
+    setQuery = setQuery.ilike("inventory_number", setIdQuery);
+  } else if (setIdQuery) {
     const numericSetId = Number.parseInt(setIdQuery, 10);
     const matchingSetIds = new Set<string>();
 
@@ -1443,6 +1396,9 @@ export default async function SetsPage({
     requiredSetIdsByFilter.push([...matchingSetIds]);
   }
 
+  const { data: classOptionData } = await classOptionsQuery;
+  const classOptions = (classOptionData ?? []) as SchoolClassOptionRow[];
+
   if (classFilter) {
     const selectedClass = classOptions.find(
       (schoolClass) => schoolClass.label === classFilter,
@@ -1535,6 +1491,10 @@ export default async function SetsPage({
       .is("returned_at", null)
       .not("issued_at", "is", null),
   ]);
+
+  if (setIdQuery && setsResult.error) {
+    throw setsResult.error;
+  }
 
   const candidateSets = (setsResult.data ?? []) as InventorySetRow[];
   const candidateSetIds = candidateSets.map((set) => set.id);
@@ -1703,34 +1663,39 @@ export default async function SetsPage({
   const rangeEnd = rangeStart + PAGE_SIZE;
   const sets = sortedSets.slice(rangeStart, rangeEnd);
   const setIds = sets.map((set) => set.id);
-  const componentAssignmentsResult =
+  const [
+    componentAssignmentsResult,
+    supplementalAssignmentsResult,
+    previousAssignmentResults,
+  ] = await Promise.all([
     setIds.length > 0
-      ? await supabase
-        .from("set_component_assignment")
-        .select("set_id,role,component:component_id(id,legacy_inventory_number,category,model,serial_number,condition,legacy_status)")
+      ? supabase
+          .from("set_component_assignment")
+          .select("set_id,role,component:component_id(id,legacy_inventory_number,category,model,serial_number,condition,legacy_status)")
           .is("valid_until", null)
           .in("set_id", setIds)
-      : { data: [] };
-  const supplementalAssignmentsResult =
+      : { data: [] },
     setIds.length > 0
-      ? await supabase
+      ? supabase
           .from("set_supplemental_assignment")
           .select("id,set_id,item_type,quantity,label")
           .is("returned_at", null)
           .in("set_id", setIds)
-      : { data: [] };
+      : { data: [] },
+    Promise.all(chunkValues(setIds).map((setIdBatch) =>
+      supabase
+        .from("set_person_assignment")
+        .select(
+          "id,set_id,issued_at,returned_at,person:person_id(id,first_name,last_name,email,person_type)",
+        )
+        .not("returned_at", "is", null)
+        .in("set_id", setIdBatch)
+        .order("returned_at", { ascending: false }),
+    )),
+  ]);
   const rawPreviousPersonAssignments: RawPersonAssignmentRow[] = [];
 
-  for (const setIdBatch of chunkValues(setIds)) {
-    const { data, error } = await supabase
-      .from("set_person_assignment")
-      .select(
-        "id,set_id,issued_at,returned_at,person:person_id(id,first_name,last_name,email,person_type)",
-      )
-      .not("returned_at", "is", null)
-      .in("set_id", setIdBatch)
-      .order("returned_at", { ascending: false });
-
+  for (const { data, error } of previousAssignmentResults) {
     if (error) {
       throw error;
     }
@@ -1958,6 +1923,46 @@ export default async function SetsPage({
         .order("damage_number", { ascending: false })
     : { data: [], error: null };
   const setToIssue = sets.find((set) => set.id === issueSetId) ?? null;
+  const personSelectionOptions: PersonSelectionOption[] = [];
+
+  if (setToIssue && canManageSets) {
+    const { data: personOptionData } = await supabase
+      .from("person")
+      .select("id,legacy_user_id,first_name,last_name,email,person_type")
+      .eq("status", "aktiv")
+      .order("last_name", { ascending: true, nullsFirst: false })
+      .order("first_name", { ascending: true, nullsFirst: false })
+      .limit(5000);
+    const personOptions = (personOptionData ?? []) as PersonOptionRow[];
+    const classByOptionPersonId = new Map<string, string>();
+    const optionClassResults = await Promise.all(
+      chunkValues(personOptions.map((person) => person.id)).map((ids) =>
+        supabase
+          .from("person_class_assignment")
+          .select("person_id,school_class:school_class_id(label,grade_level)")
+          .is("valid_until", null)
+          .in("person_id", ids),
+      ),
+    );
+
+    for (const { data, error } of optionClassResults) {
+      if (error) throw error;
+      for (const assignment of (data ?? []) as RawPersonClassAssignmentRow[]) {
+        const schoolClass = normalizeJoined(assignment.school_class);
+        if (schoolClass) classByOptionPersonId.set(assignment.person_id, schoolClass.label);
+      }
+    }
+
+    personSelectionOptions.push(...personOptions.map((person) => ({
+      classLabel: classByOptionPersonId.get(person.id) ?? null,
+      email: person.email,
+      firstName: person.first_name,
+      id: person.id,
+      lastName: person.last_name,
+      legacyUserId: person.legacy_user_id,
+      personType: person.person_type,
+    })));
+  }
   const setToReturn = sets.find((set) => set.id === returnSetId) ?? null;
   const setToEditStorage = sets.find((set) => set.id === storageSetId) ?? null;
   const assignmentToIssue = setToIssue

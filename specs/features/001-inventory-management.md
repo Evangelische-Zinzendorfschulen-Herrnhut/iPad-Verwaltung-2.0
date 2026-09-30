@@ -64,6 +64,17 @@ Die Schule braucht eine verlaessliche Uebersicht ueber alle Komponenten eines iP
 5. Detailansichten laden nur bei geoeffneter Detailaktion die zusaetzlichen Detaildaten.
 6. Set-Liste und Lagerliste nutzen die verfuegbare Browserbreite mit einem schmalen, responsiven Seitenabstand, damit Tabellenzellen moeglichst einzeilig bleiben.
 
+### Akzeptanz: Ladepfad der Set-Liste
+
+- Fuer die bestehenden leseberechtigten Rollen schraenkt `setId` die Set-Abfrage direkt auf die Inventarnummer ein; numerische Legacy-IDs behalten ihre bisherige Bedeutung. Kombinierte Suche und Filter bleiben wirksam.
+- Personen-, Klassen-, Komponenten-, Zusatzartikel-, Historien- und Aufgabendaten fuer Tabellenzeilen werden bei einer eindeutigen Setnummer nur fuer dieses Set geladen. Globale Kennzahlen und Klassenfilter bleiben verfuegbar.
+- Die Auswahl aktiver Personen samt Klassen wird nur geladen, wenn ein berechtigter Nutzer den Ausgabe-/Zuordnungsdialog fuer ein sichtbares Set oeffnet.
+- Unabhaengige Folgeabfragen laufen parallel; bestehende Fehlerbehandlung und serverseitige Rollenpruefungen bleiben erhalten.
+- Verifikation: fokussierte Ladepfadtests, Typecheck, Lint, Build sowie lesende Pruefung mit realem Supabase. In Google Chrome werden mindestens acht warme Aufrufe von `/sets?setId=M40` bis zur sichtbaren Zeile und Trefferzahl gemessen; Median und Spannweite werden mit 4,15 s bzw. 3,64-5,96 s verglichen. Ziel ist ein niedrigerer Median unter vergleichbaren Bedingungen. Ungefilterte Liste und Ausgabe-Dialog werden ebenfalls geprueft.
+- Datenmodell, RLS, Ausgabe/Ruecknahme und Audit bleiben unveraendert. Keine Migration, View oder RPC. Offene Fragen: keine.
+
+Verifikation am 30.09.2026: Google Chrome, angemeldete Sitzung, warmer Next.js-Entwicklungsserver auf Port 3005, Reload bis sichtbare Trefferzahl und M40-Komponentenzeile (inklusive Browser-Steuerungs-/Beobachtungsaufwand). Acht Laeufe: 4116, 1662, 1701, 1409, 1368, 1361, 1549, 1803 ms. Median 1605,5 ms, Spannweite 1361-4116 ms; gegenueber Baseline 4150 ms etwa 61 % niedrigerer Median. Ungefilterte Liste (1-50 von 716 Sets) und Ausgabe-/Zuordnungsdialog mit Personenauswahl geprueft. Reale Supabase-Leseabfrage bestaetigt fuer M40 drei aktuelle Komponenten, eine aktive Zuordnung und keine aktuellen Zusatzartikel. Keine Daten geaendert. Dies ist eine lokale Vergleichsmessung, kein Produktions-SLA; globale Kennzahlen, Sammelabfragen der ungefilterten Liste und die bestehende 5000-Personen-Grenze im Dialog bleiben bestehen.
+
 ## Darstellung: Inventarnummer in der Geraeteliste
 
 - Ziel und Nutzerrollen: Admin, iPad-Verwaltung und weitere bereits leseberechtigte Rollen erkennen die Geraetekategorie durch ein blaues Icon hinter jeder Inventarnummer schneller.

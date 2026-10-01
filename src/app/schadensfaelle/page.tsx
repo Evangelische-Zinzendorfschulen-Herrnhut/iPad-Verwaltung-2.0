@@ -1,3 +1,4 @@
+import { validExchangeDate } from "@/lib/damage-exchange-validation";
 import { SharePointFolderSection } from "./sharepoint-folder-section";
 import { ReplacementComponentSearch, type ReplacementOption } from "./replacement-component-search";
 import Link from "next/link";
@@ -359,6 +360,9 @@ async function updateDamageCase(formData: FormData) {
   const supabase = await createClient();
   const replacementInventoryNumber = String(formData.get("replacement_inventory_number") ?? "").trim();
   let replacementComponentId: string | undefined;
+  if (replacementInventoryNumber && !validExchangeDate(replacementIssuedAt)) {
+    redirect(appendFlagToHref(returnTo, "error", "exchange_date"));
+  }
   if (replacementInventoryNumber) {
     const replacementResult = await supabase.from("inventory_component")
       .select("id")
@@ -397,6 +401,9 @@ async function updateDamageCase(formData: FormData) {
     .single();
 
   if (error) {
+    if (error.code === "P0001") {
+      redirect(appendFlagToHref(returnTo, "error", "exchange_rejected"));
+    }
     throw error;
   }
 
@@ -1283,6 +1290,8 @@ export default async function SchadensfaellePage({
             </div>
 
             <form action={updateDamageCase} className="grid gap-5 p-6">
+              {getSingleParam(params, "error") === "exchange_date" && <p role="alert" className="rounded-md bg-red-50 p-3 text-sm text-red-800">Bitte ein gültiges, nicht zukünftiges Austauschdatum angeben. Es wurde nichts gespeichert.</p>}
+              {getSingleParam(params, "error") === "exchange_rejected" && <p role="alert" className="rounded-md bg-red-50 p-3 text-sm text-red-800">Der Austausch wurde abgewiesen. Bitte Datum, aktuelle Set-Zuordnung und Verfügbarkeit der Ersatzkomponente prüfen. Es wurde nichts gespeichert.</p>}
               <input name="id" type="hidden" value={editCase.id} />
               <input
                 name="return_to"
@@ -1440,7 +1449,7 @@ export default async function SchadensfaellePage({
                 {editCase.replacement_component ? (
                   <Field label="Ersatzkomponente" value={formatComponent(editCase.replacement_component)} />
                 ) : editCase.component ? (
-                  <ReplacementComponentSearch options={replacementOptions} />
+                  <ReplacementComponentSearch options={replacementOptions} initialIssuedAt={editCase.replacement_issued_at ?? ""} />
                 ) : (
                   <p className="text-sm text-zinc-500">Für die Ersatzsuche muss dem Schadensfall eine konkrete Komponente zugeordnet sein.</p>
                 )}
@@ -1464,14 +1473,14 @@ export default async function SchadensfaellePage({
                     </select>
                   </FormField>
 
-                  <FormField label="Ersatz ausgegeben am">
+                  {(editCase.replacement_component || !editCase.component) && <FormField label="Ersatz ausgegeben am">
                     <input
                       className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
                       defaultValue={editCase.replacement_issued_at ?? ""}
                       name="replacement_issued_at"
                       type="date"
                     />
-                  </FormField>
+                  </FormField>}
                 </div>
               </section>
 

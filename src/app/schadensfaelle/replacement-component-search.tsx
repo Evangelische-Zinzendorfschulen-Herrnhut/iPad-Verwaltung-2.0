@@ -1,10 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { FieldIcon } from "./field-icon";
+import { berlinToday } from "@/lib/damage-exchange-validation";
 
 export type ReplacementOption = { id: string; inventoryNumber: string; model: string | null; storage: string | null; source: string; priority: number };
 
-export function ReplacementComponentSearch({ options }: { options: ReplacementOption[] }) {
+export function ReplacementComponentSearch({ options, initialIssuedAt = "" }: { options: ReplacementOption[]; initialIssuedAt?: string }) {
+  const [issuedAt, setIssuedAt] = useState(initialIssuedAt);
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState("");
   const matches = options.filter((option) =>
@@ -24,12 +27,16 @@ export function ReplacementComponentSearch({ options }: { options: ReplacementOp
         </label>
         {options.filter((option) => option.inventoryNumber === selected || matches.includes(option)).map((option) => (
           <label key={option.id} className="flex cursor-pointer items-center gap-3 border-b border-zinc-100 px-3 py-2 text-sm last:border-0 hover:bg-zinc-50">
-            <input type="radio" name="replacement_selection" checked={selected === option.inventoryNumber} onChange={() => setSelected(option.inventoryNumber)} />
+            <input type="radio" name="replacement_selection" checked={selected === option.inventoryNumber} onChange={() => { setSelected(option.inventoryNumber); setIssuedAt(berlinToday()); }} />
             <span><span className="inventory-number font-semibold">{option.inventoryNumber}</span><span className="block text-zinc-500">{option.model || "Modell nicht angegeben"} · {option.source} · Lagerort: {option.storage || "-"}</span></span>
           </label>
         ))}
         {!matches.length && <p className="px-3 py-2 text-sm text-zinc-500">{options.length ? "Keine passenden Treffer." : "Keine passenden freien Komponenten vorhanden."}</p>}
       </div>
+      <label className="flex flex-col gap-1 text-sm font-medium">
+        <span className="flex items-center gap-2"><FieldIcon label="Ersatz ausgegeben am" /><span>Ersatz ausgegeben am</span></span>
+        <input className="rounded-md border border-zinc-300 px-3 py-2 font-normal" name="replacement_issued_at" type="date" value={issuedAt} onChange={(event) => setIssuedAt(event.target.value)} required={Boolean(selected)} max={berlinToday()} />
+      </label>
     </fieldset>
   );
 }

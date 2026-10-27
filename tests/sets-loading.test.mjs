@@ -15,7 +15,7 @@ const inventorySet = {
   availability: "frei", assigned_person: person, assigned_person_id: person.id, storage_label: "W1 / 1",
 };
 
-async function render(params = {}, { role = "admin", failHistory = false, failSet = false } = {}) {
+async function render(params = {}, { role = "admin", failHistory = false, failSet = false, introductionEnabled = true } = {}) {
   const calls = [];
   let active = 0;
   let maxActive = 0;
@@ -62,6 +62,8 @@ async function render(params = {}, { role = "admin", failHistory = false, failSe
   const pageModule = { exports: {} };
   const imports = (name) => {
     if (name === "react/jsx-runtime") return require(name);
+    if (name === "@/lib/introduction-support") return {supportsIntroduction:async()=>introductionEnabled,introductionColumns:(columns,enabled)=>enabled?columns:columns.replaceAll("ipad_introduction_at,","")};
+    if (name === "@/lib/ipad-introduction") return { berlinToday: () => "2026-10-08" };
     if (name === "@/lib/condition") return { conditionLabel: (value) => value };
     if (name === "@/lib/supabase/server") return { createClient: async () => client };
     if (name === "@/lib/auth/current-user") return {
@@ -150,4 +152,11 @@ test("independent queries overlap and history errors remain visible", async () =
 test("authentication and role checks happen before database access", async () => {
   await assert.rejects(render({}, { role: null }), /redirect:\/login/);
   await assert.rejects(render({}, { role: "buchhaltung" }), /redirect:\//);
+});
+
+test("pre-migration set list does not query the new date and disables introduction filter",async()=>{
+ const {calls,nodes}=await render({}, {introductionEnabled:false});
+ assert.ok(calls.filter(c=>c.table==='set_person_assignment').every(c=>!c.fields.includes('ipad_introduction_at')));
+ assert.ok(!calls.some(c=>c.filters.some(values=>JSON.stringify(values).includes('ipad_introduction_at'))));
+ assert.equal(nodes.find(n=>n.props?.introductionEnabled!==undefined).props.introductionEnabled,false);
 });

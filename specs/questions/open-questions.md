@@ -1,5 +1,18 @@
 # Offene Fragen
 
+## Set-Verfuegbarkeit iPad-Einfuehrung, Stand 08.10.2026
+
+Die bestaetigte Definition und der Entwurf stehen in
+[`014-ipad-introduction.md`](../features/014-ipad-introduction.md).
+Datumslogik sowie interner und kompletter Schadenstausch sind entschieden.
+Die Einfuehrung behaelt Person und Wagenplatz; Mitnahme erfolgt manuell durch
+Admin/iPad-Verwaltung, auch wagenweise aus der Lagerliste. Einfuehrungssets sind
+keine Komponentenquelle. Details und ausdruecklich begrenzter Umsetzungsschnitt
+stehen in Feature 014. Keine offenen Blocker fuer diesen Schnitt.
+Spaetere Fragen: eigenstaendige Einfuehrungsprotokolle/Unterschriften,
+Korrektur-/Stornoaktion und lagerortuebergreifende Platz-/Reservierungspruefung.
+Bestehende Daten werden nicht automatisch als Einfuehrung umgedeutet.
+
 ## Prioritaet 1: Grundlage
 
 1. Wer soll sich in der ersten Version einloggen koennen: nur Mitarbeitende oder auch Schueler/Eltern?

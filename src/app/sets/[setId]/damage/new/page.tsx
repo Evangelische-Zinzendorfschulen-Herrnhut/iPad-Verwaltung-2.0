@@ -1,3 +1,4 @@
+import { INTRODUCTION, canSupplyReplacement } from "@/lib/ipad-introduction";
 import { provisionDamageFolder } from "@/lib/sharepoint/folder-service";
 import { DamageExchangeForm, DamageExchangeFields } from "../../../damage-exchange-form";
 import Link from "next/link";
@@ -456,7 +457,7 @@ async function applyReplacementComponentIssue({
     throw new Error("Ersatzkomponente ist bereits diesem Set zugeordnet.");
   }
 
-  if (replacementAssignment?.set?.availability === "ausgegeben") {
+  if (replacementAssignment?.set && !["frei", "blockiert"].includes(replacementAssignment.set.availability)) {
     throw new Error("Ersatzkomponente ist einem ausgegebenen Set zugeordnet.");
   }
 
@@ -603,6 +604,14 @@ async function createDamageCase(formData: FormData) {
   }
 
   const supabase = await createClient();
+  const targetResult = await supabase.from("inventory_set").select("availability,assigned_person_id").eq("id",setId).single();
+  if(targetResult.error) throw targetResult.error;
+  const isIntroductionTarget = targetResult.data.availability === INTRODUCTION;
+  if(isIntroductionTarget) {
+    const active = await supabase.from("set_person_assignment").select("id,person_id").eq("set_id",setId).is("returned_at",null).single();
+    if(active.error || active.data.id!==assignmentId || active.data.person_id!==personId || personId!==targetResult.data.assigned_person_id)
+      throw new Error("Die aktuelle Personenzuordnung der iPad-Einführung hat sich geändert.");
+  }
   if (replacementComponentId) {
     const original = await supabase.from("inventory_component").select("category").eq("id", componentId).single();
     const replacement = await supabase.from("inventory_component").select("category,condition").eq("id", replacementComponentId).single();
@@ -614,7 +623,7 @@ async function createDamageCase(formData: FormData) {
     if (source.data) {
     const sourceSet = await supabase.from("inventory_set").select("availability,assigned_person_id").eq("id", source.data.set_id).single();
     const sourcePerson = await supabase.from("set_person_assignment").select("id").eq("set_id", source.data.set_id).is("returned_at", null).maybeSingle();
-    if (sourceSet.error || sourcePerson.error || !["frei", "blockiert"].includes(sourceSet.data?.availability ?? "") || sourceSet.data?.assigned_person_id || sourcePerson.data) {
+    if (sourceSet.error || sourcePerson.error || !canSupplyReplacement(sourceSet.data?.availability ?? "", sourceSet.data?.assigned_person_id ?? null, Boolean(sourcePerson.data))) {
       throw new Error("Die Ersatzkomponente muss aus einem freien oder blockierten Set ohne Personenzuordnung stammen.");
     }
     }
@@ -701,7 +710,16 @@ async function createDamageCase(formData: FormData) {
     throw error;
   }
 
+  let introductionSetExchanged = false;
   if (damageCase) {
+    const [componentExchange, setExchange] = await Promise.all([
+      replacementComponentId ? supabase.from("damage_component_exchange_log").select("id").eq("damage_case_id",damageCase.id).limit(1) : Promise.resolve({data:[],error:null}),
+      replacementSetId ? supabase.from("set_introduction_audit").select("id").eq("object_type","introduction_set_exchange").eq("object_id",damageCase.id).limit(1) : Promise.resolve({data:[],error:null}),
+    ]);
+    if(componentExchange.error) throw componentExchange.error;
+    if(setExchange.error) throw setExchange.error;
+    const componentAlreadyExchanged = Boolean(componentExchange.data?.length);
+    introductionSetExchanged = Boolean(setExchange.data?.length);
     const shortDescription = `Schaden ${damageCase.damage_number}: ${preliminaryShortDescription}`;
     const shouldMarkDamagedPartsDefective =
       caseType !== "technisches_problem" || normalizedProblemType === "hardware";
@@ -715,6 +733,7 @@ async function createDamageCase(formData: FormData) {
     }
 
     if (
+      !introductionSetExchanged &&
       exchangeStatus === "ausgegeben" &&
       replacementSetId &&
       personId &&
@@ -733,6 +752,7 @@ async function createDamageCase(formData: FormData) {
     }
 
     if (
+      !componentAlreadyExchanged &&
       componentId &&
       replacementComponentId &&
       componentId !== replacementComponentId
@@ -766,7 +786,7 @@ async function createDamageCase(formData: FormData) {
     }
   }
 
-  if (hasStorageLabelField) {
+  if (hasStorageLabelField && !introductionSetExchanged) {
     const { error: storageError } = await supabase
       .from("inventory_set")
       .update({ storage_label: storageLabel || null })

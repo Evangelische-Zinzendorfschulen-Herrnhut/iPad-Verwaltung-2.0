@@ -36,3 +36,10 @@ Legacy-Originalwerte bleiben erhalten und werden beim Import zusätzlich normali
 - Set-Zustand wird aus iPad, Pencil und Tastatur abgeleitet.
 - Set-Verfügbarkeit wird aus aktiver Ausleihe, Set-Zustand und Blockierungsgründen abgeleitet.
 - Prozesswerte wie `Zurücksetzen`, `Gerätetausch neu` oder `Prüfung Rückgabe` werden als Workflow-/Importhinweise behandelt, nicht als alleiniger Status.
+
+## Ergaenzung 08.10.2026
+
+`ipad_einfuehrung` ist eine eigene Set-Verfuegbarkeit fuer bereits begonnene
+Unterrichtsnutzung bei fortbestehendem Wagenplatz. Gespeicherte Verfuegbarkeit
+ist hier fuehrend; Klassenstufe darf sie nicht verdecken. Datums-/Sammelaktions-
+entscheidung: ADR 0019 und Feature 014.

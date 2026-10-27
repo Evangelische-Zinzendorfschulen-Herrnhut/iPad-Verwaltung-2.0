@@ -746,3 +746,12 @@ Schadensfall:
 - Gibt es Eltern-/Schuelerzugriff oder nur interne Mitarbeitende ueber Univention SSO?
 - Muss MDM synchronisiert werden oder reicht manuelle Dokumentation?
 - Welche Ersatzbetraege gelten fuer fehlende oder beschaedigte Zubehoerteile?
+
+## iPad-Einfuehrung
+
+Set-Verfuegbarkeit `ipad_einfuehrung` und optionales Datum
+`set_person_assignment.ipad_introduction_at` ergaenzen das Modell (Feature 014,
+ADR 0019). `issued_at` bezeichnet erst regulaere Ausgabe zur Mitnahme.
+Ein Einfuehrungsset benoetigt Schuelerzuordnung, aktuelle Klasse sowie W1–W6
+mit Platz 1–30 im bestehenden `storage_label`. Der neue Zustand ist
+keine automatische Klassenstufenableitung. Tausch/Ruecknahme erhalten die Historie.

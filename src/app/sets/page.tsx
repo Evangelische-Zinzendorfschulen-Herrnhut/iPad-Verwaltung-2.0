@@ -1,3 +1,6 @@
+import { supportsIntroduction, introductionColumns } from "@/lib/introduction-support";
+import { berlinToday } from "@/lib/ipad-introduction";
+import { changeSetIssue } from "../actions/change-set-issue";
 import { DamageContextItem } from "./damage-context-item";
 import { conditionLabel } from "@/lib/condition";
 import Link from "next/link";
@@ -58,6 +61,7 @@ type PersonAssignmentRow = {
   id: string;
   set_id: string;
   issued_at: string | null;
+  ipad_introduction_at: string | null;
   returned_at?: string | null;
   person: {
     id: string;
@@ -612,7 +616,7 @@ function deriveAvailability(
   schoolClass?: PersonClassAssignmentRow["school_class"],
   assignment?: PersonAssignmentRow,
 ) {
-  if (!person) {
+  if (["ipad_einfuehrung", "ausgegeben"].includes(set.availability) || !person) {
     return set.availability;
   }
 
@@ -695,7 +699,7 @@ async function returnSet(formData: FormData) {
   const returnTo = normalizeRequiredText(formData.get("return_to")) || "/sets";
   const returnedAt =
     normalizeRequiredText(formData.get("returned_at")) ||
-    new Date().toISOString().slice(0, 10);
+    berlinToday();
   const storageLabel = normalizeOptionalText(formData.get("storage_label"));
   const returnNote = normalizeOptionalText(formData.get("return_note"));
   const returnDefects = normalizeOptionalText(formData.get("return_defects"));
@@ -764,6 +768,18 @@ async function returnSet(formData: FormData) {
     redirect(returnTo);
   }
 
+  const { data: currentSet, error: currentSetError } = await supabase.from("inventory_set").select("availability").eq("id",setId).single();
+  if(currentSetError) throw currentSetError;
+  if(currentSet.availability === "ipad_einfuehrung") {
+    const {error} = await supabase.rpc("return_introduction_set",{
+      p_set_id:setId,p_assignment_id:assignmentId,p_date:returnedAt,p_storage:storageLabel,
+      p_note:combinedNote || null,p_defects:returnDefects,p_resolutions:returnResolutions,
+      p_checks:{return_ipad_present:ipadPresent,return_pencil_present:pencilPresent,return_keyboard_present:keyboardPresent,
+        return_power_adapter_present:powerAdapterPresent,return_charging_cable_present:chargingCablePresent,
+        return_pencil_cap_present:pencilCapPresent,pencil_accessory_required:pencilAccessoryKind!=="none"}
+    });
+    if(error) throw error;
+  } else {
   const { error: returnError } = await supabase
     .from("set_person_assignment")
     .update({
@@ -798,6 +814,8 @@ async function returnSet(formData: FormData) {
 
   if (setError) {
     throw setError;
+  }
+
   }
 
   if (hasHdmi && hdmiAssignmentId && hdmiReturned) {
@@ -1105,109 +1123,7 @@ async function createTaskForSet(formData: FormData) {
 
 async function completeSetIssue(formData: FormData) {
   "use server";
-
-  const appUser = await getCurrentAppUser();
-
-  if (!appUser) {
-    redirect("/login");
-  }
-
-  if (!hasAnyRole(appUser, ["admin", "ipad_verwaltung"])) {
-    redirect("/");
-  }
-
-  const setId = normalizeRequiredText(formData.get("set_id"));
-  const returnTo = normalizeRequiredText(formData.get("return_to")) || "/sets";
-  const issuedAt =
-    normalizeRequiredText(formData.get("issued_at")) ||
-    new Date().toISOString().slice(0, 10);
-  const issueNote = normalizeOptionalText(formData.get("issue_note"));
-
-  if (!setId) {
-    redirect(returnTo);
-  }
-
-  const supabase = await createClient();
-  const [
-    { data: set, error: setError },
-    { data: assignment, error: assignmentError },
-  ] = await Promise.all([
-    supabase
-      .from("inventory_set")
-      .select("id,availability,condition,assigned_person_id")
-      .eq("id", setId)
-      .maybeSingle(),
-    supabase
-      .from("set_person_assignment")
-      .select("id,issue_note,person:person_id(id,legacy_user_id,status)")
-      .eq("set_id", setId)
-      .is("returned_at", null)
-      .is("issued_at", null)
-      .maybeSingle(),
-  ]);
-
-  if (setError) {
-    throw setError;
-  }
-
-  if (assignmentError) {
-    throw assignmentError;
-  }
-
-  const assignmentPerson = Array.isArray(assignment?.person)
-    ? assignment?.person[0]
-    : assignment?.person;
-
-  if (
-    !set ||
-    !assignment ||
-    !assignmentPerson ||
-    assignmentPerson.status !== "aktiv" ||
-    set.availability !== "zugeordnet" ||
-    !["ok", "beschädigt_nutzbar"].includes(set.condition)
-  ) {
-    redirect(`${returnTo}${returnTo.includes("?") ? "&" : "?"}error=issue_invalid`);
-  }
-
-  const combinedNote = [
-    assignment.issue_note,
-    issueNote,
-    `Tatsächliche Ausgabe am ${issuedAt} über Set-Liste.`,
-  ]
-    .filter(Boolean)
-    .join("\n");
-
-  const { error: assignmentUpdateError } = await supabase
-    .from("set_person_assignment")
-    .update({
-      issued_at: issuedAt,
-      issue_note: combinedNote || null,
-      legacy_status: "manual_issue",
-      legacy_user_id: assignmentPerson.legacy_user_id ?? 0,
-    })
-    .eq("id", assignment.id)
-    .is("returned_at", null)
-    .is("issued_at", null);
-
-  if (assignmentUpdateError) {
-    throw assignmentUpdateError;
-  }
-
-  const { error: setUpdateError } = await supabase
-    .from("inventory_set")
-    .update({
-      availability: "ausgegeben",
-      legacy_user_id: assignmentPerson.legacy_user_id,
-      notes: combinedNote || null,
-      storage_label: null,
-    })
-    .eq("id", setId);
-
-  if (setUpdateError) {
-    throw setUpdateError;
-  }
-
-  redirect(`${returnTo}${returnTo.includes("?") ? "&" : "?"}issued=1`);
+  return changeSetIssue(formData);
 }
 
 export default async function SetsPage({
@@ -1240,6 +1156,7 @@ export default async function SetsPage({
   }
 
   const supabase = await createClient();
+  const introductionEnabled = await supportsIntroduction(supabase);
   const canManageSets = hasAnyRole(appUser, ["admin", "ipad_verwaltung"]);
   const canReadTasks = hasAnyRole(appUser, ["admin"]);
   const canEditSetStorage = canManageSets;
@@ -1489,7 +1406,7 @@ export default async function SetsPage({
       .from("set_person_assignment")
       .select("id", { count: "exact", head: true })
       .is("returned_at", null)
-      .not("issued_at", "is", null),
+      .or(introductionEnabled ? "issued_at.not.is.null,ipad_introduction_at.not.is.null" : "issued_at.not.is.null"),
   ]);
 
   if (setIdQuery && setsResult.error) {
@@ -1504,7 +1421,7 @@ export default async function SetsPage({
     const { data, error } = await supabase
       .from("set_person_assignment")
       .select(
-        "id,set_id,issued_at,person:person_id(id,first_name,last_name,email,person_type)",
+        introductionColumns("id,set_id,ipad_introduction_at,issued_at,person:person_id(id,first_name,last_name,email,person_type)", introductionEnabled),
       )
       .is("returned_at", null)
       .in("set_id", setIdBatch);
@@ -1513,7 +1430,7 @@ export default async function SetsPage({
       throw error;
     }
 
-    rawPersonAssignments.push(...((data ?? []) as RawPersonAssignmentRow[]));
+    rawPersonAssignments.push(...((data ?? []) as unknown as RawPersonAssignmentRow[]));
   }
 
   const personAssignments = rawPersonAssignments.map((assignment) => ({
@@ -1686,7 +1603,7 @@ export default async function SetsPage({
       supabase
         .from("set_person_assignment")
         .select(
-          "id,set_id,issued_at,returned_at,person:person_id(id,first_name,last_name,email,person_type)",
+          introductionColumns("id,set_id,ipad_introduction_at,issued_at,returned_at,person:person_id(id,first_name,last_name,email,person_type)", introductionEnabled),
         )
         .not("returned_at", "is", null)
         .in("set_id", setIdBatch)
@@ -1701,7 +1618,7 @@ export default async function SetsPage({
     }
 
     rawPreviousPersonAssignments.push(
-      ...((data ?? []) as RawPersonAssignmentRow[]),
+      ...((data ?? []) as unknown as RawPersonAssignmentRow[]),
     );
   }
 
@@ -1857,7 +1774,7 @@ export default async function SetsPage({
       components: componentOptions,
       condition,
       damageHref:
-        availability === "ausgegeben" || availability === "frei"
+        ["ausgegeben", "ipad_einfuehrung", "frei"].includes(availability)
           ? buildDamageHref(params, set.id)
           : null,
       devicesHref: `/geraete?set=${encodeURIComponent(setIdentifier(set))}`,
@@ -1894,7 +1811,7 @@ export default async function SetsPage({
           ? personListHref(previousPerson)
           : null,
       problemHref:
-        availability === "ausgegeben" || availability === "frei"
+        ["ausgegeben", "ipad_einfuehrung", "frei"].includes(availability)
           ? buildProblemHref(params, set.id)
           : null,
       releaseReturnTo: buildCloseStorageHref(params),
@@ -1903,7 +1820,7 @@ export default async function SetsPage({
         ? null
         : `/sets/${set.id}/return-protocol`,
       returnSetHref:
-        person && currentAssignment && currentAssignment.issued_at
+        person && currentAssignment && (currentAssignment.issued_at || currentAssignment.ipad_introduction_at)
           ? buildReturnHref(params, set.id)
           : null,
       storageHref:
@@ -2025,7 +1942,7 @@ export default async function SetsPage({
           : undefined,
       )
     : null;
-  const returnDateDefault = new Date().toISOString().slice(0, 10);
+  const returnDateDefault = berlinToday();
   const issueDateDefault = returnDateDefault;
   const returnSupplementalComponents = [
     componentsToReturn?.get("adapter")?.component
@@ -2109,6 +2026,7 @@ export default async function SetsPage({
           </div>
 
         <SetsFilterForm
+          introductionEnabled={introductionEnabled}
           availability={availabilityFilter}
           classFilter={classFilter}
           classOptions={classFilterOptions}
@@ -2200,6 +2118,8 @@ export default async function SetsPage({
                     <DetailField label="Legacy-Status" value={setToShowDetail.legacy_status} />
                     <DetailField label="Marker" value={setToShowDetail.marker} />
                     <DetailField label="Lagerort" value={setToShowDetail.storage_label} />
+                    <DetailField label="Datum der iPad-Einführung" value={currentAssignmentBySetId.get(setToShowDetail.id)?.ipad_introduction_at} />
+                    <DetailField label="Ausgabedatum zur Mitnahme" value={currentAssignmentBySetId.get(setToShowDetail.id)?.issued_at} />
                   </dl>
                 </section>
 
@@ -2407,7 +2327,7 @@ export default async function SetsPage({
 
                   {isPreparedIssue ? (
                     <DetailField
-                      label="Vorbereitet für"
+                      label="Zugeordnet an"
                       value={formatPerson(
                         personToIssue,
                         personToIssue
@@ -2422,12 +2342,20 @@ export default async function SetsPage({
                     </div>
                   )}
 
+                  {isPreparedIssue ? <label className="grid gap-1 text-sm font-medium">Ausgabeart
+                    <select name="issue_target" className="rounded border px-3 py-2" defaultValue="ausgegeben">
+                      <option value="ausgegeben">Ausgabe zur Mitnahme nach Hause</option>
+                      {introductionEnabled && setToIssue.availability === "zugeordnet" && personToIssue?.person_type === "schueler" ? <option value="ipad_einfuehrung">iPad-Einführung: Nutzung im Unterricht, bleibt im Wagen</option> : null}
+                    </select>
+                    {assignmentToIssue?.ipad_introduction_at ? <span>iPad-Einführung am {assignmentToIssue.ipad_introduction_at}</span> : null}
+                  </label> : null}
                   {isPreparedIssue ? (
                     <label className="flex flex-col gap-1 text-sm font-medium md:max-w-52">
-                      Ausgabedatum
+                      {setToIssue.availability === "ipad_einfuehrung" ? "Ausgabedatum zur Mitnahme" : "Datum der gewählten Ausgabe"}
                       <input
                         className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
                         defaultValue={issueDateDefault}
+                        max={berlinToday()}
                         name="issued_at"
                         required
                         type="date"

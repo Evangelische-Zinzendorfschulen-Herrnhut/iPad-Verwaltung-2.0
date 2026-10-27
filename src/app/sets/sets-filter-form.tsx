@@ -12,6 +12,7 @@ import {
 } from "react";
 
 type SetsFilterFormProps = {
+  introductionEnabled?: boolean;
   availability: string;
   classFilter: string;
   classOptions: string[];
@@ -23,6 +24,7 @@ type SetsFilterFormProps = {
 };
 
 export function SetsFilterForm({
+  introductionEnabled = true,
   availability,
   classFilter,
   classOptions,
@@ -169,6 +171,7 @@ export function SetsFilterForm({
           <option value="">Alle</option>
           <option value="frei">Frei</option>
           <option value="zugeordnet">Zugeordnet</option>
+          {introductionEnabled ? <option value="ipad_einfuehrung">iPad-Einführung</option> : null}
           <option value="ausgegeben">Ausgegeben</option>
           <option value="blockiert">Blockiert</option>
           <option value="unklar">Unklar</option>

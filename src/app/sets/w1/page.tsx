@@ -1,3 +1,7 @@
+import { supportsIntroduction } from "@/lib/introduction-support";
+import { WagonIssueForm } from "./wagon-issue-form";
+import { berlinToday } from "@/lib/ipad-introduction";
+import { changeSetIssue } from "../../actions/change-set-issue";
 import { conditionLabel } from "@/lib/condition";
 import Link from "next/link";
 import type { Metadata } from "next";
@@ -25,9 +29,9 @@ const storageFilters = [
   { label: "Wagen W4 7-1", value: "W4" },
   { label: "Wagen W5 7-3", value: "W5" },
   { label: "Wagen W6", value: "W6" },
-  { label: "Schrank1", value: "Schrank1" },
-  { label: "Schrank2", value: "Schrank2" },
-  { label: "Regal1", value: "Regal1" },
+  { label: "Schrank 1", value: "Schrank 1" },
+  { label: "Schrank 2", value: "Schrank 2" },
+  { label: "Regal 2.35", value: "Regal 2.35" },
   { label: "Alle Lagerorte", value: "all" },
 ];
 const ipadStorageFilters = [32, 64, 128, 256];
@@ -339,98 +343,7 @@ async function updateSetStorageFromStorageList(formData: FormData) {
 
 async function completeSetIssueFromStorageList(formData: FormData) {
   "use server";
-
-  const appUser = await getCurrentAppUser();
-
-  if (!appUser) {
-    redirect("/login");
-  }
-
-  if (!hasAnyRole(appUser, ["admin", "ipad_verwaltung"])) {
-    redirect("/");
-  }
-
-  const setId = normalizeRequiredText(formData.get("set_id"));
-  const returnTo = normalizeRequiredText(formData.get("return_to")) || "/sets/w1";
-  const issuedAt =
-    normalizeRequiredText(formData.get("issued_at")) ||
-    new Date().toISOString().slice(0, 10);
-  const issueNote = normalizeOptionalText(formData.get("issue_note"));
-
-  if (!setId) {
-    redirect(returnTo);
-  }
-
-  const supabase = await createClient();
-  const [
-    { data: set, error: setError },
-    { data: assignment, error: assignmentError },
-  ] = await Promise.all([
-    supabase
-      .from("inventory_set")
-      .select("id,availability,condition,assigned_person_id")
-      .eq("id", setId)
-      .maybeSingle(),
-    supabase
-      .from("set_person_assignment")
-      .select("id,issue_note,person:person_id(id,legacy_user_id,status)")
-      .eq("set_id", setId)
-      .is("returned_at", null)
-      .is("issued_at", null)
-      .maybeSingle(),
-  ]);
-
-  if (setError) throw setError;
-  if (assignmentError) throw assignmentError;
-
-  const assignmentPerson = normalizeJoined(assignment?.person);
-
-  if (
-    !set ||
-    !assignment ||
-    !assignmentPerson ||
-    assignmentPerson.status !== "aktiv" ||
-    set.availability !== "zugeordnet" ||
-    !["ok", "beschädigt_nutzbar"].includes(set.condition)
-  ) {
-    redirect(`${returnTo}${returnTo.includes("?") ? "&" : "?"}error=issue_invalid`);
-  }
-
-  const combinedNote = [
-    assignment.issue_note,
-    issueNote,
-    `Tatsächliche Ausgabe am ${issuedAt} über Lagerliste.`,
-  ]
-    .filter(Boolean)
-    .join("\n");
-
-  const { error: assignmentUpdateError } = await supabase
-    .from("set_person_assignment")
-    .update({
-      issued_at: issuedAt,
-      issue_note: combinedNote || null,
-      legacy_status: "manual_issue",
-      legacy_user_id: assignmentPerson.legacy_user_id ?? 0,
-    })
-    .eq("id", assignment.id)
-    .is("returned_at", null)
-    .is("issued_at", null);
-
-  if (assignmentUpdateError) throw assignmentUpdateError;
-
-  const { error: setUpdateError } = await supabase
-    .from("inventory_set")
-    .update({
-      availability: "ausgegeben",
-      legacy_user_id: assignmentPerson.legacy_user_id,
-      notes: combinedNote || null,
-      storage_label: null,
-    })
-    .eq("id", setId);
-
-  if (setUpdateError) throw setUpdateError;
-
-  redirect(`${returnTo}${returnTo.includes("?") ? "&" : "?"}issued=1`);
+  return changeSetIssue(formData);
 }
 
 export default async function W1SetsPage({
@@ -481,6 +394,13 @@ export default async function W1SetsPage({
       ? "Keine Sets mit Lagerort gefunden."
       : `Keine Sets mit Lagerort ${selectedStorageLabel} gefunden.`;
   const supabase = await createClient();
+  const introductionEnabled = await supportsIntroduction(supabase);
+  const wagonSnapshotResult = canManageSets && isWagenFilter && introductionEnabled
+    ? await supabase.from("inventory_set").select("id,updated_at")
+      .eq("availability", "ipad_einfuehrung").ilike("storage_label", `${selectedStorage}%`).order("id").limit(31)
+    : {data:[],error:null};
+  if(wagonSnapshotResult.error) throw wagonSnapshotResult.error;
+  const wagonSnapshot = wagonSnapshotResult.data ?? [];
   const { data: personOptionData, error: personOptionError } = canManageSets
     ? await supabase
         .from("person")
@@ -534,7 +454,7 @@ export default async function W1SetsPage({
   const setToEditStorage = rows.find((row) => row.id === setStorageId) ?? null;
   const setForTask = rows.find((row) => row.id === taskSetId) ?? null;
   const isPreparedIssue = setToIssue?.issueLabel === "Set ausgeben";
-  const issueDateDefault = new Date().toISOString().slice(0, 10);
+  const issueDateDefault = berlinToday();
   const closeIssueParams = new URLSearchParams();
 
   if (selectedStorage !== "W1") {
@@ -598,6 +518,7 @@ export default async function W1SetsPage({
         </header>
 
         <SectionTabs active="wagen-w1" />
+        {!introductionEnabled ? <p role="status" className="rounded border border-amber-200 bg-amber-50 p-4 text-sm">iPad-Einführung ist noch nicht verfügbar: Die Datenbankmigration wartet auf Freigabe. Die bisherige Lagerliste bleibt nutzbar.</p> : null}
 
         {infoMessage ? (
           <div className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-900">
@@ -610,6 +531,8 @@ export default async function W1SetsPage({
             {errorMessage}
           </div>
         ) : null}
+
+        {canManageSets && isWagenFilter && introductionEnabled && wagonSnapshot.length > 0 ? <WagonIssueForm key={selectedStorage} wagon={selectedStorage} snapshot={wagonSnapshot} today={berlinToday()} /> : null}
 
         <div className="grid gap-3 sm:grid-cols-3">
           <div className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
@@ -731,17 +654,24 @@ export default async function W1SetsPage({
                     <>
                       <div>
                         <dt className="text-xs font-medium text-zinc-500">
-                          Vorbereitet für
+                          Zugeordnet an
                         </dt>
                         <dd className="mt-1 text-sm">
                           {setToIssue.person || "-"}
                         </dd>
                       </div>
+                      <label className="grid gap-1 text-sm font-medium">Ausgabeart
+                        <select name="issue_target" defaultValue="ausgegeben" className="rounded border px-3 py-2">
+                          <option value="ausgegeben">Ausgabe zur Mitnahme nach Hause</option>
+                          {introductionEnabled && setToIssue.availability === "zugeordnet" && setToIssue.personType === "schueler" ? <option value="ipad_einfuehrung">iPad-Einführung: Unterrichtsnutzung im Wagen</option> : null}
+                        </select>
+                      </label>
                       <label className="flex flex-col gap-1 text-sm font-medium md:max-w-52">
-                        Ausgabedatum
+                        Datum der gewählten Ausgabe
                         <input
                           className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
                           defaultValue={issueDateDefault}
+                          max={berlinToday()}
                           name="issued_at"
                           required
                           type="date"

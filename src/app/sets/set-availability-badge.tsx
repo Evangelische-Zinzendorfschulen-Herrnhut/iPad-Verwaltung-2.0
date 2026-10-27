@@ -3,6 +3,7 @@ import { faCircleCheck, faUserCheck, faArrowUpRightFromSquare, faLock, faBookmar
 const availabilityStyles: Record<string, { label: string; colors: string }> = {
   frei: { label: "Frei", colors: "bg-emerald-100 text-emerald-800" },
   zugeordnet: { label: "Zugeordnet", colors: "bg-violet-100 text-violet-800" },
+  ipad_einfuehrung: { label: "iPad-Einführung", colors: "bg-cyan-100 text-cyan-900" },
   ausgegeben: { label: "Ausgegeben", colors: "bg-blue-100 text-blue-800" },
   blockiert: { label: "Blockiert", colors: "bg-red-100 text-red-800" },
   reserviert: { label: "Reserviert", colors: "bg-violet-100 text-violet-800" },
@@ -12,7 +13,7 @@ const availabilityStyles: Record<string, { label: string; colors: string }> = {
 
 export function SetAvailabilityBadge({ value }: { value: string | null | undefined }) {
   const normalized = (value?.trim().toLowerCase() || "unklar").replace("zuruecksetzen", "zurücksetzen");
-  const icons = { frei: faCircleCheck, zugeordnet: faUserCheck, ausgegeben: faArrowUpRightFromSquare, blockiert: faLock, reserviert: faBookmark, zurücksetzen: faRotate };
+  const icons = { ipad_einfuehrung: faUserCheck, frei: faCircleCheck, zugeordnet: faUserCheck, ausgegeben: faArrowUpRightFromSquare, blockiert: faLock, reserviert: faBookmark, zurücksetzen: faRotate };
   const icon = icons[normalized as keyof typeof icons] ?? faCircleQuestion;
   const style = availabilityStyles[normalized];
 

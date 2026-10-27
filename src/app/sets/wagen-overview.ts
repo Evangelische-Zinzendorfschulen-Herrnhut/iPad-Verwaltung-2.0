@@ -1,3 +1,4 @@
+import { supportsIntroduction, introductionColumns } from "@/lib/introduction-support";
 import { conditionLabel } from "@/lib/condition";
 import { createClient } from "@/lib/supabase/server";
 
@@ -37,6 +38,7 @@ type PersonRow = {
 
 type RawPersonAssignmentRow = {
   issued_at?: string | null;
+  ipad_introduction_at?: string | null;
   set_id: string;
   returned_at?: string | null;
   person: PersonRow | PersonRow[] | null;
@@ -83,6 +85,7 @@ export type WagenOverviewRow = {
   legacyStatus: string;
   pencil: string;
   person: string;
+  personType: string | null;
   previousPerson: string;
   issueHref: string | null;
   issueLabel: string | null;
@@ -170,7 +173,7 @@ function deriveAvailability(
   schoolClass?: { grade_level: number | null },
   issuedAt?: string | null,
 ) {
-  if (!person) {
+  if (["ipad_einfuehrung", "ausgegeben"].includes(set.availability) || !person) {
     return set.availability;
   }
 
@@ -192,7 +195,11 @@ function parseStoragePlace(storageLabel: string | null) {
     return null;
   }
 
-  const match = storageLabel.match(/\bW[1-6]\b\D*(\d{1,2})\b/i);
+  const wagonMatch = storageLabel.match(/\bW[1-6]\b\D*(\d{1,2})\b/i);
+  const storageSlotMatch = storageLabel.match(
+    /\b(?:Schrank\s+\d+|Regal\s+\d+(?:\.\d+)?)\s*-\s*(\d{1,2})\s*$/i,
+  );
+  const match = wagonMatch ?? storageSlotMatch;
   const place = match ? Number.parseInt(match[1], 10) : Number.NaN;
 
   return Number.isInteger(place) && place >= 1 && place <= 30 ? place : null;
@@ -223,6 +230,7 @@ export async function loadWagenOverview(
   ipadStorageFilter: number | null = null,
 ) {
   const supabase = await createClient();
+  const introductionEnabled = await supportsIntroduction(supabase);
   let setQuery = supabase
     .from("inventory_set")
     .select(
@@ -254,7 +262,7 @@ export async function loadWagenOverview(
       await Promise.all([
         supabase
           .from("set_person_assignment")
-          .select("issued_at,set_id,person:person_id(id,first_name,last_name,email,person_type)")
+          .select(introductionColumns("ipad_introduction_at,issued_at,set_id,person:person_id(id,first_name,last_name,email,person_type)", introductionEnabled))
           .is("returned_at", null)
           .in("set_id", setIdBatch),
         supabase
@@ -275,7 +283,7 @@ export async function loadWagenOverview(
     }
 
     rawPersonAssignments.push(
-      ...((personAssignmentsResult.data ?? []) as RawPersonAssignmentRow[]),
+      ...((personAssignmentsResult.data ?? []) as unknown as RawPersonAssignmentRow[]),
     );
     rawComponentAssignments.push(
       ...((componentAssignmentsResult.data ?? []) as RawComponentAssignmentRow[]),
@@ -296,16 +304,18 @@ export async function loadWagenOverview(
       throw error;
     }
 
-    rawPreviousPersonAssignments.push(...((data ?? []) as RawPersonAssignmentRow[]));
+    rawPreviousPersonAssignments.push(...((data ?? []) as unknown as RawPersonAssignmentRow[]));
   }
 
   const personBySetId = new Map<string, PersonRow | null>();
+  const introductionAtBySetId = new Map<string, string | null>();
   const issuedAtBySetId = new Map<string, string | null>();
   const previousPersonBySetId = new Map<string, PersonRow | null>();
 
   for (const assignment of rawPersonAssignments) {
     personBySetId.set(assignment.set_id, normalizeJoined(assignment.person));
     issuedAtBySetId.set(assignment.set_id, assignment.issued_at ?? null);
+    introductionAtBySetId.set(assignment.set_id, assignment.ipad_introduction_at ?? null);
   }
 
   for (const assignment of rawPreviousPersonAssignments) {
@@ -401,6 +411,7 @@ export async function loadWagenOverview(
         legacyStatus: set.legacy_status ?? "",
         pencil: componentLabel(components?.get("pencil") ?? null),
         person: formatPerson(person),
+        personType: person?.person_type ?? null,
         previousPerson:
           !person && (availability === "frei" || availability === "blockiert")
             ? formatPerson(previousPerson)
@@ -410,7 +421,7 @@ export async function loadWagenOverview(
             ? `/sets?issue=${set.id}`
             : null,
         issueLabel: isPrepared ? "Set ausgeben" : "Set vorbereiten",
-        returnHref: person && issuedAt ? `/sets?return=${set.id}` : null,
+        returnHref: person && (issuedAt || introductionAtBySetId.get(set.id)) ? `/sets?return=${set.id}` : null,
         storageLabel: set.storage_label ?? "",
         storagePlace: parseStoragePlace(set.storage_label),
       };

@@ -1,9 +1,12 @@
+import { supportsIntroduction, introductionColumns } from "@/lib/introduction-support";
+import { changeSetIssue } from "../actions/change-set-issue";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { getCurrentAppUser, hasAnyRole } from "@/lib/auth/current-user";
 import { createClient } from "@/lib/supabase/server";
+import { assignmentPhase } from "@/lib/assignment-phase";
 import { releaseReturnedSet } from "../actions/release-set";
 import { SectionTabs } from "../section-tabs";
 import { AssignmentFilterForm } from "./assignment-filter-form";
@@ -19,6 +22,7 @@ type AssignmentSort = "issued_asc" | "name_asc" | "returned_desc";
 type AssignmentRow = {
   id: string;
   issued_at: string | null;
+  ipad_introduction_at: string | null;
   issue_note: string | null;
   return_charging_cable_present: boolean | null;
   return_defects: string | null;
@@ -32,7 +36,8 @@ type AssignmentRow = {
   return_resolutions: string | null;
   set: {
     id: string;
-    legacy_set_id: number;
+    inventory_number: string | null;
+    legacy_set_id: number | null;
     availability: string;
     condition: string;
     storage_label: string | null;
@@ -265,6 +270,10 @@ function formatPerson(person: AssignmentRow["person"]) {
 
   const name = [person.last_name, person.first_name].filter(Boolean).join(", ");
   return name || person.email || "-";
+}
+
+function formatSetIdentifier(set: AssignmentRow["set"]) {
+  return set?.inventory_number || String(set?.legacy_set_id ?? "-");
 }
 
 function escapeSupabaseSearch(value: string) {
@@ -517,107 +526,7 @@ async function updateSetStorage(formData: FormData) {
 
 async function completePreparedIssue(formData: FormData) {
   "use server";
-
-  const appUser = await getCurrentAppUser();
-
-  if (!appUser) {
-    redirect("/login");
-  }
-
-  if (!hasAnyRole(appUser, ["admin", "ipad_verwaltung"])) {
-    redirect("/");
-  }
-
-  const setId = normalizeRequiredText(formData.get("set_id"));
-  const returnTo = normalizeRequiredText(formData.get("return_to")) || "/ausgaben";
-  const issuedAt =
-    normalizeOptionalText(formData.get("issued_at")) ||
-    new Date().toISOString().slice(0, 10);
-
-  if (!setId) {
-    redirect(returnTo);
-  }
-
-  const supabase = await createClient();
-  const [
-    { data: set, error: setError },
-    { data: assignment, error: assignmentError },
-  ] = await Promise.all([
-    supabase
-      .from("inventory_set")
-      .select("id,availability,condition")
-      .eq("id", setId)
-      .maybeSingle(),
-    supabase
-      .from("set_person_assignment")
-      .select("id,issue_note,person:person_id(id,legacy_user_id,status)")
-      .eq("set_id", setId)
-      .is("returned_at", null)
-      .is("issued_at", null)
-      .maybeSingle(),
-  ]);
-
-  if (setError) {
-    throw setError;
-  }
-
-  if (assignmentError) {
-    throw assignmentError;
-  }
-
-  const assignmentPerson = Array.isArray(assignment?.person)
-    ? assignment?.person[0]
-    : assignment?.person;
-
-  if (
-    !set ||
-    !assignment ||
-    !assignmentPerson ||
-    assignmentPerson.status !== "aktiv" ||
-    set.availability !== "zugeordnet" ||
-    !["ok", "beschädigt_nutzbar"].includes(set.condition)
-  ) {
-    redirect(returnTo);
-  }
-
-  const combinedNote = [
-    assignment.issue_note,
-    `Tatsächliche Ausgabe am ${issuedAt} über Aus- und Rückgabeliste.`,
-  ]
-    .filter(Boolean)
-    .join("\n");
-
-  const { error: assignmentUpdateError } = await supabase
-    .from("set_person_assignment")
-    .update({
-      issued_at: issuedAt,
-      issue_note: combinedNote || null,
-      legacy_status: "manual_issue",
-      legacy_user_id: assignmentPerson.legacy_user_id ?? 0,
-    })
-    .eq("id", assignment.id)
-    .is("returned_at", null)
-    .is("issued_at", null);
-
-  if (assignmentUpdateError) {
-    throw assignmentUpdateError;
-  }
-
-  const { error: setUpdateError } = await supabase
-    .from("inventory_set")
-    .update({
-      availability: "ausgegeben",
-      legacy_user_id: assignmentPerson.legacy_user_id,
-      notes: combinedNote || null,
-      storage_label: null,
-    })
-    .eq("id", setId);
-
-  if (setUpdateError) {
-    throw setUpdateError;
-  }
-
-  redirect(returnTo);
+  return changeSetIssue(formData);
 }
 
 export default async function AusgabenPage({
@@ -648,6 +557,7 @@ export default async function AusgabenPage({
   }
 
   const supabase = await createClient();
+  const introductionEnabled = await supportsIntroduction(supabase);
   const canEditSetStorage = hasAnyRole(appUser, ["admin", "ipad_verwaltung"]);
   const { data: classOptionData } = await supabase
     .from("school_class")
@@ -659,7 +569,7 @@ export default async function AusgabenPage({
   let assignmentsQuery = supabase
     .from("set_person_assignment")
     .select(
-      "id,issued_at,issue_note,return_charging_cable_present,return_defects,return_ipad_present,return_keyboard_present,returned_at,return_note,return_pencil_cap_present,return_pencil_present,return_power_adapter_present,return_resolutions,set:set_id(id,legacy_set_id,availability,condition,storage_label),person:person_id(id,first_name,last_name,email,person_type)",
+      introductionColumns("id,ipad_introduction_at,issued_at,issue_note,return_charging_cable_present,return_defects,return_ipad_present,return_keyboard_present,returned_at,return_note,return_pencil_cap_present,return_pencil_present,return_power_adapter_present,return_resolutions,set:set_id(id,legacy_set_id,inventory_number,availability,condition,storage_label),person:person_id(id,first_name,last_name,email,person_type)", introductionEnabled),
       { count: "exact" },
     );
   const requiredAssignmentIdsByFilter: string[][] = [];
@@ -685,6 +595,19 @@ export default async function AusgabenPage({
     const numericQuery = Number.parseInt(query, 10);
     const matchingAssignmentIds = new Set<string>();
 
+    const { data: matchingCurrentSets, error: currentSetError } = await supabase
+      .from("inventory_set")
+      .select("id")
+      .ilike("inventory_number", `%${escapedQuery}%`);
+
+    if (currentSetError) {
+      throw currentSetError;
+    }
+
+    const matchingSetIds = new Set(
+      (matchingCurrentSets ?? []).map((set) => set.id),
+    );
+
     if (Number.isInteger(numericQuery)) {
       const { data: matchingSets, error: setError } = await supabase
         .from("inventory_set")
@@ -695,21 +618,23 @@ export default async function AusgabenPage({
         throw setError;
       }
 
-      const matchingSetIds = (matchingSets ?? []).map((set) => set.id);
+      for (const set of matchingSets ?? []) {
+        matchingSetIds.add(set.id);
+      }
+    }
 
-      for (const setIdBatch of chunkValues(matchingSetIds)) {
-        const { data, error } = await supabase
-          .from("set_person_assignment")
-          .select("id")
-          .in("set_id", setIdBatch);
+    for (const setIdBatch of chunkValues([...matchingSetIds])) {
+      const { data, error } = await supabase
+        .from("set_person_assignment")
+        .select("id")
+        .in("set_id", setIdBatch);
 
-        if (error) {
-          throw error;
-        }
+      if (error) {
+        throw error;
+      }
 
-        for (const assignment of data ?? []) {
-          matchingAssignmentIds.add(assignment.id);
-        }
+      for (const assignment of data ?? []) {
+        matchingAssignmentIds.add(assignment.id);
       }
     }
 
@@ -827,7 +752,7 @@ export default async function AusgabenPage({
     throw assignmentsResult.error;
   }
 
-  const assignments = ((assignmentsResult.data ?? []) as RawAssignmentRow[]).map(
+  const assignments = ((assignmentsResult.data ?? []) as unknown as RawAssignmentRow[]).map(
     (assignment) => ({
       ...assignment,
       person: normalizeJoined(assignment.person),
@@ -906,9 +831,11 @@ export default async function AusgabenPage({
   const issueReturnTo = buildCloseStorageHref(params);
   const rows: AssignmentTableRow[] = visibleAssignments.map((assignment) => {
     const setId = assignment.set?.id ?? "";
-    const legacySetId = assignment.set?.legacy_set_id;
+    const setIdentifier = formatSetIdentifier(assignment.set);
     const isActive = !assignment.returned_at;
-    const isPrepared = isActive && !assignment.issued_at;
+    const phase = assignmentPhase(assignment);
+    const isIntroduction = phase === "introduction";
+    const isPrepared = phase === "prepared";
     const returnComplete = deriveReturnComplete(assignment);
 
     return {
@@ -920,7 +847,8 @@ export default async function AusgabenPage({
       issueProtocolHref:
         assignment.issued_at && setId ? `/sets/${setId}/issue-protocol` : null,
       issuedAt: formatDate(assignment.issued_at),
-      issueHref: isPrepared && setId ? issueReturnTo : null,
+      introductionAt: formatDate(assignment.ipad_introduction_at),
+      issueHref: (isPrepared || isIntroduction) && setId ? issueReturnTo : null,
       person: formatPerson(assignment.person),
       releaseReturnTo: buildCloseStorageHref(params),
       releasable:
@@ -935,10 +863,13 @@ export default async function AusgabenPage({
       returnProtocolHref:
         !isActive && setId ? `/sets/${setId}/return-protocol` : null,
       returnedAt: formatDate(assignment.returned_at),
-      setHref: setId ? `/sets?q=${legacySetId ?? ""}&sort=set` : "/sets",
+      setHref:
+        setId && setIdentifier !== "-"
+          ? `/sets?q=${encodeURIComponent(setIdentifier)}&sort=set`
+          : "/sets",
       setId,
-      setLabel: legacySetId ? `Set ${legacySetId}` : "Set -",
-      status: isPrepared ? "Vorbereitet" : isActive ? "Aktiv" : "Zurückgegeben",
+      setLabel: `Set ${setIdentifier}`,
+      status: isIntroduction ? "iPad-Einführung" : isPrepared ? "Vorbereitet" : isActive ? "Aktiv" : "Zurückgegeben",
       storageHref:
         canEditSetStorage && setId ? buildStorageHref(params, setId) : null,
       storageLabel: assignment.set?.storage_label || "-",
@@ -954,7 +885,7 @@ export default async function AusgabenPage({
     storageSetId && !selectedStorageSet
       ? await supabase
           .from("inventory_set")
-          .select("id,legacy_set_id,storage_label")
+          .select("id,legacy_set_id,inventory_number,storage_label")
           .eq("id", storageSetId)
           .maybeSingle()
       : null;
@@ -965,7 +896,8 @@ export default async function AusgabenPage({
           availability: "",
           ...(storageSetResult.data as {
             id: string;
-            legacy_set_id: number;
+            inventory_number: string | null;
+            legacy_set_id: number | null;
             storage_label: string | null;
           }),
         }
@@ -984,7 +916,7 @@ export default async function AusgabenPage({
       ? await supabase
           .from("set_person_assignment")
           .select(
-            "id,issued_at,issue_note,return_charging_cable_present,return_defects,return_ipad_present,return_keyboard_present,returned_at,return_note,return_pencil_cap_present,return_pencil_present,return_power_adapter_present,return_resolutions,set:set_id(id,legacy_set_id,availability,condition,storage_label),person:person_id(id,first_name,last_name,email,person_type)",
+            introductionColumns("id,ipad_introduction_at,issued_at,issue_note,return_charging_cable_present,return_defects,return_ipad_present,return_keyboard_present,returned_at,return_note,return_pencil_cap_present,return_pencil_present,return_power_adapter_present,return_resolutions,set:set_id(id,legacy_set_id,inventory_number,availability,condition,storage_label),person:person_id(id,first_name,last_name,email,person_type)", introductionEnabled),
           )
           .eq("id", editAssignmentId)
           .maybeSingle()
@@ -993,9 +925,9 @@ export default async function AusgabenPage({
     selectedAssignment ??
     (editAssignment?.data
       ? {
-          ...(editAssignment.data as RawAssignmentRow),
-          person: normalizeJoined((editAssignment.data as RawAssignmentRow).person),
-          set: normalizeJoined((editAssignment.data as RawAssignmentRow).set),
+          ...(editAssignment.data as unknown as RawAssignmentRow),
+          person: normalizeJoined((editAssignment.data as unknown as RawAssignmentRow).person),
+          set: normalizeJoined((editAssignment.data as unknown as RawAssignmentRow).set),
         }
       : null);
 
@@ -1280,6 +1212,7 @@ export default async function AusgabenPage({
 
                 <section className="grid gap-4 rounded-lg border border-zinc-200 p-4">
                   <h3 className="font-semibold">Ausgabe</h3>
+                  {assignmentToEdit.ipad_introduction_at ? <p className="text-sm">Datum der iPad-Einführung: {formatDate(assignmentToEdit.ipad_introduction_at)}</p> : null}
                   <label className="flex flex-col gap-1 text-sm font-medium md:max-w-56">
                     Ausgabedatum
                     <input

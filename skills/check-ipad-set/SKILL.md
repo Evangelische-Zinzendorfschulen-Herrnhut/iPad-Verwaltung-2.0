@@ -37,6 +37,29 @@ Use this skill to answer operational questions about a school iPad set. Always p
 - After writing an assignment, always verify by re-reading the set and open assignment. Report the inserted assignment id, resulting availability, assigned person, and storage label.
 - After a successful prepared set assignment, offer or perform the MDM follow-up when the user asks for browser/MDM work: open the assigned iPad in Relution/MDM, set the MDM `Gerätebeschreibung` to the current iPad inventory number, and assign the MDM user to the same person as the prepared issue.
 
+## iPad-Einfuehrung
+
+- `ipad_einfuehrung` (Anzeige „iPad-Einführung“) ist bereits begonnene,
+  personengebundene Unterrichtsnutzung. `zugeordnet` ist ausschliesslich Vorbereitung.
+  Das Set darf noch nicht nach Hause und benoetigt W1–W6 mit Platz 1–30.
+- `set_person_assignment.ipad_introduction_at` bezeichnet den Unterrichtsbeginn;
+  `issued_at` wird erst bei manueller Freigabe zur Mitnahme gesetzt. Kein Datum
+  aus Klassenstufe, Lagerort oder Legacy-Werten ableiten.
+- Admin/iPad-Verwaltung koennen die Freigabe einzeln oder in der Wagen-Lagerliste
+  fuer den ganzen Wagen bestaetigen. Vorschau und Einzel-Audit sind verbindlich;
+  Freigabe entfernt den Set-Lagerort und erhaelt das Einfuehrungsdatum.
+- Einfuehrungssets niemals als Komponentenquelle fuer andere Sets nutzen.
+  Interner Schadenstausch ist erlaubt, erhaelt aber Person, Einfuehrung und Platz;
+  Ersatz nur aus erlaubten freien Quellen. Defekte Komponente historisieren.
+- Beim schadensbedingten Kompletttausch uebernimmt das Ersatzset Person, Zustand
+  und Platz. Altes Set wird blockiert und verliert aktuelle Zuordnung/Platz.
+  Beide Zuordnungen und das urspruengliche Einfuehrungsdatum bleiben historisch
+  nachvollziehbar; kein regulaeres Ausgabedatum beim Tausch setzen.
+- Schadens-/Problemmeldungen und Ruecknahmen sind schon waehrend der Einfuehrung
+  moeglich. Nicht wegen leerem `issued_at` als ungenutzte Vorbereitung behandeln.
+- Neue Workflow-Migrationen nur nach ausdruecklicher Freigabe produktiv anwenden.
+  Details: `specs/features/014-ipad-introduction.md`, ADR 0019.
+
 ## Quick Start
 
 From the repository root, run the bundled read-only script:

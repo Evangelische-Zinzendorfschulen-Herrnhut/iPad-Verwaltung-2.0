@@ -44,9 +44,9 @@ Die Schule braucht eine verlaessliche Uebersicht ueber alle Komponenten eines iP
 
 1. Nutzer oeffnet die zusaetzliche Lagerliste aus der Set-Liste.
 2. System zeigt als Default alle Sets, deren Set-Lagerort mit `W1` beginnt.
-3. Nutzer kann den Lagerort per Dropdown auf W1 bis W6, Schrank1, Schrank2, Regal1 oder alle Lagerorte filtern.
+3. Nutzer kann den Lagerort per Dropdown auf W1 bis W6, Schrank 1, Schrank 2, Regal 2.35 oder alle Lagerorte filtern. Der Filter gleicht das Lagerort-Praefix ab, sodass bei Schrank- und Regalorten auch Eintraege mit nachgestelltem Slot erscheinen.
 4. Nutzer kann zusaetzlich frei nach Person, Setnummer oder Inventarnummern der Set-Komponenten suchen.
-5. System sortiert erkannte Wagenplaetze 1 bis 30 aufsteigend und zeigt Sets ohne erkannten Platz danach.
+5. System liest den Platz aus Wagen-Lagerorten sowie aus Schrank- und Regal-Lagerorten mit nachgestelltem Slot, sortiert erkannte Plaetze 1 bis 30 aufsteigend und zeigt Sets ohne erkannten Platz danach.
 6. System zeigt pro Set Platz, Setnummer, aktuelle Person, Klasse, iPad, Pencil, Tastatur, Verfuegbarkeit, Zustand und Lagerort.
 7. Nutzer kann die Lagerliste zusaetzlich nach iPad-Speichergroesse 32 GB, 64 GB, 128 GB oder 256 GB filtern.
 8. Nutzer kann aus der Lagerliste per Kontextmenue Set-Ausgabe- und Ruecknahme-Workflows starten, sofern die Rolle dazu berechtigt ist.

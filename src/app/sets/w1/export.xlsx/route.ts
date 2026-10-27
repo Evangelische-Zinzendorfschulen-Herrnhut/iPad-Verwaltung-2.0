@@ -10,9 +10,9 @@ const storageFilters = [
   { label: "Wagen W4 7-1", value: "W4" },
   { label: "Wagen W5 7-3", value: "W5" },
   { label: "Wagen W6", value: "W6" },
-  { label: "Schrank1", value: "Schrank1" },
-  { label: "Schrank2", value: "Schrank2" },
-  { label: "Regal1", value: "Regal1" },
+  { label: "Schrank 1", value: "Schrank 1" },
+  { label: "Schrank 2", value: "Schrank 2" },
+  { label: "Regal 2.35", value: "Regal 2.35" },
   { label: "Alle Lagerorte", value: "all" },
 ];
 const ipadStorageFilters = [32, 64, 128, 256];

@@ -104,7 +104,7 @@ Die iPad-Verwaltung braucht eine chronologische Arbeitsliste der Set-Ausgaben un
 - Nutzerrolle: `admin` und `ipad_verwaltung`
 - Primaerer Zweck: aktive Ausgaben und abgeschlossene Rueckgaben schnell finden, pruefen und in Folgeprozesse oeffnen.
 - Datenbasis: `set_person_assignment` mit Person, Set und aktueller Klassenzuordnung.
-- Filter: Freitextsuche nach Person, E-Mail oder Setnummer; Status `aktiv` oder `zurueckgegeben`; Ausgabe- und Rueckgabedatum.
+- Filter: Freitextsuche nach Person, E-Mail, Legacy-Setnummer oder aktueller Set-Kennung; Status `aktiv` oder `zurueckgegeben`; Ausgabe- und Rueckgabedatum.
 - Korrektur: Berechtigte Nutzer koennen bestehende Listeneintraege ueber ein Kontextmenue bearbeiten.
 - Datenschutz: Die Liste enthaelt personenbezogene Ausleihdaten und ist nur fuer berechtigte Rollen sichtbar.
 - Audit: Die Liste selbst aendert keine Daten; Korrekturen oder Rueckgaben erfolgen ueber bestehende Workflows und deren Audit-Anforderungen.
@@ -157,8 +157,9 @@ Die iPad-Verwaltung braucht eine chronologische Arbeitsliste der Set-Ausgaben un
 - Beim Erstellen einer Zahlungsforderung wird `buchhaltung` per Mail informiert.
 - Ausgabe und Rueckgabe erzeugen Audit-Logs.
 - `ipad_verwaltung` kann keine Benutzer oder Rollen verwalten.
-- Die Aus- und Rueckgabeliste zeigt aktive und abgeschlossene Ausleihen mit Setnummer, Person, Klasse, Ausgabe- und Rueckgabedatum.
-- Die Aus- und Rueckgabeliste kann nach Person oder Setnummer durchsucht und nach Status gefiltert werden.
+- Die Aus- und Rueckgabeliste zeigt aktive und abgeschlossene Ausleihen mit der aktuellen Set-Kennung, ersatzweise der Legacy-Setnummer, sowie Person, Klasse, Ausgabe- und Rueckgabedatum.
+- Die Aus- und Rueckgabeliste kann nach Person, aktueller Set-Kennung oder Legacy-Setnummer durchsucht und nach Status gefiltert werden.
+- Sets ohne Legacy-Setnummer, zum Beispiel `S1`, werden nicht als `Set -` dargestellt und verlinken mit ihrer aktuellen Kennung auf die Set-Liste.
 - Von tatsaechlich ausgegebenen Eintraegen kann das Ausgabeprotokoll geoeffnet werden.
 - Von abgeschlossenen Eintraegen kann das Rueckgabeprotokoll geoeffnet werden.
 - Von vollstaendig zurueckgegebenen, blockierten und `ok` geprueften Sets kann die Aktion "Zuruecksetzen und freigeben" aus der Setliste und aus der Aus- und Rueckgabeliste ausgefuehrt werden.
@@ -180,3 +181,13 @@ Die iPad-Verwaltung braucht eine chronologische Arbeitsliste der Set-Ausgaben un
 - Brauchen wir Unterschriften bei Ausgabe oder Rueckgabe?
 - Sollen Adapter, HDMI-Kabel und Magic-Maeuse mit Bestandszahlen verwaltet werden, obwohl sie keine Inventarnummer haben?
 - Welche weiteren Komponenten- oder Zusatzartikelkategorien sollen direkt zum Start angelegt werden?
+
+## Erweiterung iPad-Einfuehrung (08.10.2026)
+
+Feature 014 und ADR 0019 sind fuer den neuen Zustand fuehrend: Vorbereitung bleibt
+`zugeordnet`. Unterrichtsbeginn setzt `ipad_introduction_at` und `ipad_einfuehrung`,
+noch kein `issued_at`; Wagen/Platz bleiben erhalten. Manuelle Einzelfreigabe oder
+bestaetigte Sammelfreigabe in der Wagen-Lagerliste setzt erst `issued_at` und leert
+den Lagerort. Klassenstufe allein aendert keine dieser Verfuegbarkeiten.
+Ruecknahme ist bereits waehrend Einfuehrung moeglich und aktualisiert Zustand,
+Zuordnung und Audit atomar. Bestehende Vollstaendigkeits-/Abrechnungsregeln gelten.

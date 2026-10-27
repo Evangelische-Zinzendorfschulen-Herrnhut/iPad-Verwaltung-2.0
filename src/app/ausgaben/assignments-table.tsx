@@ -19,6 +19,7 @@ export type AssignmentTableRow = {
   id: string;
   issueProtocolHref: string | null;
   issuedAt: string;
+  introductionAt: string;
   issueHref: string | null;
   person: string;
   releaseReturnTo: string;
@@ -114,6 +115,7 @@ export function AssignmentsTable({
               <th className="px-4 py-3 font-medium">Person</th>
               <th className="px-4 py-3 font-medium">Klasse</th>
               <th className="px-4 py-3 font-medium">Lagerort</th>
+              <th className="px-4 py-3 font-medium">iPad-Einführung</th>
               <th className="px-4 py-3 font-medium">Ausgabe</th>
               <th className="px-4 py-3 font-medium">Rückgabe</th>
               <th className="px-4 py-3 font-medium">Vollst.</th>
@@ -146,6 +148,7 @@ export function AssignmentsTable({
                 <td className="px-4 py-3">{row.person}</td>
                 <td className="px-4 py-3">{row.classLabel}</td>
                 <td className="px-4 py-3">{row.storageLabel}</td>
+                <td className="px-4 py-3">{row.introductionAt}</td>
                 <td className="px-4 py-3">{row.issuedAt}</td>
                 <td className="px-4 py-3">{row.returnedAt}</td>
                 <td className="px-4 py-3">

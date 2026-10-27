@@ -415,3 +415,15 @@ Noch noetig fuer Inbetriebnahme: Tenant-ID, Client-ID, serverseitiges Client-Sec
 ### Verifikation des Verlinkungsschnitts am 30.09.2026
 
 14 neue Logik-, Graph-, Service-, API- und UI-Tests sowie 10 bestehende Ladepfadtests bestehen. Die echte Ordner-Migration besteht in isoliertem PostgreSQL (PGlite 0.5.8) mit minimalem Rollenschema: RLS/Grants, Lease, Snapshot, Finalisierung und Audit getestet. TypeScript, gezieltes ESLint und Produktionsbuild bestehen; Build benoetigte wegen lokaler Worker-Ports Ausfuehrung ausserhalb der Sandbox. Keine reale Supabase-Migration, Graph-Konfiguration, Ordneranlage oder Dateioperation ausgefuehrt. Echtintegration und iPad-Test warten auf Adminangaben. Inbetriebnahme und sichere Umgebungsvariablen: `specs/data/sharepoint-folder-operations.md`.
+
+## Einfuehrungssets (08.10.2026)
+
+Schaden/Problem ist auch fuer `ipad_einfuehrung` erlaubt, mit aktueller Person
+und aktiver Zuordnung trotz leerem regulaeren Ausgabedatum. Einfuehrungssets sind
+nie Ersatzquelle. Interner Austausch aus erlaubten freien Quellen ist beim
+Anlegen und Bearbeiten atomar, erhaelt Person/Zustand/Platz und historisiert die
+defekte Komponente samt Audit. Beim Kompletttausch uebernimmt das Ersatzset
+Person, Einfuehrungszustand und Platz; die alte Zuordnung endet, das alte Set wird
+blockiert und verliert Person/Platz. Urspruengliches Einfuehrungsdatum bleibt in
+beiden historischen Zuordnungen erhalten, kein regulaeres Ausgabedatum beim
+Tausch. Die Meldung allein erlaubt keine Mitnahme. Feature 014 / ADR 0019.

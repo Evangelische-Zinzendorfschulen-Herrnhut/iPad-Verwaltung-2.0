@@ -111,30 +111,30 @@ die Anzeige sein, wenn iPad, Pencil oder Tastatur aktuell fehlen.
 
 ## Set-Verfügbarkeit
 
-Zielwerte:
+Aktueller Umsetzungsschnitt (08.10.2026):
 
-- `verfuegbar`
-- `ausgegeben`
-- `blockiert`
-- `in_pruefung`
-- `unklar`
+| Speicherwert | Anzeige | Bedeutung |
+| --- | --- | --- |
+| `frei` | Frei | fuer neue Vorbereitung verfuegbar |
+| `zugeordnet` | Zugeordnet | personengebunden vorbereitet, Nutzung noch nicht begonnen |
+| `ipad_einfuehrung` | iPad-Einführung | Unterrichtsnutzung begonnen; kein Mitnehmen; Person und Wagen W1–W6 / Platz 1–30 zwingend |
+| `ausgegeben` | Ausgegeben | regulaer zur Mitnahme freigegeben |
+| `blockiert` | Blockiert | z. B. nach Ruecknahme oder wegen Bestands-/Schadensklaerung |
+| `unklar` | Unklar | Klaerungsbedarf |
 
-Ableitung:
+`reserviert` und `zuruecksetzen` bleiben nur vorbereitete UI-Darstellungen und
+werden durch diese Erweiterung nicht zu speicherbaren Enum-Werten.
 
-| Bedingung | Set-Verfügbarkeit |
-| --- | --- |
-| aktive Ausleihe ohne RueckgabeDatum | `ausgegeben` |
-| Set-Zustand `defekt` oder `unvollstaendig` | `blockiert` |
-| Set-Zustand `unklar` | `in_pruefung` |
-| mindestens eine Hauptkomponente ist gesperrt | `blockiert` |
-| keine aktive Ausleihe und Set-Zustand `ok` | `verfuegbar` |
+Gespeicherte Einfuehrungs- und Ausgabezustaende duerfen nicht durch Klassenstufe
+ueberschrieben werden. Eine offene Personenzuordnung mit leerem `issued_at` kann
+Vorbereitung oder bereits begonnene Einfuehrung sein: `ipad_introduction_at`
+unterscheidet beide. Defekt-/Sperrpruefungen erfolgen bei jeder Freigabe zur Mitnahme;
+eine Schadensmeldung allein hebt die Einfuehrungsbeschraenkung nicht auf.
 
-Priorität:
-
-1. `ausgegeben`
-2. `blockiert`
-3. `in_pruefung`
-4. `verfuegbar`
+Beginn, manuelle Einzelfreigabe, Wagen-Sammelfreigabe, Ruecknahme und Tausch:
+Feature 014, ADR 0019. Bestehende Datensaetze werden nicht automatisch umgedeutet.
+Die historischen Normalisierungsbegriffe `verfuegbar`/`in_pruefung` sind keine
+zusaetzlichen aktuellen Werte des Set-Enums.
 
 ## Set auftrennen und Komponenten umbauen
 
@@ -142,7 +142,9 @@ Freie und blockierte Sets duerfen aufgetrennt werden, um Komponenten anderen Set
 
 Regeln:
 
-- Ausgegebene Sets duerfen nicht ohne Ruecknahme aufgetrennt werden.
+- Ausgegebene Sets und Einfuehrungssets duerfen nicht ohne Ruecknahme als
+  Komponentenquelle aufgetrennt werden. Interner Schadenstausch in einem
+  Einfuehrungsset bleibt mit Historisierung und Audit erlaubt.
 - Freie Sets duerfen aufgetrennt werden.
 - Blockierte Sets duerfen aufgetrennt werden, wenn sie nicht aktiv ausgegeben sind.
 - Jede Entnahme oder Neuzuordnung einer Komponente erzeugt Audit-Logs.

@@ -74,3 +74,14 @@ In der Personenliste sind nur die wichtigsten Stammdaten sichtbar. Fuer Verwaltu
 - Assumption: In dieser Iteration reicht eine eigene Detailseite; ein Seitenpanel in der Liste kann spaeter ergaenzt werden.
 - Assumption: Die iPad-Verwaltung erhaelt vorerst keine Stammdaten-Schreibrechte, weil die vorhandenen Policies nur Admin-Bearbeitung erlauben.
 - Wie sollen Stammdaten-Aenderungen an Personen auditierbar protokolliert werden?
+
+## Fehlerkorrektur 2026-10-05: Bearbeitungsmodus
+
+- Befund: `edit=1` wird bisher nicht ausgewertet; das Kontextmenue fuehrt nur zur lesenden Detailansicht.
+- Ziel / primaere Rolle: Admins koennen Schreibfehler in vorhandenen Stammdaten korrigieren. Nebenrollen bleiben lesend.
+- Datenmodell: Bestehende `person`-Felder; keine Schemaaenderung. Klassen, Ausleihen und Importinformationen werden nicht bearbeitet.
+- Rechte: Lesen wie oben; Erstellen unveraendert; Aendern ausschliesslich Admin mit serverseitiger Pruefung und bestehender RLS; Loeschen ausgeschlossen.
+- Akzeptanz: `edit=1` zeigt Admins vorausgefuellte Felder und Speichern/Abbrechen. Die Detailansicht bietet einen sichtbaren Bearbeiten-Link. Namen duerfen nicht beide leer sein; E-Mail, Typ, Status und ganzzahliger Jahrgang 2000–2100 werden serverseitig validiert. Bei Fehlern bleiben Eingaben erhalten. Zwischenzeitlich geaenderte Datensaetze werden nicht ueberschrieben. Erfolgreiches Speichern liest die Detaildaten erneut; Listenfilter bleiben erhalten.
+- Datenschutz: Nur die freigegebenen Stammdatenfelder werden geschrieben. Keine Datenkorrektur im Rahmen der Fehlerreproduktion.
+- Audit: Die oben dokumentierte allgemeine Stammdaten-Auditierung bleibt offene Folgearbeit; diese Korrektur fuehrt keine neuen kritischen Zuordnungs- oder Finanzoperationen ein.
+- Assumption: Der vorhandene Umfang der Stammdatenbearbeitung und die Admin-only-Regel bleiben verbindlich.

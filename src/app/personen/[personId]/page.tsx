@@ -1,3 +1,6 @@
+import { supportsIntroduction, introductionColumns } from "@/lib/introduction-support";
+import { SetAvailabilityBadge } from "../../sets/set-availability-badge";
+import { PersonEditForm } from "../person-edit-form";
 import { conditionLabel } from "@/lib/condition";
 import Link from "next/link";
 
@@ -75,6 +78,7 @@ type RawClassAssignmentRow = Omit<ClassAssignmentRow, "school_class"> & {
 type SetAssignmentRow = {
   id: string;
   issued_at: string | null;
+  ipad_introduction_at: string | null;
   returned_at: string | null;
   legacy_status: string | null;
   issue_note: string | null;
@@ -266,6 +270,7 @@ export default async function PersonDetailPage({
   }
 
   const supabase = await createClient();
+  const introductionEnabled = await supportsIntroduction(supabase);
   const [
     personResult,
     classAssignmentsResult,
@@ -292,7 +297,7 @@ export default async function PersonDetailPage({
       supabase
         .from("set_person_assignment")
         .select(
-          "id,issued_at,returned_at,legacy_status,issue_note,return_note,inventory_set:set_id(id,inventory_number,legacy_set_id,availability,condition,storage_label)",
+          introductionColumns("id,ipad_introduction_at,issued_at,returned_at,legacy_status,issue_note,return_note,inventory_set:set_id(id,inventory_number,legacy_set_id,availability,condition,storage_label)", introductionEnabled),
         )
         .eq("person_id", personId)
         .order("returned_at", { ascending: false, nullsFirst: true })
@@ -343,7 +348,7 @@ export default async function PersonDetailPage({
         : null,
     };
   });
-  const setAssignments = ((setAssignmentsResult.data ?? []) as RawSetAssignmentRow[])
+  const setAssignments = ((setAssignmentsResult.data ?? []) as unknown as RawSetAssignmentRow[])
     .map((assignment) => ({
       ...assignment,
       inventory_set: normalizeJoin(assignment.inventory_set),
@@ -358,7 +363,12 @@ export default async function PersonDetailPage({
   const currentClass = classAssignments.find(
     (assignment) => assignment.valid_until === null,
   );
-  const returnTo = getSingleParam(queryParams, "returnTo") || "/personen";
+  const requestedReturnTo = getSingleParam(queryParams, "returnTo");
+  const returnTo = requestedReturnTo === "/personen" || requestedReturnTo.startsWith("/personen?") ? requestedReturnTo : "/personen";
+  const canEdit = hasAnyRole(appUser, ["admin"]);
+  const isEditing = canEdit && getSingleParam(queryParams, "edit") === "1";
+  const detailHref = `/personen/${person.id}?${new URLSearchParams({ returnTo })}`;
+  const editHref = `${detailHref}&edit=1`;
   const filteredSetsHref = filteredListHref("/sets", person);
   const filteredDamageCasesHref = filteredListHref("/schadensfaelle", person);
 
@@ -387,9 +397,12 @@ export default async function PersonDetailPage({
         <SectionTabs active="personen" />
 
         <section className="rounded-lg border border-zinc-200 bg-white shadow-sm">
-          <div className="border-b border-zinc-200 px-4 py-3">
+          <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-3">
             <h2 className="font-semibold">Stammdaten</h2>
+            {canEdit && !isEditing ? <Link className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-semibold" href={editHref}>Datensatz bearbeiten</Link> : null}
           </div>
+          {getSingleParam(queryParams, "saved") === "1" ? <p role="status" className="px-4 pt-4 text-sm text-emerald-700">Änderungen gespeichert.</p> : null}
+          {isEditing ? <PersonEditForm person={person} returnTo={returnTo} detailHref={detailHref} /> : <>
           <div className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4">
             <Field label="Nachname" value={person.last_name} />
             <Field label="Vorname" value={person.first_name} />
@@ -409,6 +422,7 @@ export default async function PersonDetailPage({
               <Field label="Importhinweis" value={person.import_hint} />
             </div>
           ) : null}
+          </>}
         </section>
 
         <section className="rounded-lg border border-zinc-200 bg-white shadow-sm">
@@ -473,6 +487,7 @@ export default async function PersonDetailPage({
                 <thead className="bg-zinc-100 text-zinc-600">
                   <tr>
                     <th className="px-4 py-3 font-medium">Set</th>
+                    <th className="px-4 py-3 font-medium">iPad-Einführung</th>
                     <th className="px-4 py-3 font-medium">Ausgabe</th>
                     <th className="px-4 py-3 font-medium">Rueckgabe</th>
                     <th className="px-4 py-3 font-medium">Verfuegbarkeit</th>
@@ -506,12 +521,13 @@ export default async function PersonDetailPage({
                           "-"
                         )}
                       </td>
+                      <td className="px-4 py-3">{assignment.ipad_introduction_at ?? "-"}</td>
                       <td className="px-4 py-3">{assignment.issued_at ?? "-"}</td>
                       <td className="px-4 py-3">
                         {assignment.returned_at ?? "aktiv"}
                       </td>
                       <td className="px-4 py-3">
-                        {assignment.inventory_set?.availability ?? "-"}
+                        <SetAvailabilityBadge value={assignment.inventory_set?.availability} />
                       </td>
                       <td className="px-4 py-3">
                         {conditionLabel(assignment.inventory_set?.condition)}

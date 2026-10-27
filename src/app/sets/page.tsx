@@ -1,3 +1,4 @@
+import { validateStorageLabel } from "@/lib/storage-place";
 import { supportsIntroduction, introductionColumns } from "@/lib/introduction-support";
 import { berlinToday } from "@/lib/ipad-introduction";
 import { changeSetIssue } from "../actions/change-set-issue";
@@ -700,7 +701,7 @@ async function returnSet(formData: FormData) {
   const returnedAt =
     normalizeRequiredText(formData.get("returned_at")) ||
     berlinToday();
-  const storageLabel = normalizeOptionalText(formData.get("storage_label"));
+  const storageLabel = validateStorageLabel(normalizeOptionalText(formData.get("storage_label")));
   const returnNote = normalizeOptionalText(formData.get("return_note"));
   const returnDefects = normalizeOptionalText(formData.get("return_defects"));
   const returnResolutions = normalizeOptionalText(
@@ -850,7 +851,7 @@ async function updateSetStorage(formData: FormData) {
 
   const setId = normalizeRequiredText(formData.get("set_id"));
   const returnTo = normalizeRequiredText(formData.get("return_to")) || "/sets";
-  const storageLabel = normalizeOptionalText(formData.get("storage_label"));
+  const storageLabel = validateStorageLabel(normalizeOptionalText(formData.get("storage_label")));
 
   if (!setId) {
     redirect(returnTo);
@@ -886,7 +887,7 @@ async function issueSet(formData: FormData) {
   const personId = normalizeRequiredText(formData.get("person_id"));
   const returnTo = normalizeRequiredText(formData.get("return_to")) || "/sets";
   const issueNote = normalizeOptionalText(formData.get("issue_note"));
-  const storageLabel = normalizeOptionalText(formData.get("storage_label"));
+  const storageLabel = validateStorageLabel(normalizeOptionalText(formData.get("storage_label")));
 
   if (!setId || !personId) {
     redirect(returnTo);

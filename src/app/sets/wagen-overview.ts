@@ -1,3 +1,4 @@
+import { parseStoragePlace } from "@/lib/storage-place";
 import { supportsIntroduction, introductionColumns } from "@/lib/introduction-support";
 import { conditionLabel } from "@/lib/condition";
 import { createClient } from "@/lib/supabase/server";
@@ -91,7 +92,7 @@ export type WagenOverviewRow = {
   issueLabel: string | null;
   returnHref: string | null;
   storageLabel: string;
-  storagePlace: number | null;
+  storagePlace: number | string | null;
 };
 
 const QUERY_BATCH_SIZE = 100;
@@ -190,20 +191,6 @@ function deriveAvailability(
   return "ausgegeben";
 }
 
-function parseStoragePlace(storageLabel: string | null) {
-  if (!storageLabel) {
-    return null;
-  }
-
-  const wagonMatch = storageLabel.match(/\bW[1-6]\b\D*(\d{1,2})\b/i);
-  const storageSlotMatch = storageLabel.match(
-    /\b(?:Schrank\s+\d+|Regal\s+\d+(?:\.\d+)?)\s*-\s*(\d{1,2})\s*$/i,
-  );
-  const match = wagonMatch ?? storageSlotMatch;
-  const place = match ? Number.parseInt(match[1], 10) : Number.NaN;
-
-  return Number.isInteger(place) && place >= 1 && place <= 30 ? place : null;
-}
 
 function matchesSearch(row: WagenOverviewRow, search: string) {
   if (!search) {
@@ -217,6 +204,7 @@ function matchesSearch(row: WagenOverviewRow, search: string) {
     row.ipad,
     row.pencil,
     row.keyboard,
+    row.storageLabel,
   ]
     .join(" ")
     .toLocaleLowerCase("de-DE");
@@ -433,7 +421,7 @@ export async function loadWagenOverview(
     .sort((first, second) => {
       if (first.storagePlace && second.storagePlace) {
         return (
-          first.storagePlace - second.storagePlace ||
+          String(first.storagePlace).localeCompare(String(second.storagePlace), "de-DE", { numeric: true }) ||
           first.legacySetId - second.legacySetId
         );
       }

@@ -46,12 +46,12 @@ function splitComponentLabel(value: string) {
   };
 }
 
-function rowHighlightClass(row: WagenOverviewRow, duplicatePlaces: Set<number>) {
+function rowHighlightClass(row: WagenOverviewRow, duplicatePlaces: Set<number | string>) {
   if (row.storagePlace && duplicatePlaces.has(row.storagePlace)) {
     return "border-amber-200 bg-amber-100 hover:bg-amber-200/70";
   }
 
-  if (row.storagePlace && row.storagePlace % 5 === 0) {
+  if (typeof row.storagePlace === "number" && row.storagePlace % 5 === 0) {
     return "border-t-2 border-t-zinc-300 bg-zinc-50 hover:bg-zinc-100";
   }
 
@@ -91,7 +91,7 @@ export function WagenTable({
 
     counts.set(row.storagePlace, (counts.get(row.storagePlace) ?? 0) + 1);
     return counts;
-  }, new Map<number, number>());
+  }, new Map<number | string, number>());
   const duplicatePlaces = new Set(
     [...storagePlaceCounts.entries()]
       .filter(([, count]) => count > 1)

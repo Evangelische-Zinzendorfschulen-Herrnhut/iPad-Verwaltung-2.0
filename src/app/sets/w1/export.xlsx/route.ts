@@ -12,6 +12,7 @@ const storageFilters = [
   { label: "Wagen W6", value: "W6" },
   { label: "Schrank 1", value: "Schrank 1" },
   { label: "Schrank 2", value: "Schrank 2" },
+  { label: "Regal", value: "Regal" },
   { label: "Regal 2.35", value: "Regal 2.35" },
   { label: "Alle Lagerorte", value: "all" },
 ];

@@ -44,7 +44,7 @@ Die Schule braucht eine verlaessliche Uebersicht ueber alle Komponenten eines iP
 
 1. Nutzer oeffnet die zusaetzliche Lagerliste aus der Set-Liste.
 2. System zeigt als Default alle Sets, deren Set-Lagerort mit `W1` beginnt.
-3. Nutzer kann den Lagerort per Dropdown auf W1 bis W6, Schrank 1, Schrank 2, Regal 2.35 oder alle Lagerorte filtern. Der Filter gleicht das Lagerort-Praefix ab, sodass bei Schrank- und Regalorten auch Eintraege mit nachgestelltem Slot erscheinen.
+3. Nutzer kann den Lagerort per Dropdown auf W1 bis W6, Schrank 1, Schrank 2, Regal, Regal 2.35 oder alle Lagerorte filtern. Der Filter gleicht das Lagerort-Praefix ab, sodass bei Schrank- und Regalorten auch Eintraege mit nachgestelltem Slot erscheinen.
 4. Nutzer kann zusaetzlich frei nach Person, Setnummer oder Inventarnummern der Set-Komponenten suchen.
 5. System liest den Platz aus Wagen-Lagerorten sowie aus Schrank- und Regal-Lagerorten mit nachgestelltem Slot, sortiert erkannte Plaetze 1 bis 30 aufsteigend und zeigt Sets ohne erkannten Platz danach.
 6. System zeigt pro Set Platz, Setnummer, aktuelle Person, Klasse, iPad, Pencil, Tastatur, Verfuegbarkeit, Zustand und Lagerort.
@@ -158,3 +158,22 @@ Verifikation am 30.09.2026: Google Chrome, angemeldete Sitzung, warmer Next.js-E
   Mietsets werden Pencil und Tastatur als einzelne pruefbare Komponenten ohne
   eigene Inventarnummer gefuehrt; die M-Inventarnummer des iPads bezeichnet
   das gesamte Set.
+
+### Ergänzung 27.10.2026: Regalfilter und Bestandskorrektur
+
+- Ziel/Rollen: Admin und iPad-Verwaltung finden die umgelagerten Sets über den oberen Lagerortfilter der Lagerliste. Bestehende Leserechte gelten auch für `Regal`.
+- Datenmodell: Ort und Platz bleiben gemeinsam in `inventory_set.storage_label`, Zielwert `Regal - 4/1`. `4/1` ist eine freie Platzbezeichnung und keine Wagenplatznummer.
+- Rechte: Keine neuen Schreibrechte; einmalige ausdrücklich beauftragte Korrektur ausschließlich der 18 vorgeprüften Set-Lagerorte aus `Regal 2.35`.
+- Akzeptanz: `Regal` ist auswählbar; Präfixfilter findet `Regal - 4/1`; XLSX nutzt denselben Filter. Komponenten, Zustände, Verfügbarkeiten und Zuordnungen bleiben unverändert.
+- Datenschutz/Audit: Korrekturprotokoll mit Set-IDs, alten/neuen Lagerorten, Zeitpunkt, SQL und Rückleseprüfung unter `outputs/storage-correction-2026-10-27/`; keine Namen/Kontakte. Bestehender Einführungsaudit greift bei diesen Sets nicht; keine direkten Inserts in dessen geschützte Audittabelle.
+- Ausführungsstatus: Nach direkter Nutzerfreigabe am 27.10.2026 um 15:06 Uhr (Europe/Berlin) atomar ausgeführt und separat zurückgelesen: exakt 18 Sets auf `Regal - 4/1`, keine Abweichungen. Andere Set-Felder unverändert bis auf triggergepflegtes `updated_at`; Prüfsummen aller Komponenten und Komponenten-/Personenzuordnungen unverändert. Protokoll: `outputs/storage-correction-2026-10-27/audit.json` und `executed.sql`.
+- Verifikation: Browser zeigt `Regal` als ausgewählten Filter mit 19 vorhandenen Treffern (18 unter Regal 2.35 sowie Set 74 unter Regal).
+
+### Regal-Plätze mit Schrägstrich
+
+- Ziel/Rollen: Bestehende Lagerlisten-Nutzer können den Platz `4/1` der 18 umgelagerten Sets erkennen und suchen; bestehende Schreibrollen bleiben unverändert.
+- Modell: Nur beim exakten Ort `Regal` ist ein Platz aus zwei positiven Ganzzahlen mit Schrägstrich zulässig (`Regal - 4/1`). Speicherung unverändert als Text in `storage_label`, ohne Schemaänderung.
+- Akzeptanz: Anzeige und XLSX enthalten exakt `4/1`; Suche nach `4/1` findet die Sets. Schrägstrichplätze werden nicht als ganzzahlige Wagenplätze ausgewertet. Bestehende Erkennung ganzzahliger Plätze 1–30 für andere Orte bleibt bestehen. Ungültige Schrägstrichplätze werden serverseitig beim Speichern abgewiesen.
+- Rechte/Datenschutz/Audit: Bestehende serverseitige Rollenprüfungen gelten; keine Bestandskorrektur, keine zusätzlichen personenbezogenen Daten. Keine offenen Fragen.
+
+Verifikation: vier gezielte Tests einschließlich XLSX-Zellentyp erfolgreich; TypeScript und ESLint erfolgreich. Browser-Suche `Regal` + `4/1` zeigt exakt die 18 betroffenen Sets mit Platz `4/1`. Bestehende Doppelplatz-Markierung bleibt sichtbar, weil alle 18 denselben Platz haben. Keine Bestandsdaten geändert.

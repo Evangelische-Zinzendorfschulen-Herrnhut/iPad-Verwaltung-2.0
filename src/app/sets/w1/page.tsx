@@ -1,3 +1,4 @@
+import { validateStorageLabel } from "@/lib/storage-place";
 import { supportsIntroduction } from "@/lib/introduction-support";
 import { WagonIssueForm } from "./wagon-issue-form";
 import { berlinToday } from "@/lib/ipad-introduction";
@@ -31,6 +32,7 @@ const storageFilters = [
   { label: "Wagen W6", value: "W6" },
   { label: "Schrank 1", value: "Schrank 1" },
   { label: "Schrank 2", value: "Schrank 2" },
+  { label: "Regal", value: "Regal" },
   { label: "Regal 2.35", value: "Regal 2.35" },
   { label: "Alle Lagerorte", value: "all" },
 ];
@@ -140,7 +142,7 @@ async function prepareSetFromStorageList(formData: FormData) {
   const personId = normalizeRequiredText(formData.get("person_id"));
   const returnTo = normalizeRequiredText(formData.get("return_to")) || "/sets/w1";
   const issueNote = normalizeOptionalText(formData.get("issue_note"));
-  const storageLabel = normalizeOptionalText(formData.get("storage_label"));
+  const storageLabel = validateStorageLabel(normalizeOptionalText(formData.get("storage_label")));
 
   if (!setId || !personId) {
     redirect(returnTo);
@@ -322,7 +324,7 @@ async function updateSetStorageFromStorageList(formData: FormData) {
 
   const setId = normalizeRequiredText(formData.get("set_id"));
   const returnTo = normalizeRequiredText(formData.get("return_to")) || "/sets/w1";
-  const storageLabel = normalizeOptionalText(formData.get("storage_label"));
+  const storageLabel = validateStorageLabel(normalizeOptionalText(formData.get("storage_label")));
 
   if (!setId) {
     redirect(returnTo);

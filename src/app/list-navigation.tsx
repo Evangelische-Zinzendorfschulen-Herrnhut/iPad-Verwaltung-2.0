@@ -1,5 +1,7 @@
 "use client";
 
+import { normalizeListSearch } from "./list-search";
+
 import { useRouter } from "next/navigation";
 import {
   createContext, useContext, useEffect, useLayoutEffect, useRef, useState, useTransition,
@@ -71,6 +73,9 @@ export function ListNavigationProvider({ children }: { children: ReactNode }) {
           event.preventDefault();
           if (pending) return;
           target.search = new URLSearchParams(Array.from(new FormData(form, submitter), ([key, value]) => [key, String(value)])).toString();
+          const params = new URLSearchParams(target.search);
+          normalizeListSearch(params);
+          target.search = params.toString();
           navigate(target);
         }}
       >

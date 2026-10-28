@@ -1,3 +1,4 @@
+import listSearch from "./helpers/list-search.mjs";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -21,6 +22,7 @@ function harness() {
   const start = (callback) => { active++; try { callback(); } catch (error) { active--; throw error; } };
   const push = (href) => requests.push({ href, finish: () => { active--; }, fail: () => { active--; } });
   const imports = (name) => {
+    if (name.endsWith("/list-search")) return listSearch;
     if (name === "react/jsx-runtime") return require(name);
     if (name === "react") return {
       createContext: () => ({ Provider: "provider" }), useContext: () => [active > 0, start],
@@ -129,6 +131,7 @@ test("slow status appears after eight seconds and its timer is cleaned up", () =
   };
   const testedModule = { exports: {} };
   const imports = (name) => {
+    if (name.endsWith("/list-search")) return listSearch;
     if (name === "react/jsx-runtime") return require(name);
     if (name === "react") return {
       createContext: () => ({}), useState: () => [slow, (value) => { slow = value; }],
@@ -166,4 +169,24 @@ test("error view focuses its message and exposes retry without raw error data", 
   buttons.props.children[0].props.onClick();
   assert.equal(retried, true);
   assert.equal(buttons.props.children[0].props.disabled, false);
+});
+
+
+test("native persons GET search trims q or removes empty q while retaining other filters", () => {
+  const OriginalFormData = globalThis.FormData;
+  try {
+    for (const value of ["  Name  ", "", "   "]) {
+      const h = harness();
+      globalThis.FormData = class { *[Symbol.iterator]() { yield ["q", value]; yield ["type", "lehrer"]; yield ["status", "aktiv"]; yield ["class", "10-1"]; yield ["page", "1"]; } };
+      const event = { target: { method: "get", action: "http://localhost/personen", target: "" }, nativeEvent: {}, preventDefault() { this.defaultPrevented = true; } };
+      assert.equal(h.requests.length, 0);
+      h.render().content.props.onSubmit(event);
+      assert.equal(h.requests.length, 1);
+      const params = new URL(h.requests[0].href, "http://localhost").searchParams;
+      assert.equal(params.get("q"), value.trim() || null);
+      assert.equal(params.get("type"), "lehrer"); assert.equal(params.get("status"), "aktiv");
+      assert.equal(params.get("class"), "10-1"); assert.equal(params.get("page"), "1");
+      assert.equal(h.render().busy, true);
+    }
+  } finally { globalThis.FormData = OriginalFormData; }
 });

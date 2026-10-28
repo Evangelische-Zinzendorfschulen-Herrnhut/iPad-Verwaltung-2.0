@@ -313,15 +313,13 @@ export async function GET(request: NextRequest) {
     const { data: classRows, error: classRowsError } = await supabase
       .from("school_class")
       .select("id")
-      .eq("active", true)
-      .eq("label", classFilter)
-      .limit(1);
+      .eq("active", true);
 
     if (classRowsError) {
       throw classRowsError;
     }
 
-    const classId = classRows?.[0]?.id;
+    const classId = classRows?.find((schoolClass) => schoolClass.id === classFilter)?.id;
     const matchingAssignmentIds = new Set<string>();
 
     if (classId) {

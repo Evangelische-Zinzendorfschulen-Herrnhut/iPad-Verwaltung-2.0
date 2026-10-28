@@ -1,12 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { searchOnEnter } from "../../list-search";
 import { useListTransition } from "../../list-navigation";
 import { usePathname, useRouter } from "next/navigation";
 import {
   ChangeEvent,
   useCallback,
-  useEffect,
   useState,
 } from "react";
 
@@ -40,7 +40,7 @@ export function StorageFilterForm({
       const params = new URLSearchParams();
       const nextIpadStorage = nextValues.ipadStorage ?? selectedIpadStorage;
       const nextStorage = nextValues.storage ?? selectedStorage;
-      const nextQuery = nextValues.q ?? search;
+      const nextQuery = nextValues.q ?? query;
 
       if (nextStorage && nextStorage !== "W1") {
         params.set("storage", nextStorage);
@@ -62,7 +62,7 @@ export function StorageFilterForm({
         router.push(target);
       });
     },
-    [startTransition, pathname, router, search, selectedIpadStorage, selectedStorage],
+    [startTransition, pathname, router, query, selectedIpadStorage, selectedStorage],
   );
 
   function handleStorageChange(event: ChangeEvent<HTMLSelectElement>) {
@@ -72,16 +72,6 @@ export function StorageFilterForm({
   function handleIpadStorageChange(event: ChangeEvent<HTMLSelectElement>) {
     updateUrl({ ipadStorage: event.target.value });
   }
-
-  useEffect(() => {
-    const timeout = window.setTimeout(() => {
-      if (search !== query) {
-        updateUrl({ q: search });
-      }
-    }, 350);
-
-    return () => window.clearTimeout(timeout);
-  }, [query, search, updateUrl]);
 
   return (
     <form className="flex flex-wrap items-end gap-3">
@@ -121,6 +111,7 @@ export function StorageFilterForm({
         <input
           className="min-w-64 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm outline-none ring-emerald-500 transition focus:ring-2"
           name="q"
+          onKeyDown={searchOnEnter((q) => updateUrl({ q }))}
           onChange={(event) => setSearch(event.target.value)}
           placeholder="Person, Set oder Inventarnummer"
           type="search"

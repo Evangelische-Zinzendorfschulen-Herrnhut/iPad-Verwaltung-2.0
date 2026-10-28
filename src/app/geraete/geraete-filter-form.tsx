@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { searchOnEnter } from "../list-search";
 import { useListTransition } from "../list-navigation";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -45,7 +46,7 @@ export function GeraeteFilterForm({
       sort?: string;
     }) => {
       const params = new URLSearchParams();
-      const nextQuery = nextValues.q ?? search;
+      const nextQuery = nextValues.q ?? query;
       const nextCategory = nextValues.category ?? category;
       const nextCondition = nextValues.condition ?? condition;
       const nextAssignment = nextValues.assignment ?? assignment;
@@ -91,7 +92,7 @@ export function GeraeteFilterForm({
       condition,
       pathname,
       router,
-      search,
+      query,
       setNumber,
       sort,
     ],
@@ -100,16 +101,6 @@ export function GeraeteFilterForm({
   function handleSelectChange(event: ChangeEvent<HTMLSelectElement>) {
     updateUrl({ [event.target.name]: event.target.value });
   }
-
-  useEffect(() => {
-    const timeout = window.setTimeout(() => {
-      if (search !== query) {
-        updateUrl({ q: search });
-      }
-    }, 350);
-
-    return () => window.clearTimeout(timeout);
-  }, [query, search, updateUrl]);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -128,6 +119,7 @@ export function GeraeteFilterForm({
         <input
           className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
           name="q"
+          onKeyDown={searchOnEnter((q) => updateUrl({ q }))}
           onChange={(event) => setSearch(event.target.value)}
           placeholder="Inventarnummer, Modell, Seriennummer oder Set"
           type="search"

@@ -1,18 +1,18 @@
 "use client";
 
+import { searchOnEnter } from "../list-search";
 import { useListTransition } from "../list-navigation";
 import { usePathname, useRouter } from "next/navigation";
 import {
   ChangeEvent,
   FormEvent,
   useCallback,
-  useEffect,
   useState,
 } from "react";
 
 type AssignmentFilterFormProps = {
   classFilter: string;
-  classOptions: string[];
+  classOptions: { id: string; label: string }[];
   hasActiveFilters: boolean;
   query: string;
   returnedFrom: string;
@@ -46,7 +46,7 @@ export function AssignmentFilterForm({
       to?: string;
     }) => {
       const params = new URLSearchParams();
-      const nextQuery = nextValues.q ?? search;
+      const nextQuery = nextValues.q ?? query;
       const nextStatus = nextValues.status ?? status;
       const nextClass = nextValues.class ?? classFilter;
       const nextTo = nextValues.to ?? to;
@@ -79,7 +79,7 @@ export function AssignmentFilterForm({
 
       return params;
     },
-    [classFilter, returnedFrom, search, sort, status, to],
+    [classFilter, returnedFrom, query, sort, status, to],
   );
   const updateUrl = useCallback(
     (nextValues: {
@@ -126,16 +126,6 @@ export function AssignmentFilterForm({
     updateUrl({ [event.target.name]: event.target.value });
   }
 
-  useEffect(() => {
-    const timeout = window.setTimeout(() => {
-      if (search !== query) {
-        updateUrl({ q: search });
-      }
-    }, 350);
-
-    return () => window.clearTimeout(timeout);
-  }, [query, search, updateUrl]);
-
   return (
     <form
       className="space-y-3 border-b border-zinc-200 px-4 py-4"
@@ -147,6 +137,7 @@ export function AssignmentFilterForm({
           <input
             className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
             name="q"
+            onKeyDown={searchOnEnter((q) => updateUrl({ q }))}
             onChange={handleInputChange}
             placeholder="Name, E-Mail oder Set"
             type="search"
@@ -177,9 +168,9 @@ export function AssignmentFilterForm({
             value={classFilter}
           >
             <option value="">Alle</option>
-            {classOptions.map((label) => (
-              <option key={label} value={label}>
-                {label}
+            {classOptions.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.label}
               </option>
             ))}
           </select>

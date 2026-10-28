@@ -1,13 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { searchOnEnter } from "../list-search";
 import { useListTransition } from "../list-navigation";
 import { usePathname, useRouter } from "next/navigation";
 import {
   ChangeEvent,
   FormEvent,
   useCallback,
-  useEffect,
   useState,
 } from "react";
 
@@ -39,7 +39,7 @@ export function TasksFilterForm({
       status?: string;
     }) => {
       const params = new URLSearchParams();
-      const nextQuery = nextValues.q ?? search;
+      const nextQuery = nextValues.q ?? query;
       const nextStatus = nextValues.status ?? status;
       const nextPriority = nextValues.priority ?? priority;
       const nextSort = nextValues.sort ?? sort;
@@ -68,7 +68,7 @@ export function TasksFilterForm({
         router.push(target);
       });
     },
-    [startTransition, pathname, priority, router, search, sort, status],
+    [startTransition, pathname, priority, router, query, sort, status],
   );
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -80,16 +80,6 @@ export function TasksFilterForm({
     updateUrl({ [event.target.name]: event.target.value });
   }
 
-  useEffect(() => {
-    const timeout = window.setTimeout(() => {
-      if (search !== query) {
-        updateUrl({ q: search });
-      }
-    }, 350);
-
-    return () => window.clearTimeout(timeout);
-  }, [query, search, updateUrl]);
-
   return (
     <form
       className="grid gap-3 border-b border-zinc-200 px-4 py-4 md:grid-cols-[minmax(220px,1fr)_160px_150px_190px_auto]"
@@ -100,6 +90,7 @@ export function TasksFilterForm({
         <input
           className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
           name="q"
+          onKeyDown={searchOnEnter((q) => updateUrl({ q }))}
           onChange={(event) => setSearch(event.target.value)}
           placeholder="Titel, Set- oder Inventarnummer"
           type="search"

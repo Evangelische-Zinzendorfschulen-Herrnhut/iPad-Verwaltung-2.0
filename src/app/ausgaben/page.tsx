@@ -64,6 +64,7 @@ type ClassAssignmentRow = {
 };
 
 type SchoolClassOptionRow = {
+  school_year: { label: string } | { label: string }[] | null;
   id: string;
   label: string;
   grade_level: number | null;
@@ -559,12 +560,16 @@ export default async function AusgabenPage({
   const supabase = await createClient();
   const introductionEnabled = await supportsIntroduction(supabase);
   const canEditSetStorage = hasAnyRole(appUser, ["admin", "ipad_verwaltung"]);
-  const { data: classOptionData } = await supabase
+  const { data: classOptionData, error: classOptionError } = await supabase
     .from("school_class")
-    .select("id,label,grade_level")
+    .select("id,label,grade_level,school_year:school_year_id(label)")
     .eq("active", true)
     .order("grade_level", { ascending: true, nullsFirst: false })
     .order("label", { ascending: true });
+  if (classOptionError) {
+    throw classOptionError;
+  }
+
   const classOptions = (classOptionData ?? []) as SchoolClassOptionRow[];
   let assignmentsQuery = supabase
     .from("set_person_assignment")
@@ -671,7 +676,7 @@ export default async function AusgabenPage({
 
   if (classFilter) {
     const selectedClass = classOptions.find(
-      (schoolClass) => schoolClass.label === classFilter,
+      (schoolClass) => schoolClass.id === classFilter,
     );
     const matchingAssignmentIds = new Set<string>();
 
@@ -1063,7 +1068,10 @@ export default async function AusgabenPage({
 
           <AssignmentFilterForm
             classFilter={classFilter}
-            classOptions={classOptions.map((schoolClass) => schoolClass.label)}
+            classOptions={classOptions.map((schoolClass) => ({
+              id: schoolClass.id,
+              label: `${schoolClass.label} · ${normalizeJoined(schoolClass.school_year)?.label ?? "Schuljahr unbekannt"}`,
+            }))}
             hasActiveFilters={hasActiveFilters}
             key={`${query}:${status}:${classFilter}:${issuedTo}:${returnedFrom}:${sort}`}
             query={query}

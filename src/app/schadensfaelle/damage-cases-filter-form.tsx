@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { searchOnEnter } from "../list-search";
 import { useListTransition } from "../list-navigation";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -44,7 +45,7 @@ export function DamageCasesFilterForm({
     }) => {
       const params = new URLSearchParams();
       const nextDamage = nextValues.damage ?? damage;
-      const nextQuery = nextValues.q ?? search;
+      const nextQuery = nextValues.q ?? query;
       const nextStatus = nextValues.status ?? status;
       const nextType = nextValues.type ?? type;
       const nextBilling = nextValues.billing ?? billing;
@@ -71,7 +72,7 @@ export function DamageCasesFilterForm({
 
       return params;
     },
-    [billing, damage, search, status, type],
+    [billing, damage, query, status, type],
   );
 
   const updateUrl = useCallback(
@@ -96,7 +97,7 @@ export function DamageCasesFilterForm({
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    updateUrl({ damage, q: search });
+    updateUrl({ damage });
   }
 
   function handleInputChange(event: ChangeEvent<HTMLInputElement>) {
@@ -114,13 +115,13 @@ export function DamageCasesFilterForm({
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
-      if (damage !== damageNumber || search !== query) {
-        updateUrl({ damage, q: search });
+      if (damage !== damageNumber) {
+        updateUrl({ damage });
       }
     }, 350);
 
     return () => window.clearTimeout(timeout);
-  }, [damage, damageNumber, query, search, updateUrl]);
+  }, [damage, damageNumber, updateUrl]);
 
   return (
     <form
@@ -132,6 +133,7 @@ export function DamageCasesFilterForm({
         <input
           className="rounded-md border border-zinc-300 px-3 py-2 font-normal outline-none ring-emerald-500 transition focus:ring-2"
           name="q"
+          onKeyDown={searchOnEnter((q) => updateUrl({ q }))}
           onChange={handleInputChange}
           placeholder="Beschreibung, Person, Set oder Inventar"
           type="search"

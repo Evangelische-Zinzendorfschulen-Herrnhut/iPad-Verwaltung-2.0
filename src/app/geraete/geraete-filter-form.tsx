@@ -1,13 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { useListTransition } from "../list-navigation";
 import { usePathname, useRouter } from "next/navigation";
 import {
   ChangeEvent,
   useCallback,
   useEffect,
   useState,
-  useTransition,
 } from "react";
 
 type GeraeteFilterFormProps = {
@@ -31,7 +31,7 @@ export function GeraeteFilterForm({
 }: GeraeteFilterFormProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
+  const [isPending, startTransition] = useListTransition();
   const [search, setSearch] = useState(query);
   const [setNumber, setSetNumber] = useState(setFilter);
 
@@ -85,6 +85,7 @@ export function GeraeteFilterForm({
       });
     },
     [
+      startTransition,
       assignment,
       category,
       condition,

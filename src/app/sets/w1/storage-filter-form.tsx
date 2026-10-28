@@ -1,13 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { useListTransition } from "../../list-navigation";
 import { usePathname, useRouter } from "next/navigation";
 import {
   ChangeEvent,
   useCallback,
   useEffect,
   useState,
-  useTransition,
 } from "react";
 
 type StorageFilterOption = {
@@ -32,7 +32,7 @@ export function StorageFilterForm({
 }: StorageFilterFormProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
+  const [isPending, startTransition] = useListTransition();
   const [search, setSearch] = useState(query);
 
   const updateUrl = useCallback(
@@ -62,7 +62,7 @@ export function StorageFilterForm({
         router.push(target);
       });
     },
-    [pathname, router, search, selectedIpadStorage, selectedStorage],
+    [startTransition, pathname, router, search, selectedIpadStorage, selectedStorage],
   );
 
   function handleStorageChange(event: ChangeEvent<HTMLSelectElement>) {

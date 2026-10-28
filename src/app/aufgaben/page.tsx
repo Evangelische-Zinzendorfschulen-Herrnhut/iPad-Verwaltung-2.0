@@ -942,6 +942,7 @@ export default async function TasksPage({
           </section>
 
           <TasksFilterForm
+            key={JSON.stringify(await searchParams)}
             hasActiveFilters={hasActiveFilters}
             priority={priority}
             query={query}

@@ -1,5 +1,6 @@
 "use client";
 
+import { useListTransition } from "../list-navigation";
 import { usePathname, useRouter } from "next/navigation";
 import {
   ChangeEvent,
@@ -7,7 +8,6 @@ import {
   useCallback,
   useEffect,
   useState,
-  useTransition,
 } from "react";
 
 type AssignmentFilterFormProps = {
@@ -33,7 +33,7 @@ export function AssignmentFilterForm({
 }: AssignmentFilterFormProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
+  const [isPending, startTransition] = useListTransition();
   const [search, setSearch] = useState(query);
 
   const buildSearchParams = useCallback(
@@ -99,7 +99,7 @@ export function AssignmentFilterForm({
         router.push(target);
       });
     },
-    [buildSearchParams, pathname, router],
+    [startTransition, buildSearchParams, pathname, router],
   );
   const exportParams = buildSearchParams({});
   const exportHref = exportParams.toString()

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { ListNavigationProvider } from "./list-navigation";
 
 export const metadata: Metadata = {
   title: "iPad-Verwaltung",
@@ -14,7 +15,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="de" className="h-full antialiased">
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col"><ListNavigationProvider>{children}</ListNavigationProvider></body>
     </html>
   );
 }

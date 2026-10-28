@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useListTransition } from "../list-navigation";
 import { usePathname, useRouter } from "next/navigation";
 import {
   ChangeEvent,
@@ -8,7 +9,6 @@ import {
   useCallback,
   useEffect,
   useState,
-  useTransition,
 } from "react";
 
 type SetsFilterFormProps = {
@@ -36,7 +36,7 @@ export function SetsFilterForm({
 }: SetsFilterFormProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
+  const [isPending, startTransition] = useListTransition();
   const [search, setSearch] = useState(query);
   const [setIdSearch, setSetIdSearch] = useState(setIdQuery);
 
@@ -90,6 +90,7 @@ export function SetsFilterForm({
       });
     },
     [
+      startTransition,
       availability,
       classFilter,
       condition,

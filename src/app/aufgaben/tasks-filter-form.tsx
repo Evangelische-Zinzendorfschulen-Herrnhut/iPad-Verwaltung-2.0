@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useListTransition } from "../list-navigation";
 import { usePathname, useRouter } from "next/navigation";
 import {
   ChangeEvent,
@@ -8,7 +9,6 @@ import {
   useCallback,
   useEffect,
   useState,
-  useTransition,
 } from "react";
 
 type TasksFilterFormProps = {
@@ -28,7 +28,7 @@ export function TasksFilterForm({
 }: TasksFilterFormProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
+  const [isPending, startTransition] = useListTransition();
   const [search, setSearch] = useState(query);
 
   const updateUrl = useCallback(
@@ -68,7 +68,7 @@ export function TasksFilterForm({
         router.push(target);
       });
     },
-    [pathname, priority, router, search, sort, status],
+    [startTransition, pathname, priority, router, search, sort, status],
   );
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {

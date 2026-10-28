@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useListTransition } from "../list-navigation";
 import { usePathname, useRouter } from "next/navigation";
 import {
   ChangeEvent,
@@ -8,7 +9,6 @@ import {
   useCallback,
   useEffect,
   useState,
-  useTransition,
 } from "react";
 
 type DamageCasesFilterFormProps = {
@@ -30,7 +30,7 @@ export function DamageCasesFilterForm({
 }: DamageCasesFilterFormProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
+  const [isPending, startTransition] = useListTransition();
   const [damage, setDamage] = useState(damageNumber);
   const [search, setSearch] = useState(query);
 
@@ -91,7 +91,7 @@ export function DamageCasesFilterForm({
         router.push(target);
       });
     },
-    [buildSearchParams, pathname, router],
+    [startTransition, buildSearchParams, pathname, router],
   );
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
